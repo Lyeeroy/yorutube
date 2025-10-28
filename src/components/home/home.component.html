@@ -1,0 +1,11 @@
+<div class="flex flex-col space-y-12 p-4 sm:p-6">
+  @for (category of categories(); track category.title; let catIndex = $index) {
+    <app-content-category
+      [title]="category.title"
+      [fetchFn$]="category.fetchFn$"
+      [genreMap]="genreMap()"
+      [isPriorityCategory]="catIndex < 2"
+      (mediaClicked)="onMediaClicked($event)">
+    </app-content-category>
+  }
+</div>

@@ -1,0 +1,85 @@
+@if (selectedMediaItem(); as media) {
+  <div class="p-4 sm:p-6 lg:grid lg:grid-cols-12 lg:gap-6 xl:gap-8">
+    <!-- Main Content: Player and Info -->
+    <div class="lg:col-span-8 xl:col-span-9">
+      <div class="relative mb-4 bg-black rounded-lg aspect-[16/9] overflow-hidden">
+        <!-- The actual Iframe Player -->
+        <iframe 
+          class="absolute top-0 left-0 w-full h-full" 
+          [src]="safeConstructedPlayerUrl()"
+          [class.invisible]="loadingTrailer() || !playerUrl()"
+          title="Video player" 
+          frameborder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+          referrerpolicy="strict-origin-when-cross-origin" 
+          allowfullscreen>
+        </iframe>
+        
+        @if (loadingTrailer() || !playerUrl()) {
+          <!-- Loading Facade (Thumbnail and Spinner) -->
+          <div class="w-full h-full absolute inset-0">
+            @if(thumbnailUrl(); as thumb) {
+              <img 
+                [ngSrc]="thumb" 
+                [alt]="media.media_type === 'movie' ? media.title : media.name" 
+                class="w-full h-full object-cover" 
+                width="1280" 
+                height="720" 
+                priority>
+            }
+            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+            
+            @if (loadingTrailer()) {
+              <!-- Loading Spinner -->
+              <div class="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"></div>
+              </div>
+            } @else if (selectedPlayer() === 'YouTube' && !playerUrl()) {
+              <!-- No Trailer Available Message -->
+              <div class="absolute inset-0 flex items-center justify-center bg-zinc-900/80">
+                <div class="text-center p-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5-4.22 2.53m-4.22-2.53l4.22 2.53m0 0l4.22 2.53m-4.22-2.53V6.75a2.25 2.25 0 012.25-2.25h.036a2.25 2.25 0 012.25 2.25v6.75m-4.22 2.53l-4.22-2.53m0 0l-4.22-2.53m16.88 10.14l-4.22-2.53m0 0l-4.22-2.53m4.22 2.53l4.22 2.53M4.5 19.5v-6.75a2.25 2.25 0 012.25-2.25h.036a2.25 2.25 0 012.25 2.25v6.75m0 0l4.22 2.53m-4.22-2.53l-4.22-2.53" />
+                  </svg>
+                  <p class="text-zinc-400 mt-4">No YouTube trailer available.</p>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+      <div>
+        <app-video-info 
+          [media]="media"
+          [genreMap]="genreMap()"
+          [currentEpisode]="currentEpisode()"
+          [videoDetails]="videoDetails()"
+          (episodeSelected)="onEpisodeSelected($event)"
+          (refreshPlayer)="onRefreshPlayer()">
+        </app-video-info>
+      </div>
+    </div>
+
+    <!-- Sidebar: Playlist or Related Videos -->
+    <div class="lg:col-span-4 xl:col-span-3 mt-8 lg:mt-0">
+      @if (playlist(); as pl) {
+        <div class="mb-8">
+          <app-video-player-playlist 
+            [playlist]="pl"
+            [currentMediaId]="media.id"
+            (selectMedia)="onSelectMedia($event)"
+          />
+        </div>
+      }
+      <app-related-videos 
+          [currentMedia]="media"
+          [genreMap]="genreMap()"
+          (selectMedia)="onSelectMedia($event)">
+      </app-related-videos>
+    </div>
+  </div>
+} @else {
+    <div class="flex justify-center items-center h-96">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"></div>
+    </div>
+}

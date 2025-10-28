@@ -1,0 +1,73 @@
+<div class="h-screen w-full flex flex-col bg-zinc-900 text-white font-sans" [class.overflow-hidden]="isSidebarOpen() || showLoginModal()">
+  <app-header (hamburgerClick)="toggleSidebar()" (signInClicked)="showLoginModal.set(true)"></app-header>
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <div class="md:shrink-0 md:transition-[width] md:duration-200 ease-in-out"
+         [class.md:w-64]="!isSidebarMini()"
+         [class.md:w-20]="isSidebarMini()">
+      <app-sidebar 
+        [isMini]="isSidebarMini()"
+        [subscriptions]="subscriptions()"
+        (closeSidebar)="closeSidebar()"
+        class="fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 w-64 md:w-full"
+        [class]="isSidebarOpen() ? 'translate-x-0' : '-translate-x-full'">
+      </app-sidebar>
+    </div>
+
+    <!-- Backdrop for mobile -->
+    @if (isSidebarOpen()) {
+      <div (click)="closeSidebar()" class="fixed inset-0 bg-black/60 z-20 md:hidden"></div>
+    }
+
+    <!-- Main Content -->
+    <main #mainContent class="flex-1 overflow-y-auto">
+      @switch (navigationState().view) {
+        @case ('home') {
+          <app-home />
+        }
+        @case ('watch') {
+          <app-video-player [params]="navigationState().params" />
+        }
+        @case ('search') {
+          <app-search-results [params]="navigationState().params" />
+        }
+        @case ('discover') {
+          <app-discover />
+        }
+        @case ('calendar') {
+          <app-calendar />
+        }
+        @case ('channels') {
+          <app-channels />
+        }
+        @case ('channel') {
+          <app-channel-detail [params]="navigationState().params" />
+        }
+        @case ('history') {
+          <app-history />
+        }
+        @case ('watchlist') {
+          <app-watchlist />
+        }
+        @case ('subscriptions') {
+          <app-subscriptions />
+        }
+        @case ('collections') {
+          <app-collections />
+        }
+        @case ('collection-detail') {
+          <app-collection-detail [params]="navigationState().params" />
+        }
+        @case ('playlists') {
+          <app-playlists />
+        }
+        @case ('playlist-detail') {
+          <app-playlist-detail [params]="navigationState().params" />
+        }
+      }
+    </main>
+  </div>
+</div>
+@if (showLoginModal()) {
+  <app-login-modal (close)="showLoginModal.set(false)"></app-login-modal>
+}

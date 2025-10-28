@@ -1,0 +1,184 @@
+<div class="flex flex-col space-y-6 p-4 sm:p-6">
+  <h1 class="text-3xl font-bold text-white">Discover Channels</h1>
+
+  <!-- Tabs -->
+  <div class="flex items-center space-x-2 border-b border-zinc-800 pb-2 overflow-x-auto">
+    <button
+      (click)="activeTab.set('networks')"
+      class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+      [class.bg-white]="activeTab() === 'networks'"
+      [class.text-black]="activeTab() === 'networks'"
+      [class.bg-zinc-800]="activeTab() !== 'networks'"
+      [class.text-white]="activeTab() !== 'networks'"
+      [class.hover:bg-zinc-700]="activeTab() !== 'networks'">
+      TV Networks
+    </button>
+    <button
+      (click)="activeTab.set('movieStudios')"
+      class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+      [class.bg-white]="activeTab() === 'movieStudios'"
+      [class.text-black]="activeTab() === 'movieStudios'"
+      [class.bg-zinc-800]="activeTab() !== 'movieStudios'"
+      [class.text-white]="activeTab() !== 'movieStudios'"
+      [class.hover:bg-zinc-700]="activeTab() !== 'movieStudios'">
+      Movie Studios
+    </button>
+    <button
+      (click)="activeTab.set('animeStudios')"
+      class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+      [class.bg-white]="activeTab() === 'animeStudios'"
+      [class.text-black]="activeTab() === 'animeStudios'"
+      [class.bg-zinc-800]="activeTab() !== 'animeStudios'"
+      [class.text-white]="activeTab() !== 'animeStudios'"
+      [class.hover:bg-zinc-700]="activeTab() !== 'animeStudios'">
+      Anime Studios
+    </button>
+  </div>
+
+  <!-- Content -->
+  <div class="mt-4">
+    @switch (activeTab()) {
+      @case ('networks') {
+        @if (loading().networks) {
+          <!-- Skeleton loader -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+            @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
+              <div class="animate-pulse flex flex-col items-center gap-4">
+                  <div class="w-32 h-32 rounded-full bg-zinc-800"></div>
+                  <div class="h-4 bg-zinc-800 rounded w-3/4"></div>
+                  <div class="h-10 bg-zinc-800 rounded-full w-full"></div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="flex flex-col space-y-8">
+            @if (networks().popular.length > 0) {
+              <div>
+                <h2 class="text-2xl font-bold text-white mb-4">Popular Networks</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+                  @for (network of networks().popular; track network.id) {
+                    <app-channel-card
+                      [channel]="network"
+                      [isSubscribed]="isSubscribed(network.id)"
+                      (subscribeClicked)="toggleSubscription(network, 'network')"
+                      (cardClicked)="onChannelSelected(network, 'network')"
+                    ></app-channel-card>
+                  }
+                </div>
+              </div>
+            }
+            @if (networks().other.length > 0) {
+              <div>
+                <h2 class="text-2xl font-bold text-white mb-4">All Networks</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+                  @for (network of networks().other; track network.id) {
+                    <app-channel-card
+                      [channel]="network"
+                      [isSubscribed]="isSubscribed(network.id)"
+                      (subscribeClicked)="toggleSubscription(network, 'network')"
+                      (cardClicked)="onChannelSelected(network, 'network')"
+                    ></app-channel-card>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+      @case ('movieStudios') {
+        @if (loading().movieStudios) {
+          <!-- Skeleton loader -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+            @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
+              <div class="animate-pulse flex flex-col items-center gap-4">
+                  <div class="w-32 h-32 rounded-full bg-zinc-800"></div>
+                  <div class="h-4 bg-zinc-800 rounded w-3/4"></div>
+                  <div class="h-10 bg-zinc-800 rounded-full w-full"></div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="flex flex-col space-y-8">
+            @if (movieStudios().popular.length > 0) {
+              <div>
+                <h2 class="text-2xl font-bold text-white mb-4">Popular Movie Studios</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+                  @for (studio of movieStudios().popular; track studio.id) {
+                    <app-channel-card
+                      [channel]="studio"
+                      [isSubscribed]="isSubscribed(studio.id)"
+                      (subscribeClicked)="toggleSubscription(studio, 'company')"
+                      (cardClicked)="onChannelSelected(studio, 'company')"
+                    ></app-channel-card>
+                  }
+                </div>
+              </div>
+            }
+            @if (movieStudios().other.length > 0) {
+              <div>
+                <h2 class="text-2xl font-bold text-white mb-4">All Movie Studios</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+                  @for (studio of movieStudios().other; track studio.id) {
+                    <app-channel-card
+                      [channel]="studio"
+                      [isSubscribed]="isSubscribed(studio.id)"
+                      (subscribeClicked)="toggleSubscription(studio, 'company')"
+                      (cardClicked)="onChannelSelected(studio, 'company')"
+                    ></app-channel-card>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+      @case ('animeStudios') {
+        @if (loading().animeStudios) {
+          <!-- Skeleton loader -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+            @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
+              <div class="animate-pulse flex flex-col items-center gap-4">
+                  <div class="w-32 h-32 rounded-full bg-zinc-800"></div>
+                  <div class="h-4 bg-zinc-800 rounded w-3/4"></div>
+                  <div class="h-10 bg-zinc-800 rounded-full w-full"></div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="flex flex-col space-y-8">
+            @if (animeStudios().popular.length > 0) {
+              <div>
+                <h2 class="text-2xl font-bold text-white mb-4">Popular Anime Studios</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+                  @for (studio of animeStudios().popular; track studio.id) {
+                    <app-channel-card
+                      [channel]="studio"
+                      [isSubscribed]="isSubscribed(studio.id)"
+                      (subscribeClicked)="toggleSubscription(studio, 'company')"
+                      (cardClicked)="onChannelSelected(studio, 'company')"
+                    ></app-channel-card>
+                  }
+                </div>
+              </div>
+            }
+            @if (animeStudios().other.length > 0) {
+              <div>
+                <h2 class="text-2xl font-bold text-white mb-4">All Anime Studios</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+                  @for (studio of animeStudios().other; track studio.id) {
+                    <app-channel-card
+                      [channel]="studio"
+                      [isSubscribed]="isSubscribed(studio.id)"
+                      (subscribeClicked)="toggleSubscription(studio, 'company')"
+                      (cardClicked)="onChannelSelected(studio, 'company')"
+                    ></app-channel-card>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+</div>

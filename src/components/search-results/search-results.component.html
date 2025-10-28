@@ -1,0 +1,112 @@
+<div class="p-4 sm:p-6">
+@if (loading()) {
+  <!-- Skeleton loader for initial search -->
+  <div class="flex flex-col divide-y divide-zinc-800">
+    @for (item of [1,2,3,4,5]; track item) {
+      <div class="animate-pulse flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6 py-6">
+        <div class="sm:w-2/5 md:w-1/3 lg:w-1/4 xl:w-1/5 shrink-0">
+          <div class="bg-zinc-800 rounded-lg aspect-video"></div>
+        </div>
+        <div class="sm:w-3/5 md:w-2/3 lg:w-3/4 xl:w-4/5 flex-1 space-y-3">
+          <div class="h-5 bg-zinc-800 rounded w-3/4"></div>
+          <div class="h-4 bg-zinc-800 rounded w-1/2"></div>
+          <div class="h-4 bg-zinc-800 rounded w-full mt-4"></div>
+          <div class="h-4 bg-zinc-800 rounded w-5/6"></div>
+        </div>
+      </div>
+    }
+  </div>
+} @else {
+  <!-- Filter and Sort Controls -->
+  <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 border-b border-zinc-800 pb-4">
+    <div class="flex items-center space-x-2 self-start sm:self-center overflow-x-auto">
+      <button 
+        (click)="activeFilter.set('all')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeFilter() === 'all'"
+        [class.text-black]="activeFilter() === 'all'"
+        [class.bg-zinc-800]="activeFilter() !== 'all'"
+        [class.text-white]="activeFilter() !== 'all'"
+        [class.hover:bg-zinc-700]="activeFilter() !== 'all'">
+          All
+      </button>
+      <button 
+        (click)="activeFilter.set('movie')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeFilter() === 'movie'"
+        [class.text-black]="activeFilter() === 'movie'"
+        [class.bg-zinc-800]="activeFilter() !== 'movie'"
+        [class.text-white]="activeFilter() !== 'movie'"
+        [class.hover:bg-zinc-700]="activeFilter() !== 'movie'">
+          Movies
+      </button>
+       <button 
+        (click)="activeFilter.set('tv')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeFilter() === 'tv'"
+        [class.text-black]="activeFilter() === 'tv'"
+        [class.bg-zinc-800]="activeFilter() !== 'tv'"
+        [class.text-white]="activeFilter() !== 'tv'"
+        [class.hover:bg-zinc-700]="activeFilter() !== 'tv'">
+          TV Shows
+      </button>
+      <button 
+        (click)="activeFilter.set('channel')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeFilter() === 'channel'"
+        [class.text-black]="activeFilter() === 'channel'"
+        [class.bg-zinc-800]="activeFilter() !== 'channel'"
+        [class.text-white]="activeFilter() !== 'channel'"
+        [class.hover:bg-zinc-700]="activeFilter() !== 'channel'">
+          Channels
+      </button>
+    </div>
+    
+    <div class="self-end sm:self-center">
+      <select 
+        [value]="sortBy()"
+        (change)="onSortChange($event)"
+        class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm">
+        <option value="relevance">Relevance</option>
+        <option value="newest">Newest</option>
+        <option value="rating">Top Rated</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="flex flex-col divide-y divide-zinc-800">
+    @for (result of filteredAndSortedResults(); track (isMedia(result) ? 'media_' + result.id : 'channel_' + result.id); let i = $index) {
+      <div class="py-3">
+        @if (isMedia(result)) {
+          <app-search-result-card 
+            [media]="result" 
+            [genreMap]="genreMap()"
+            [isPriority]="i < 2"
+            (mediaClicked)="onMediaClicked(result)" />
+        } @else if (isChannel(result)) {
+          <app-search-result-channel-card
+            [channel]="result"
+            (cardClicked)="onChannelResultClicked(result)"
+            (subscribeClicked)="toggleSubscription(result)">
+          </app-search-result-channel-card>
+        }
+      </div>
+    } @empty {
+      <div class="text-center py-16">
+        <h2 class="text-2xl font-semibold text-zinc-400">No results found</h2>
+        <p class="text-zinc-500 mt-2">Try a different search or change your filters.</p>
+      </div>
+    }
+  </div>
+
+  @if (loadingMore()) {
+    <div class="flex justify-center py-8">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+    </div>
+  }
+
+  @if (hasMore() && !loadingMore() && activeFilter() === 'all' && sortBy() === 'relevance') {
+    <app-infinite-scroll-trigger (intersect)="loadMore()"></app-infinite-scroll-trigger>
+  }
+}
+</div>

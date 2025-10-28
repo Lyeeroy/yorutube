@@ -1,0 +1,20 @@
+<div class="bg-zinc-800 rounded-xl border border-zinc-700">
+  <div class="p-4 border-b border-zinc-700">
+    <h2 class="text-lg font-bold text-white truncate">{{ playlist().name }}</h2>
+    <p class="text-sm text-zinc-400">Playlist • {{ currentIndex() + 1 }} / {{ playlist().items.length }}</p>
+  </div>
+  <div class="max-h-96 overflow-y-auto">
+    @for(item of playlist().items; track item.id; let i = $index) {
+      <div 
+        (click)="selectMedia.emit(item)"
+        class="flex items-center p-2 hover:bg-zinc-700 cursor-pointer"
+        [class.bg-zinc-700/50]="item.id === currentMediaId()">
+        <span class="text-zinc-400 w-8 text-center shrink-0">{{ i + 1 }}</span>
+        <img [ngSrc]="item.poster_path ? 'https://image.tmdb.org/t/p/w300' + item.poster_path : 'https://picsum.photos/seed/' + item.id + '/90/135'" alt="Thumbnail" class="w-12 h-auto rounded-md mx-2 shrink-0" width="90" height="135">
+        <div class="flex-grow min-w-0">
+          <p class="font-semibold text-xs text-white truncate" [class.text-red-400]="item.id === currentMediaId()">{{ getMediaTitle(item) }}</p>
+        </div>
+      </div>
+    }
+  </div>
+</div>

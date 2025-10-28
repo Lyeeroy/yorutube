@@ -1,0 +1,52 @@
+@if (loading()) {
+  <div class="flex justify-center items-center h-96">
+    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"></div>
+  </div>
+} @else if (collection(); as collection) {
+  <div class="flex flex-col">
+    <!-- Header with backdrop -->
+    <div class="relative w-full h-64 sm:h-80 md:h-96 overflow-hidden">
+      @if (backdropUrl()) {
+        <img [ngSrc]="backdropUrl()!" [alt]="collection.name + ' backdrop'" fill priority class="object-cover object-top">
+      }
+      <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/70 to-transparent"></div>
+      <div class="absolute inset-0 bg-gradient-to-r from-zinc-900 via-zinc-900/50 to-transparent"></div>
+    </div>
+
+    <!-- Info Section -->
+    <div class="flex flex-col md:flex-row gap-8 -mt-24 md:-mt-32 px-4 md:px-8 relative z-10">
+      <div class="w-48 md:w-56 shrink-0 mx-auto md:mx-0">
+        <img [ngSrc]="posterUrl()" [alt]="collection.name + ' poster'" width="500" height="750" class="rounded-lg shadow-2xl" [priority]="!backdropUrl()">
+      </div>
+      <div class="flex-grow pt-4 text-center md:text-left">
+        <h2 class="text-zinc-300 text-lg font-semibold">Collection</h2>
+        <h1 class="text-3xl md:text-5xl font-bold text-white mt-1">{{ collection.name }}</h1>
+        @if (collection.overview) {
+          <p class="text-zinc-300 mt-4 text-sm leading-relaxed max-w-3xl">{{ collection.overview }}</p>
+        }
+        <button (click)="createPlaylistFromCollection()" class="mt-4 bg-white text-black font-semibold py-2 px-4 rounded-full flex items-center justify-center space-x-2 hover:bg-zinc-200 transition-colors w-full sm:w-auto mx-auto md:mx-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <span>Create Playlist</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Movies Grid -->
+    <div class="mt-12 px-4 sm:px-6">
+      <h2 class="text-2xl font-bold text-white mb-6">Movies in this collection</h2>
+      <app-video-grid 
+        [mediaItems]="sortedMovies()"
+        [loading]="false"
+        [genreMap]="genreMap()"
+        [prioritizeFirstItems]="true"
+        (mediaClicked)="onMediaClicked($event)" />
+    </div>
+  </div>
+} @else {
+  <div class="text-center py-16">
+    <h2 class="text-2xl font-semibold text-zinc-400">Collection not found</h2>
+    <p class="text-zinc-500 mt-2">We couldn't find the collection you were looking for.</p>
+  </div>
+}

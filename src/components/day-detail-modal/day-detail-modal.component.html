@@ -1,0 +1,34 @@
+<div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" (click)="close.emit()">
+  <div class="bg-zinc-800 rounded-lg shadow-xl w-full max-w-lg border border-zinc-700 flex flex-col" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between p-4 border-b border-zinc-700">
+      <h3 class="text-lg font-semibold text-white">{{ day().date | date:'fullDate' }}</h3>
+      <button (click)="close.emit()" class="text-zinc-400 hover:text-white p-1 rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <div class="p-4 max-h-[70vh] overflow-y-auto">
+      <div class="flex flex-col space-y-3">
+        @for (release of day().releases; track release.id) {
+          <div (click)="mediaClicked.emit(release)" class="flex items-center p-2 rounded-lg hover:bg-zinc-700 cursor-pointer transition-colors group">
+            <img 
+              [ngSrc]="release.poster_path ? 'https://image.tmdb.org/t/p/w300' + release.poster_path : 'https://picsum.photos/seed/' + release.id + '/300/450'" 
+              [alt]="release.media_type === 'movie' ? release.title : release.name"
+              width="300" 
+              height="450"
+              class="w-12 h-auto rounded shrink-0 object-cover aspect-[2/3]">
+            <div class="ml-4 min-w-0">
+              <p class="font-semibold text-white truncate group-hover:text-red-500">{{ release.media_type === 'movie' ? release.title : release.name }}</p>
+              <div class="flex items-center space-x-2 text-sm text-zinc-400 mt-1">
+                <div class="w-2.5 h-2.5 rounded-full shrink-0" 
+                    [class.bg-purple-500]="release.genre_ids.includes(16)"
+                    [class.bg-red-500]="!release.genre_ids.includes(16) && release.media_type === 'movie'"
+                    [class.bg-blue-500]="!release.genre_ids.includes(16) && release.media_type === 'tv'"></div>
+                <span>{{ release.genre_ids.includes(16) ? 'Anime' : (release.media_type === 'movie' ? 'Movie' : 'TV Show') }}</span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

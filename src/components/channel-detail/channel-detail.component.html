@@ -1,0 +1,290 @@
+
+@if(loadingChannel()) {
+  <div class="flex justify-center items-center h-96">
+    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"></div>
+  </div>
+} @else if(channelDetails(); as channel) {
+  <div class="flex flex-col">
+    <!-- Channel Header -->
+    <div class="relative w-full h-48 sm:h-56 md:h-64 bg-zinc-800">
+      @if (bannerUrl()) {
+        <img [ngSrc]="bannerUrl()!" [alt]="channel.name + ' banner'" fill priority class="object-cover object-center">
+      }
+      <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent"></div>
+    </div>
+    
+    <div class="px-4 sm:px-6 -mt-10 sm:-mt-20 z-10 relative">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div class="flex flex-col sm:flex-row items-center gap-4">
+          <div class="relative h-20 w-20 sm:h-32 sm:w-32 bg-zinc-900 border-4 border-zinc-900 rounded-full flex items-center justify-center shrink-0">
+            @if (logoUrl()) {
+              <img [ngSrc]="logoUrl()!" [alt]="channel.name + ' Logo'" fill class="p-2 object-contain">
+            } @else {
+              <svg class="w-12 h-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+            }
+          </div>
+          <div class="text-center sm:text-left pt-2 sm:pb-2">
+            <h1 class="text-2xl sm:text-3xl font-bold text-white">{{ channel.name }}</h1>
+            <div class="text-sm text-zinc-400 flex items-center justify-center sm:justify-start space-x-2 mt-1">
+              <span>@yorutube</span>
+              <span>•</span>
+              <span>{{ channel.origin_country }}</span>
+            </div>
+          </div>
+        </div>
+        <button
+          (click)="toggleSubscription()"
+          class="w-full sm:w-auto text-sm font-bold py-2 px-6 rounded-full transition-colors shrink-0"
+          [class.bg-white]="!isSubscribed()"
+          [class.text-black]="!isSubscribed()"
+          [class.hover:bg-zinc-200]="!isSubscribed()"
+          [class.bg-zinc-600]="isSubscribed()"
+          [class.hover:bg-zinc-500]="isSubscribed()"
+          [class.text-white]="isSubscribed()">
+          {{ isSubscribed() ? 'Subscribed' : 'Subscribe' }}
+        </button>
+      </div>
+
+      @if (channelDescription(); as description) {
+        <div class="mt-4 text-sm text-zinc-300 max-w-3xl cursor-pointer" (click)="descriptionExpanded.set(!descriptionExpanded())">
+          <p [class.line-clamp-2]="!descriptionExpanded()">{{ description }}</p>
+          <button class="font-semibold text-zinc-400 hover:text-white mt-1">
+            {{ descriptionExpanded() ? 'Show less' : '...more' }}
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- Tabs -->
+    <div class="mt-8 border-b border-zinc-700 flex space-x-4 sm:space-x-6 px-4 sm:px-6">
+      <button (click)="onTabClick('home')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors"
+        [class.text-white]="activeTab() === 'home'"
+        [class.border-b-2]="activeTab() === 'home'"
+        [class.border-white]="activeTab() === 'home'"
+        [class.text-zinc-400]="activeTab() !== 'home'"
+        [class.hover:text-white]="activeTab() !== 'home'">
+        Home
+      </button>
+      <button (click)="onTabClick('videos')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors"
+        [class.text-white]="activeTab() === 'videos'"
+        [class.border-b-2]="activeTab() === 'videos'"
+        [class.border-white]="activeTab() === 'videos'"
+        [class.text-zinc-400]="activeTab() !== 'videos'"
+        [class.hover:text-white]="activeTab() !== 'videos'">
+        Videos
+      </button>
+      <button (click)="onTabClick('about')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors"
+        [class.text-white]="activeTab() === 'about'"
+        [class.border-b-2]="activeTab() === 'about'"
+        [class.border-white]="activeTab() === 'about'"
+        [class.text-zinc-400]="activeTab() !== 'about'"
+        [class.hover:text-white]="activeTab() !== 'about'">
+        About
+      </button>
+    </div>
+
+    <!-- Channel Content -->
+    <div class="mt-6 px-4 sm:px-6">
+      @switch (activeTab()) {
+        @case ('home') {
+          <div class="flex flex-col space-y-12">
+            @if (!loadingHome()) {
+              @if (popularMedia().length > 0) {
+                <app-content-category
+                  title="Popular"
+                  [fetchFn$]="popularMedia$()"
+                  [genreMap]="genreMap()"
+                  [isPriorityCategory]="true"
+                  (mediaClicked)="onMediaClicked($event)">
+                </app-content-category>
+              }
+              @if (latestMedia().length > 0) {
+                <app-content-category
+                  title="Latest Releases"
+                  [fetchFn$]="latestMedia$()"
+                  [genreMap]="genreMap()"
+                  [isPriorityCategory]="popularMedia().length === 0"
+                  (mediaClicked)="onMediaClicked($event)">
+                </app-content-category>
+              }
+            } @else {
+              <!-- Skeleton for home tab -->
+               <div class="flex flex-col space-y-12">
+                  <div>
+                    <div class="h-8 bg-zinc-800 rounded w-1/4 mb-4"></div>
+                    <div class="flex space-x-4 sm:space-x-6 overflow-hidden">
+                      @for (item of [1,2,3,4,5,6]; track item) {
+                        <div class="animate-pulse w-5/6 sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 shrink-0">
+                          <div class="bg-zinc-800 rounded-xl aspect-video"></div>
+                          <div class="flex items-start space-x-3 mt-3">
+                            <div class="h-9 w-9 rounded-full bg-zinc-800 shrink-0"></div>
+                            <div class="min-w-0 flex-1 space-y-2">
+                              <div class="h-4 bg-zinc-800 rounded w-full"></div>
+                              <div class="h-3 bg-zinc-800 rounded w-3/4"></div>
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+               </div>
+            }
+          </div>
+        }
+        @case ('videos') {
+          <div>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+              @if (channelType() === 'merged') {
+                <div class="flex items-center space-x-2 self-start overflow-x-auto pb-2">
+                  <button 
+                    (click)="contentFilter.set('all')"
+                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+                    [class.bg-white]="contentFilter() === 'all'"
+                    [class.text-black]="contentFilter() === 'all'"
+                    [class.bg-zinc-800]="contentFilter() !== 'all'"
+                    [class.text-white]="contentFilter() !== 'all'"
+                    [class.hover:bg-zinc-700]="contentFilter() !== 'all'">
+                      All
+                  </button>
+                  <button 
+                    (click)="contentFilter.set('movie')"
+                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+                    [class.bg-white]="contentFilter() === 'movie'"
+                    [class.text-black]="contentFilter() === 'movie'"
+                    [class.bg-zinc-800]="contentFilter() !== 'movie'"
+                    [class.text-white]="contentFilter() !== 'movie'"
+                    [class.hover:bg-zinc-700]="contentFilter() !== 'movie'">
+                      Movies
+                  </button>
+                   <button 
+                    (click)="contentFilter.set('tv')"
+                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+                    [class.bg-white]="contentFilter() === 'tv'"
+                    [class.text-black]="contentFilter() === 'tv'"
+                    [class.bg-zinc-800]="contentFilter() !== 'tv'"
+                    [class.text-white]="contentFilter() !== 'tv'"
+                    [class.hover:bg-zinc-700]="contentFilter() !== 'tv'">
+                      TV Shows
+                  </button>
+                </div>
+              }
+              <div class="w-full md:w-auto flex flex-wrap gap-2" [class.md:ml-auto]="channelType() !== 'merged'">
+                  <select 
+                      [value]="sortBy()"
+                      (change)="onSortChange($event)"
+                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      @for(option of sortOptions(); track option.value) {
+                        <option [value]="option.value">{{ option.label }}</option>
+                      }
+                  </select>
+                  <select 
+                      [value]="selectedGenre() || ''"
+                      (change)="onGenreChange($event)"
+                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      <option value="">Any Genre</option>
+                      @for(genre of availableGenres(); track genre.id) {
+                        <option [value]="genre.id">{{ genre.name }}</option>
+                      }
+                  </select>
+                  <select 
+                      [value]="selectedYear() || ''"
+                      (change)="onYearChange($event)"
+                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      <option value="">Any Year</option>
+                      @for(year of years(); track year) {
+                        <option [value]="year">{{ year }}</option>
+                      }
+                  </select>
+                  <select 
+                      [value]="selectedMinRating() || ''"
+                      (change)="onRatingChange($event)"
+                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      <option value="">Any Rating</option>
+                      @for(rating of ratings; track rating) {
+                        <option [value]="rating">{{ rating }}+ Rating</option>
+                      }
+                  </select>
+              </div>
+            </div>
+            <app-video-grid 
+              [mediaItems]="filteredMediaItems()" 
+              [loading]="loadingVideos()"
+              [genreMap]="genreMap()" 
+              [prioritizeFirstItems]="true"
+              (mediaClicked)="onMediaClicked($event)" />
+
+            @if (loadingMore()) {
+              <div class="flex justify-center py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+              </div>
+            }
+
+            @if (hasMore() && !loadingMore()) {
+              <app-infinite-scroll-trigger (intersect)="loadMoreMedia()"></app-infinite-scroll-trigger>
+            }
+          </div>
+        }
+        @case ('about') {
+          <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+            <!-- Left Column: Description -->
+            <div class="md:col-span-2">
+              <h3 class="text-xl font-bold text-white border-b border-zinc-700 pb-2 mb-4">Description</h3>
+              @if (channelDescription(); as description) {
+                <p class="text-zinc-300 whitespace-pre-wrap leading-relaxed">{{ description }}</p>
+              } @else {
+                <p class="text-zinc-500">No description available for this channel.</p>
+              }
+            </div>
+        
+            <!-- Right Column: Details -->
+            <div>
+              <h3 class="text-xl font-bold text-white border-b border-zinc-700 pb-2 mb-4">Details</h3>
+              <div class="flex flex-col space-y-4 text-zinc-300">
+                @if (channel.headquarters) {
+                  <div class="flex items-start space-x-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <div>
+                      <span class="font-semibold text-zinc-400">Headquarters</span>
+                      <p class="text-white">{{ channel.headquarters }}</p>
+                    </div>
+                  </div>
+                }
+                @if (countryName()) {
+                  <div class="flex items-start space-x-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                       <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9V3m0 18a9 9 0 009-9m-9 9a9 9 0 00-9-9" />
+                    </svg>
+                     <div>
+                       <span class="font-semibold text-zinc-400">Country</span>
+                       <p class="text-white">{{ countryName() }}</p>
+                     </div>
+                  </div>
+                }
+                 @if (channel.homepage) {
+                  <div class="flex items-start space-x-3">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                       <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                     </svg>
+                     <div>
+                       <span class="font-semibold text-zinc-400">Website</span>
+                       <a [href]="channel.homepage" target="_blank" rel="noopener noreferrer" class="block text-red-500 hover:underline break-all">{{ channel.homepage }}</a>
+                     </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+} @else {
+  <div class="text-center py-16">
+    <h2 class="text-2xl font-semibold text-zinc-400">Channel not found</h2>
+    <p class="text-zinc-500 mt-2">We couldn't find the channel you were looking for.</p>
+  </div>
+}

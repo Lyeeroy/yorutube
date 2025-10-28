@@ -1,0 +1,32 @@
+@if (loading()) {
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-12 sm:gap-x-6">
+    @for (item of [1,2,3,4,5,6,7,8,9,10]; track item) {
+      <div class="animate-pulse">
+        <div class="bg-zinc-800 rounded-xl aspect-video"></div>
+        <div class="flex items-start space-x-3 pt-4">
+          <div class="h-9 w-9 rounded-full bg-zinc-800 shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="h-4 bg-zinc-800 rounded w-full"></div>
+            <div class="h-4 bg-zinc-800 rounded w-3/4"></div>
+            <div class="h-3 bg-zinc-800 rounded w-1/2 mt-2"></div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+} @else {
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-12 sm:gap-x-6">
+    @for (media of mediaItems(); track media.id; let i = $index) {
+      <app-video-card 
+        [media]="media" 
+        [genreMap]="genreMap()"
+        [isPriority]="prioritizeFirstItems() && i < 5"
+        (mediaClicked)="onMediaClicked(media)" />
+    } @empty {
+      <div class="col-span-full text-center py-16">
+        <h2 class="text-2xl font-semibold text-zinc-400">No results found</h2>
+        <p class="text-zinc-500 mt-2">Try a different search.</p>
+      </div>
+    }
+  </div>
+}

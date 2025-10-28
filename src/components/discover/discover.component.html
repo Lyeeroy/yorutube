@@ -1,0 +1,217 @@
+<div class="flex flex-col space-y-6 p-4 sm:p-6">
+  <div class="flex flex-col space-y-4">
+    <h1 class="text-3xl font-bold text-white">Discover</h1>
+
+    <!-- Media Type Buttons -->
+    <div class="flex items-center space-x-2 border-b border-zinc-800 pb-4">
+      <button
+        (click)="setActiveType('movie')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeType() === 'movie'"
+        [class.text-black]="activeType() === 'movie'"
+        [class.bg-zinc-800]="activeType() !== 'movie'"
+        [class.text-white]="activeType() !== 'movie'"
+        [class.hover:bg-zinc-700]="activeType() !== 'movie'">
+        Movies
+      </button>
+      <button
+        (click)="setActiveType('tv')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeType() === 'tv'"
+        [class.text-black]="activeType() === 'tv'"
+        [class.bg-zinc-800]="activeType() !== 'tv'"
+        [class.text-white]="activeType() !== 'tv'"
+        [class.hover:bg-zinc-700]="activeType() !== 'tv'">
+        TV Shows
+      </button>
+      <button
+        (click)="setActiveType('anime')"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [class.bg-white]="activeType() === 'anime'"
+        [class.text-black]="activeType() === 'anime'"
+        [class.bg-zinc-800]="activeType() !== 'anime'"
+        [class.text-white]="activeType() !== 'anime'"
+        [class.hover:bg-zinc-700]="activeType() !== 'anime'">
+        Anime
+      </button>
+    </div>
+
+    <!-- NEW Filter Bar -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <!-- Sort By Filter -->
+      <div class="relative">
+        <button (click)="toggleDropdown('sort', $event)"
+          class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+          [class.bg-white]="selectedSortBy() !== 'popularity.desc'"
+          [class.text-black]="selectedSortBy() !== 'popularity.desc'"
+          [class.bg-zinc-800]="selectedSortBy() === 'popularity.desc'"
+          [class.text-white]="selectedSortBy() === 'popularity.desc'"
+          [class.hover:bg-zinc-700]="selectedSortBy() === 'popularity.desc'">
+          <span>Sort by: {{ selectedSortByLabel() }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" [class.rotate-180]="activeDropdown() === 'sort'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        @if (activeDropdown() === 'sort') {
+          <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 py-1">
+            <button (click)="selectSort('popularity.desc')" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">Popularity</button>
+            <button (click)="selectSort('vote_average.desc')" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">Top Rated</button>
+            <button (click)="selectSort('release_date.desc')" [disabled]="activeType() === 'anime'" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed">Newest</button>
+          </div>
+        }
+      </div>
+
+      <!-- Genre Filter -->
+      <div class="relative">
+        <button (click)="toggleDropdown('genre', $event)"
+          class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+          [class.bg-white]="selectedGenres().length > 0"
+          [class.text-black]="selectedGenres().length > 0"
+          [class.bg-zinc-800]="selectedGenres().length === 0"
+          [class.text-white]="selectedGenres().length === 0"
+          [class.hover:bg-zinc-700]="selectedGenres().length === 0">
+          <span>Genre @if(selectedGenres().length > 0) {({{ selectedGenres().length }})}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" [class.rotate-180]="activeDropdown() === 'genre'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        @if (activeDropdown() === 'genre') {
+          <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-72 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 flex flex-col">
+            <div class="p-4 max-h-72 overflow-y-auto grid grid-cols-2 gap-2">
+              @for(genre of availableGenres(); track genre.id) {
+                <label class="flex items-center space-x-2 p-1.5 rounded-md hover:bg-zinc-700 cursor-pointer">
+                  <input type="checkbox" [checked]="isSelectedGenre(genre.id)" (change)="toggleGenre(genre.id)" class="w-4 h-4 bg-zinc-900 border-zinc-600 text-red-500 focus:ring-red-500 rounded">
+                  <span class="text-sm">{{ genre.name }}</span>
+                </label>
+              }
+            </div>
+            <div class="flex justify-end items-center gap-2 p-2 border-t border-zinc-700">
+              <button (click)="clearSelectedGenres()" class="text-sm font-semibold py-1.5 px-3 rounded-full hover:bg-zinc-700">Clear</button>
+              <button (click)="applyFilters()" class="text-sm font-semibold py-1.5 px-3 rounded-full bg-white text-black hover:bg-zinc-200">Apply</button>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Year Filter -->
+      <div class="relative">
+        <button (click)="toggleDropdown('year', $event)"
+          class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+          [class.bg-white]="selectedYear() !== null"
+          [class.text-black]="selectedYear() !== null"
+          [class.bg-zinc-800]="selectedYear() === null"
+          [class.text-white]="selectedYear() === null"
+          [class.hover:bg-zinc-700]="selectedYear() === null">
+          <span>Year @if(selectedYear(); as year){: {{ year }}}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" [class.rotate-180]="activeDropdown() === 'year'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        @if (activeDropdown() === 'year') {
+          <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 py-1 max-h-72 overflow-y-auto">
+            <button (click)="selectYear(null)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">All Years</button>
+            @for(year of years(); track year) {
+              <button (click)="selectYear(year)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">{{ year }}</button>
+            }
+          </div>
+        }
+      </div>
+      
+      <!-- Channel Filter (Network/Studio) -->
+      @if (activeType() !== 'movie' || availableStudios()) {
+        <div class="relative">
+          <button (click)="toggleDropdown('channel', $event)"
+            class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+            [class.bg-white]="selectedNetwork() !== null || selectedCompany() !== null"
+            [class.text-black]="selectedNetwork() !== null || selectedCompany() !== null"
+            [class.bg-zinc-800]="selectedNetwork() === null && selectedCompany() === null"
+            [class.text-white]="selectedNetwork() === null && selectedCompany() === null"
+            [class.hover:bg-zinc-700]="selectedNetwork() === null && selectedCompany() === null">
+            @if (activeType() === 'tv') {
+              <span>Network@if(selectedChannelName(); as name){: {{ name }}}</span>
+            } @else {
+              <span>Studio@if(selectedChannelName(); as name){: {{ name }}}</span>
+            }
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" [class.rotate-180]="activeDropdown() === 'channel'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          @if (activeDropdown() === 'channel') {
+            <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-64 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 flex flex-col">
+              <div class="p-2 border-b border-zinc-700 sticky top-0 bg-zinc-800">
+                <input 
+                  type="text"
+                  placeholder="Filter by name..."
+                  [value]="channelSearchQuery()"
+                  (input)="updateChannelSearch($event)"
+                  class="w-full bg-zinc-900 border-zinc-700 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+              </div>
+              <div class="py-1 max-h-64 overflow-y-auto">
+                @if (activeType() === 'tv' || activeType() === 'anime') {
+                  <button (click)="selectNetwork(null)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">All Networks</button>
+                  @if(filteredNetworks(); as networks) {
+                    @if (networks.popular.length > 0) {
+                      <div class="px-4 pt-2 pb-1 text-xs text-zinc-400 font-bold uppercase">Popular</div>
+                      @for (network of networks.popular; track network.id) {
+                        <button (click)="selectNetwork(network.id)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">{{ network.name }}</button>
+                      }
+                    }
+                    @if (networks.other.length > 0) {
+                      <div class="px-4 pt-2 pb-1 text-xs text-zinc-400 font-bold uppercase">Other</div>
+                      @for (network of networks.other; track network.id) {
+                        <button (click)="selectNetwork(network.id)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">{{ network.name }}</button>
+                      }
+                    }
+                  }
+                }
+                @if (activeType() === 'movie' || activeType() === 'anime') {
+                  <button (click)="selectCompany(null)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">All Studios</button>
+                  @if(filteredStudios(); as studios) {
+                     @if (studios.popular.length > 0) {
+                      <div class="px-4 pt-2 pb-1 text-xs text-zinc-400 font-bold uppercase">Popular</div>
+                      @for (company of studios.popular; track company.id) {
+                        <button (click)="selectCompany(company.id)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">{{ company.name }}</button>
+                      }
+                    }
+                    @if (studios.other.length > 0) {
+                      <div class="px-4 pt-2 pb-1 text-xs text-zinc-400 font-bold uppercase">Other</div>
+                      @for (company of studios.other; track company.id) {
+                        <button (click)="selectCompany(company.id)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">{{ company.name }}</button>
+                      }
+                    }
+                  }
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (filtersActive()) {
+        <button (click)="resetAndApplyFilters()" class="px-4 py-2 rounded-full text-sm font-semibold bg-zinc-800 hover:bg-zinc-700">
+          Reset
+        </button>
+      }
+    </div>
+
+  </div>
+
+  <!-- Content Grid -->
+  <app-video-grid 
+    [mediaItems]="mediaItems()" 
+    [loading]="loading()"
+    [genreMap]="genreMap()" 
+    [prioritizeFirstItems]="true"
+    (mediaClicked)="onMediaClicked($event)" />
+
+  @if (loadingMore()) {
+    <div class="flex justify-center py-8">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+    </div>
+  }
+
+  @if (hasMore() && !loadingMore()) {
+    <app-infinite-scroll-trigger (intersect)="loadMoreMedia()"></app-infinite-scroll-trigger>
+  }
+</div>
