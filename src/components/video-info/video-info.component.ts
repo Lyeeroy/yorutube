@@ -1,5 +1,5 @@
-import { Component, ChangeDetectionStrategy, input, computed, signal, inject, effect, output, DestroyRef, HostListener, ElementRef } from '@angular/core';
-import { MediaType, Movie, TvShowDetails, Season, Episode, SeasonDetails, MovieDetails, Network, SubscribableChannel, ProductionCompany, Video, BelongsToCollection } from '../../models/movie.model';
+import { Component, ChangeDetectionStrategy, input, computed, signal, inject, output, HostListener, ElementRef } from '@angular/core';
+import { MediaType, Movie, TvShowDetails, MovieDetails, Network, SubscribableChannel, ProductionCompany, Video, BelongsToCollection, Episode } from '../../models/movie.model';
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { MovieService } from '../../services/movie.service';
 import { SubscriptionService } from '../../services/subscription.service';
@@ -7,9 +7,8 @@ import { WatchlistService } from '../../services/watchlist.service';
 import { NavigationService } from '../../services/navigation.service';
 import { AddToPlaylistModalComponent } from '../add-to-playlist-modal/add-to-playlist-modal.component';
 import { PlaylistService } from '../../services/playlist.service';
-import { takeUntilDestroyed } from '@angular/core/rxjs/interop';
 import { PlayerService, PlayerType } from '../../services/player.service';
-import { PlaybackProgressService } from '../../services/playback-progress.service';
+import { EpisodeSelectorComponent } from '../episode-selector/episode-selector.component';
 
 const isMovie = (media: MediaType | TvShowDetails | MovieDetails): media is Movie | MovieDetails => media.media_type === 'movie';
 const isTvShowDetails = (media: MediaType | TvShowDetails | MovieDetails): media is TvShowDetails => media.media_type === 'tv' && 'seasons' in media;
@@ -17,7 +16,7 @@ const isTvShowDetails = (media: MediaType | TvShowDetails | MovieDetails): media
 @Component({
   selector: 'app-video-info',
   standalone: true,
-  imports: [CommonModule, NgOptimizedImage, AddToPlaylistModalComponent],
+  imports: [CommonModule, NgOptimizedImage, AddToPlaylistModalComponent, EpisodeSelectorComponent],
   templateUrl: './video-info.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -37,14 +36,11 @@ export class VideoInfoComponent {
   private playlistService = inject(PlaylistService);
   private navigationService = inject(NavigationService);
   private playerService = inject(PlayerService);
-  private playbackProgressService = inject(PlaybackProgressService);
-  private destroyRef = inject(DestroyRef);
   private elementRef = inject(ElementRef);
 
   // UI State Signals
   descriptionExpanded = signal(false);
   showPlaylistModal = signal(false);
-  expandedEpisodeId = signal<number | null>(null);
   showMoreOptionsMenu = signal(false);
   showSourcesDropdown = signal(false);
 
@@ -55,14 +51,6 @@ export class VideoInfoComponent {
   // Media type-specific details derived from input
   movieDetails = computed(() => isMovie(this.media()) ? this.media() as MovieDetails : null);
   tvShowDetails = computed(() => isTvShowDetails(this.media()) ? this.media() as TvShowDetails : null);
-
-  // Reactive season details loading
-  private selectedSeasonTrigger = signal<{ tvId: number; seasonNumber: number } | null>(null);
-  seasonDetailsResource = signal<{ loading: boolean; data: SeasonDetails | null; error: any }>({ loading: false, data: null, error: null });
-  
-  // Signals for template compatibility
-  loadingSeason = computed(() => this.seasonDetailsResource().loading);
-  selectedSeasonDetails = computed(() => this.seasonDetailsResource().data);
 
   // Computed properties for display
   mediaTitle = computed(() => {
@@ -228,51 +216,12 @@ export class VideoInfoComponent {
 
   isInPlaylist = computed(() => this.playlistService.isMediaInAnyPlaylist(this.media().id));
 
-  constructor() {
-    effect((onCleanup) => {
-      const trigger = this.selectedSeasonTrigger();
-      const tvDetails = this.tvShowDetails();
-
-      // Handle stale triggers (when TV show changes) or when switching to a non-TV media type.
-      if ((trigger && !tvDetails) || (trigger && tvDetails && trigger.tvId !== tvDetails.id)) {
-        this.selectedSeasonTrigger.set(null);
-        this.seasonDetailsResource.set({ loading: false, data: null, error: null });
-        return; // The effect will re-run with a null trigger.
-      }
-
-      if (!trigger && tvDetails && tvDetails.seasons.length > 0) {
-        const firstSeason = tvDetails.seasons.find(s => s.season_number > 0) || tvDetails.seasons[0];
-        if (firstSeason) this.selectSeason(firstSeason);
-        return; // The effect will re-run with a new trigger.
-      }
-      
-      if (!trigger) return;
-
-      this.seasonDetailsResource.set({ loading: true, data: null, error: null });
-      const sub = this.movieService.getSeasonDetails(trigger.tvId, trigger.seasonNumber)
-        .subscribe({
-          next: data => this.seasonDetailsResource.set({ loading: false, data, error: null }),
-          error: err => this.seasonDetailsResource.set({ loading: false, data: null, error: err })
-        });
-      
-      onCleanup(() => sub.unsubscribe());
-    }, { allowSignalWrites: true });
-  }
-
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     if (!this.elementRef.nativeElement.contains(event.target)) {
       this.showMoreOptionsMenu.set(false);
       this.showSourcesDropdown.set(false);
     }
-  }
-
-  getProgress(mediaId: number): number {
-    const progressData = this.playbackProgressService.getProgress(mediaId);
-    if (progressData) {
-      return progressData.progress;
-    }
-    return 0;
   }
 
   toggleMoreOptionsMenu(event: MouseEvent): void {
@@ -339,58 +288,7 @@ export class VideoInfoComponent {
     this.showMoreOptionsMenu.set(false);
   }
 
-  selectSeason(season: Season): void {
-    const tvId = this.tvShowDetails()?.id;
-    if (tvId) {
-      this.selectedSeasonTrigger.set({ tvId, seasonNumber: season.season_number });
-    }
-  }
-
-  selectEpisode(episode: Episode, seasonNumber: number): void {
-    this.episodeSelected.emit({ episode, seasonNumber });
-  }
-
-  toggleEpisodeDescription(episodeId: number): void {
-    this.expandedEpisodeId.update(current => current === episodeId ? null : episodeId);
-  }
-
   goToCollection(collection: BelongsToCollection): void {
     this.navigationService.navigateTo('collection-detail', { id: collection.id });
-  }
-
-  private getRelativeTime(dateString?: string | null): string {
-    if (!dateString) { return ''; }
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
-      const now = new Date();
-      const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-      if (seconds < 0) {
-        return 'Upcoming';
-      }
-      
-      const years = Math.floor(seconds / 31536000);
-      if (years > 0) {
-        return `${years} year${years > 1 ? 's' : ''} ago`;
-      }
-      
-      const months = Math.floor(seconds / 2592000);
-      if (months > 0) {
-          return `${months} month${months > 1 ? 's' : ''} ago`;
-      }
-
-      const days = Math.floor(seconds / 86400);
-      if (days > 1) {
-          return `${days} days ago`;
-      }
-      if (days === 1) {
-          return 'Yesterday';
-      }
-      
-      return 'Today';
-    } catch (e) {
-      return '';
-    }
   }
 }

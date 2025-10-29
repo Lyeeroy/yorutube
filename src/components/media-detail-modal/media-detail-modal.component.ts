@@ -6,6 +6,8 @@ import { MediaType, MovieDetails, TvShowDetails } from '../../models/movie.model
 import { WatchlistService } from '../../services/watchlist.service';
 import { AddToPlaylistModalComponent } from '../add-to-playlist-modal/add-to-playlist-modal.component';
 import { NavigationService } from '../../services/navigation.service';
+// FIX: Add Observable import to correctly type RxJS streams.
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-media-detail-modal',
@@ -20,7 +22,8 @@ export class MediaDetailModalComponent implements OnInit, OnDestroy {
 
   private movieService = inject(MovieService);
   private watchlistService = inject(WatchlistService);
-  private sanitizer = inject(DomSanitizer);
+  // FIX: Explicitly type sanitizer to resolve an issue where it was inferred as `unknown`.
+  private sanitizer: DomSanitizer = inject(DomSanitizer);
   private navigationService = inject(NavigationService);
 
   details = signal<MovieDetails | TvShowDetails | null>(null);
@@ -45,7 +48,9 @@ export class MediaDetailModalComponent implements OnInit, OnDestroy {
     document.body.style.overflow = 'hidden';
 
     const mediaItem = this.media();
-    const details$ = mediaItem.media_type === 'movie'
+    // FIX: The `subscribe` method cannot be called on a union of observables (Observable<MovieDetails> | Observable<TvShowDetails>)
+    // due to incompatible signatures. Explicitly typing `details$` as `Observable<MovieDetails | TvShowDetails>` resolves this.
+    const details$: Observable<MovieDetails | TvShowDetails> = mediaItem.media_type === 'movie'
       ? this.movieService.getMovieDetails(mediaItem.id)
       : this.movieService.getTvShowDetails(mediaItem.id);
       
