@@ -4,7 +4,7 @@
     class="bg-zinc-900 rounded-lg shadow-2xl w-full max-w-4xl h-[90vh] max-h-[800px] border border-zinc-800 flex flex-col relative overflow-hidden">
     
     <button (click)="close.emit()" class="absolute top-3 right-3 text-white bg-black/50 rounded-full p-2 z-20 hover:bg-black/80">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      <span class="material-symbols-outlined">close</span>
     </button>
       
     @if(loading()) {
@@ -36,26 +36,22 @@
               </div>
               <div class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
                  <button (click)="playMedia()" class="h-10 px-6 flex items-center justify-center space-x-2 bg-white hover:bg-zinc-200 rounded-full text-black text-sm font-bold">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <span class="material-symbols-outlined text-3xl -ml-1">play_arrow</span>
                     <span>Play</span>
                  </button>
                  <button 
                     (click)="toggleWatchlist($event)"
                     class="h-10 px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-white text-sm font-semibold">
                    @if (isOnWatchlist()) {
-                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                       <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
-                     </svg>
+                     <span class="material-symbols-outlined text-xl">check</span>
                      <span>Added to Watchlist</span>
                    } @else {
-                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                     <span class="material-symbols-outlined text-xl">add</span>
                      <span>Add to Watchlist</span>
                    }
                  </button>
                  <button (click)="showPlaylistModal.set(true)" class="h-10 px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-white text-sm font-semibold">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
+                    <span class="material-symbols-outlined text-xl">playlist_add</span>
                     <span>Save</span>
                  </button>
               </div>

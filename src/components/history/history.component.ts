@@ -5,11 +5,12 @@ import { HistoryItem } from '../../models/history.model';
 import { HistoryItemCardComponent } from '../history-item-card/history-item-card.component';
 import { NavigationService } from '../../services/navigation.service';
 import { SubscribableChannel } from '../../models/movie.model';
+import { ContinueWatchingComponent } from '../continue-watching/continue-watching.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CommonModule, HistoryItemCardComponent],
+  imports: [CommonModule, HistoryItemCardComponent, ContinueWatchingComponent],
   templateUrl: './history.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MovieService } from '../../services/movie.service';
 import { SubscriptionService } from '../../services/subscription.service';
@@ -19,12 +19,43 @@ export class ChannelsComponent {
   private navigationService = inject(NavigationService);
 
   activeTab = signal<'networks' | 'movieStudios' | 'animeStudios'>('networks');
+  searchQuery = signal('');
 
   loading = signal({ networks: true, movieStudios: true, animeStudios: true });
   
   networks = signal<{ popular: Network[], other: Network[] }>({ popular: [], other: [] });
   movieStudios = signal<{ popular: ProductionCompany[], other: ProductionCompany[] }>({ popular: [], other: [] });
   animeStudios = signal<{ popular: ProductionCompany[], other: ProductionCompany[] }>({ popular: [], other: [] });
+
+  filteredNetworks = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const data = this.networks();
+    if (!query) return data;
+    return {
+      popular: data.popular.filter(item => item.name.toLowerCase().includes(query)),
+      other: data.other.filter(item => item.name.toLowerCase().includes(query))
+    };
+  });
+
+  filteredMovieStudios = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const data = this.movieStudios();
+    if (!query) return data;
+    return {
+      popular: data.popular.filter(item => item.name.toLowerCase().includes(query)),
+      other: data.other.filter(item => item.name.toLowerCase().includes(query))
+    };
+  });
+
+  filteredAnimeStudios = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const data = this.animeStudios();
+    if (!query) return data;
+    return {
+      popular: data.popular.filter(item => item.name.toLowerCase().includes(query)),
+      other: data.other.filter(item => item.name.toLowerCase().includes(query))
+    };
+  });
 
   constructor() {
     this.movieService.getPopularNetworks().subscribe(data => {
@@ -39,6 +70,19 @@ export class ChannelsComponent {
         this.animeStudios.set(data);
         this.loading.update(l => ({ ...l, animeStudios: false }));
     });
+  }
+  
+  setActiveTab(tab: 'networks' | 'movieStudios' | 'animeStudios'): void {
+    this.activeTab.set(tab);
+    this.searchQuery.set('');
+  }
+
+  updateSearchQuery(event: Event): void {
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  clearSearchQuery(): void {
+    this.searchQuery.set('');
   }
 
   isSubscribed(networkId: number): boolean {

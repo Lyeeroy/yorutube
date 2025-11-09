@@ -489,6 +489,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (hasPlayerChangedEpisode) {
       this.lastPlayerEpisodeState.set(playerEpisode);
 
+      // This is a crucial fix: update the application's navigation state
+      // to match the player's internal state without reloading the iframe.
+      // This prevents issues when the player's internal "next" button is used.
+      this.skipNextPlayerUpdate.set(true);
+      this.navigationService.navigateTo("watch", {
+        mediaType: "tv",
+        id: media.id,
+        season: playerEpisode.season,
+        episode: playerEpisode.episode,
+        playlistId: this.playlist()?.id,
+        autoplay: true, // Auto-next implies we want to autoplay the new content
+      });
+
       this.movieService
         .getSeasonDetails(media.id, playerEpisode.season)
         .pipe(takeUntilDestroyed(this.destroyRef))
@@ -500,6 +513,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           if (newEpisode) {
             this.currentEpisode.set(newEpisode);
             this.historyAdded.set(false);
+            // Reset the auto-play trigger for the new episode, allowing VIDLINK's
+            // auto-play to function correctly for the newly loaded episode.
+            this.autoPlayNextTriggered.set(false);
           }
         });
     }
@@ -514,32 +530,42 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       .getSeasonDetails(tvShow.id, currentEp.season_number)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((seasonDetails) => {
-        const currentIndex = seasonDetails.episodes.findIndex(
+        const episodes = seasonDetails.episodes || [];
+        const currentIndex = episodes.findIndex(
           (e) => e.episode_number === currentEp.episode_number
         );
 
-        if (
-          currentIndex >= 0 &&
-          currentIndex < seasonDetails.episodes.length - 1
-        ) {
-          // Next episode exists in current season
-          const nextEpisode = seasonDetails.episodes[currentIndex + 1];
+        if (currentIndex === -1) {
+          // Failsafe: if current episode not found, maybe it was removed.
+          // Don't auto-play to avoid unexpected behavior.
+          console.warn('Could not find current episode in season details. Auto-play cancelled.');
+          return;
+        }
+
+        if (currentIndex < episodes.length - 1) {
+          // Next episode exists in the current season.
+          const nextEpisode = episodes[currentIndex + 1];
           this.navigateToEpisode(
             tvShow.id,
             currentEp.season_number,
             nextEpisode.episode_number
           );
         } else {
-          // Try to find next season
-          const nextSeasonObj = tvShow.seasons.find(
-            (s) => s.season_number === currentEp.season_number + 1
-          );
-
-          if (nextSeasonObj && nextSeasonObj.episode_count > 0) {
-            // Navigate to first episode of next season
-            this.navigateToEpisode(tvShow.id, nextSeasonObj.season_number, 1);
+          // This is the last episode of the current season. Try to find the next season.
+          const currentSeasonIndex = tvShow.seasons.findIndex(s => s.season_number === currentEp.season_number);
+          
+          if (currentSeasonIndex > -1) {
+             // Search for the next season with episodes, skipping empty seasons.
+             for (let i = currentSeasonIndex + 1; i < tvShow.seasons.length; i++) {
+                const nextSeasonObj = tvShow.seasons[i];
+                // Also check for season_number > 0 to skip "specials" seasons
+                if (nextSeasonObj && nextSeasonObj.episode_count > 0 && nextSeasonObj.season_number > 0) {
+                    this.navigateToEpisode(tvShow.id, nextSeasonObj.season_number, 1);
+                    return; // Found and navigated, so exit.
+                }
+             }
           }
-          // If no next season/episode, do nothing (end of series)
+          // If no next season/episode is found, do nothing (end of series).
         }
       });
   }

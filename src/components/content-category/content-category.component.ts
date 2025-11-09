@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, ElementRef, inject, OnInit, OnDestroy, DestroyRef, viewChild, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, ElementRef, inject, OnInit, OnDestroy, DestroyRef, viewChild, effect, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { fromEvent, Observable } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -26,20 +26,35 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
   private elementRef = inject(ElementRef);
   private destroyRef = inject(DestroyRef);
   private observer: IntersectionObserver | null = null;
+  private checkScrollTimeout: number | null = null; // FIX: Track timeout ID
+  private hasLoadedContent = false; // FIX: Prevent duplicate loads
   
   scrollContainer = viewChild<ElementRef<HTMLElement>>('scrollContainer');
 
   canScrollLeft = signal(false);
   canScrollRight = signal(false);
+  
+  // Drag-to-scroll properties
+  private isMouseDown = false;
+  private startX = 0;
+  private scrollLeft = 0;
+  private hasDragged = false;
+  isGrabbing = signal(false);
 
   constructor() {
     effect(() => {
-        // When media changes, or scroll container becomes available, check scroll.
-        // This needs to happen after the DOM updates.
-        // A small timeout helps ensure the DOM is painted.
-        this.media(); 
-        this.scrollContainer();
-        setTimeout(() => this.checkScroll(), 100);
+      // FIX: Clear any pending timeout before scheduling a new one
+      if (this.checkScrollTimeout !== null) {
+        clearTimeout(this.checkScrollTimeout);
+      }
+      
+      this.media(); 
+      this.scrollContainer();
+      
+      this.checkScrollTimeout = window.setTimeout(() => {
+        this.checkScroll();
+        this.checkScrollTimeout = null;
+      }, 100);
     });
   }
 
@@ -60,18 +75,27 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.observer?.disconnect();
+    // FIX: Clear timeout on destroy
+    if (this.checkScrollTimeout !== null) {
+      clearTimeout(this.checkScrollTimeout);
+    }
   }
 
   private loadContent(): void {
+    // FIX: Guard against multiple calls
+    if (this.hasLoadedContent) return;
+    this.hasLoadedContent = true;
+    
     this.loading.set(true);
     this.fetchFn$().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.media.set(data);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.media.set([]);
         this.loading.set(false);
+        console.error(`Error loading content for category "${this.title()}":`, err);
       },
     });
   }
@@ -81,7 +105,6 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
     if (!element) return;
     
     const hasOverflow = element.scrollWidth > element.clientWidth;
-    // A little tolerance for floating point inaccuracies
     const atStart = element.scrollLeft < 5;
     const atEnd = element.scrollWidth - element.clientWidth - element.scrollLeft < 5;
     
@@ -102,7 +125,49 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
     });
   }
 
+  onMouseDown(e: MouseEvent): void {
+    const element = this.scrollContainer()?.nativeElement;
+    if (!element) return;
+    
+    e.preventDefault(); // FIX: Prevent text selection during drag
+    
+    this.isMouseDown = true;
+    this.hasDragged = false;
+    this.isGrabbing.set(true);
+    this.startX = e.pageX - element.offsetLeft;
+    this.scrollLeft = element.scrollLeft;
+  }
+
+  onMouseLeave(): void {
+    this.isMouseDown = false;
+    this.isGrabbing.set(false);
+  }
+
+  onMouseUp(): void {
+    this.isMouseDown = false;
+    this.isGrabbing.set(false);
+  }
+
+  onMouseMove(e: MouseEvent): void {
+    if (!this.isMouseDown) return;
+    e.preventDefault();
+    const element = this.scrollContainer()?.nativeElement;
+    if (!element) return;
+
+    const x = e.pageX - element.offsetLeft;
+    const walk = x - this.startX;
+    
+    if (Math.abs(walk) > 5) {
+        this.hasDragged = true;
+    }
+
+    element.scrollLeft = this.scrollLeft - walk;
+  }
+
   onMediaClicked(media: MediaType) {
+    if (this.hasDragged) {
+      return;
+    }
     this.mediaClicked.emit(media);
   }
 }

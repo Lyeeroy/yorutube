@@ -1,8 +1,11 @@
-import { Component, ChangeDetectionStrategy, input, computed, signal, inject, effect, output, untracked } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, computed, signal, inject, effect, output, untracked, viewChild, ElementRef, DestroyRef } from '@angular/core';
 import { TvShowDetails, Season, Episode, SeasonDetails } from '../../models/movie.model';
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { MovieService } from '../../services/movie.service';
 import { PlaybackProgressService } from '../../services/playback-progress.service';
+import { fromEvent } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-episode-selector',
@@ -20,17 +23,32 @@ export class EpisodeSelectorComponent {
   // Injected Services
   private movieService = inject(MovieService);
   private playbackProgressService = inject(PlaybackProgressService);
+  private destroyRef = inject(DestroyRef);
 
   // UI State Signals
   expandedEpisodeId = signal<number | null>(null);
 
   // Reactive season details loading
   private selectedSeasonTrigger = signal<{ tvId: number; seasonNumber: number } | null>(null);
-  seasonDetailsResource = signal<{ loading: boolean; data: SeasonDetails | null; error: any }>({ loading: false, data: null, error: null });
+  seasonDetailsResource = signal<{ loading: boolean; data: (SeasonDetails & { tvId: number; }) | null; error: any }>({ loading: false, data: null, error: null });
   
   // Signals for template compatibility
   loadingSeason = computed(() => this.seasonDetailsResource().loading);
   selectedSeasonDetails = computed(() => this.seasonDetailsResource().data);
+
+  // Horizontal Scrolling for Seasons
+  scrollContainer = viewChild<ElementRef<HTMLElement>>('scrollContainer');
+  canScrollLeft = signal(false);
+  canScrollRight = signal(false);
+  private checkScrollTimeout: number | null = null;
+  
+  // Drag-to-scroll properties
+  private isMouseDown = false;
+  private startX = 0;
+  private scrollLeft = 0;
+  private hasDragged = false;
+  isGrabbing = signal(false);
+
 
   constructor() {
     // This effect fetches season details whenever the trigger changes.
@@ -45,14 +63,17 @@ export class EpisodeSelectorComponent {
 
       // Avoid re-fetching if we already have the correct data for this show
       const currentData = untracked(() => this.seasonDetailsResource().data);
-      if (currentData && currentData.season_number === trigger.seasonNumber && untracked(this.tvShowDetails)?.id === trigger.tvId) {
+      if (currentData && currentData.season_number === trigger.seasonNumber && currentData.tvId === trigger.tvId) {
           return;
       }
 
       this.seasonDetailsResource.set({ loading: true, data: null, error: null });
       const sub = this.movieService.getSeasonDetails(trigger.tvId, trigger.seasonNumber)
         .subscribe({
-          next: data => this.seasonDetailsResource.set({ loading: false, data, error: null }),
+          next: data => {
+            const augmentedData = data ? { ...data, tvId: trigger.tvId } : null;
+            this.seasonDetailsResource.set({ loading: false, data: augmentedData, error: null });
+          },
           error: err => this.seasonDetailsResource.set({ loading: false, data: null, error: err })
         });
 
@@ -79,6 +100,24 @@ export class EpisodeSelectorComponent {
         this.selectSeason(seasonToSelect);
       }
     }, { allowSignalWrites: true });
+
+    // This effect checks for scrollbar visibility when the view updates
+    effect(() => {
+      this.tvShowDetails(); 
+      this.scrollContainer();
+      if (this.checkScrollTimeout !== null) {
+        clearTimeout(this.checkScrollTimeout);
+      }
+      this.checkScrollTimeout = window.setTimeout(() => {
+        this.checkScroll();
+        this.checkScrollTimeout = null;
+      }, 100);
+    });
+
+    fromEvent(window, 'resize').pipe(
+      debounceTime(200),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => this.checkScroll());
   }
 
   getProgress(mediaId: number): number {
@@ -138,5 +177,77 @@ export class EpisodeSelectorComponent {
     } catch (e) {
       return '';
     }
+  }
+
+  // --- Scroll Logic ---
+  onSeasonClick(season: Season): void {
+    if (this.hasDragged) {
+      return;
+    }
+    this.selectSeason(season);
+  }
+
+  checkScroll(): void {
+    const element = this.scrollContainer()?.nativeElement;
+    if (!element) return;
+    
+    const hasOverflow = element.scrollWidth > element.clientWidth;
+    const atStart = element.scrollLeft < 5;
+    const atEnd = element.scrollWidth - element.clientWidth - element.scrollLeft < 5;
+    
+    this.canScrollLeft.set(hasOverflow && !atStart);
+    this.canScrollRight.set(hasOverflow && !atEnd);
+  }
+
+  scroll(direction: 'left' | 'right'): void {
+    const element = this.scrollContainer()?.nativeElement;
+    if (!element) return;
+
+    const scrollAmount = element.clientWidth * 0.75;
+    const scrollValue = direction === 'left' ? -scrollAmount : scrollAmount;
+    
+    element.scrollBy({
+      left: scrollValue,
+      behavior: 'smooth'
+    });
+  }
+
+  onMouseDown(e: MouseEvent): void {
+    const element = this.scrollContainer()?.nativeElement;
+    if (!element) return;
+    
+    e.preventDefault();
+    
+    this.isMouseDown = true;
+    this.hasDragged = false;
+    this.isGrabbing.set(true);
+    this.startX = e.pageX - element.offsetLeft;
+    this.scrollLeft = element.scrollLeft;
+  }
+
+  onMouseLeave(): void {
+    this.isMouseDown = false;
+    this.isGrabbing.set(false);
+  }
+
+  onMouseUp(): void {
+    this.isMouseDown = false;
+    this.isGrabbing.set(false);
+  }
+
+  onMouseMove(e: MouseEvent): void {
+    if (!this.isMouseDown) return;
+    e.preventDefault();
+    const element = this.scrollContainer()?.nativeElement;
+    if (!element) return;
+
+    const x = e.pageX - element.offsetLeft;
+    const walk = x - this.startX;
+    
+    if (Math.abs(walk) > 5) {
+        this.hasDragged = true;
+    }
+
+    element.scrollLeft = this.scrollLeft - walk;
   }
 }

@@ -1,4 +1,5 @@
 
+
 @if(loadingChannel()) {
   <div class="flex justify-center items-center h-96">
     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"></div>
@@ -20,9 +21,7 @@
             @if (logoUrl()) {
               <img [ngSrc]="logoUrl()!" [alt]="channel.name + ' Logo'" fill class="p-2 object-contain">
             } @else {
-              <svg class="w-12 h-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
+              <span class="material-symbols-outlined text-4xl text-zinc-400">movie</span>
             }
           </div>
           <div class="text-center sm:text-left pt-2 sm:pb-2">
@@ -244,9 +243,7 @@
               <div class="flex flex-col space-y-4 text-zinc-300">
                 @if (channel.headquarters) {
                   <div class="flex items-start space-x-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
+                    <span class="material-symbols-outlined text-xl text-zinc-400 shrink-0 mt-0.5">apartment</span>
                     <div>
                       <span class="font-semibold text-zinc-400">Headquarters</span>
                       <p class="text-white">{{ channel.headquarters }}</p>
@@ -255,9 +252,7 @@
                 }
                 @if (countryName()) {
                   <div class="flex items-start space-x-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                       <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9V3m0 18a9 9 0 009-9m-9 9a9 9 0 00-9-9" />
-                    </svg>
+                    <span class="material-symbols-outlined text-xl text-zinc-400 shrink-0 mt-0.5">public</span>
                      <div>
                        <span class="font-semibold text-zinc-400">Country</span>
                        <p class="text-white">{{ countryName() }}</p>
@@ -266,9 +261,7 @@
                 }
                  @if (channel.homepage) {
                   <div class="flex items-start space-x-3">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                       <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                     </svg>
+                     <span class="material-symbols-outlined text-xl text-zinc-400 shrink-0 mt-0.5">link</span>
                      <div>
                        <span class="font-semibold text-zinc-400">Website</span>
                        <a [href]="channel.homepage" target="_blank" rel="noopener noreferrer" class="block text-red-500 hover:underline break-all">{{ channel.homepage }}</a>

@@ -1,11 +1,64 @@
+<div class="sticky top-0 bg-zinc-900 z-10 border-b border-zinc-800">
+  <div class="relative">
+    <div #filterContainer (scroll)="checkFilterScroll()" class="flex items-center space-x-3 px-4 overflow-x-auto" style="scrollbar-width: none; -ms-overflow-style: none;">
+      @for(filter of filters; track filter.id) {
+        <button
+          (click)="setActiveFilter(filter.id)"
+          class="px-3 py-1.5 my-3 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap"
+          [class.bg-white]="activeFilter() === filter.id"
+          [class.text-black]="activeFilter() === filter.id"
+          [class.bg-zinc-800]="activeFilter() !== filter.id"
+          [class.text-white]="activeFilter() !== filter.id"
+          [class.hover:bg-zinc-700]="activeFilter() !== filter.id">
+          {{ filter.label }}
+        </button>
+      }
+    </div>
+    <!-- Left scroll button -->
+    @if (canScrollFilterLeft()) {
+      <div class="absolute top-0 left-0 h-full w-16 bg-gradient-to-r from-zinc-900 to-transparent flex items-center pointer-events-none">
+        <button (click)="scrollFilters('left')" class="ml-1 bg-zinc-800/80 hover:bg-zinc-700/80 rounded-full p-2 text-white pointer-events-auto">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+      </div>
+    }
+    <!-- Right scroll button -->
+    @if (canScrollFilterRight()) {
+      <div class="absolute top-0 right-0 h-full w-16 bg-gradient-to-l from-zinc-900 to-transparent flex items-center justify-end pointer-events-none">
+        <button (click)="scrollFilters('right')" class="mr-1 bg-zinc-800/80 hover:bg-zinc-700/80 rounded-full p-2 text-white pointer-events-auto">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+    }
+  </div>
+</div>
+
 <div class="flex flex-col space-y-12 p-4 sm:p-6">
-  @for (category of categories(); track category.title; let catIndex = $index) {
-    <app-content-category
-      [title]="category.title"
-      [fetchFn$]="category.fetchFn$"
-      [genreMap]="genreMap()"
-      [isPriorityCategory]="catIndex < 2"
-      (mediaClicked)="onMediaClicked($event)">
-    </app-content-category>
+  @if (displayedCategories().length > 0) {
+    @for (category of displayedCategories(); track category.title; let catIndex = $index) {
+      <app-content-category
+        [title]="category.title"
+        [fetchFn$]="category.fetchFn$"
+        [genreMap]="genreMap()"
+        [isPriorityCategory]="catIndex < 2"
+        (mediaClicked)="onMediaClicked($event)">
+      </app-content-category>
+    }
+
+    @if (loadingMore()) {
+      <div class="flex justify-center py-8">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+      </div>
+    }
+
+    @if (hasMoreCategories() && !loadingMore()) {
+      <app-infinite-scroll-trigger (intersect)="loadMoreCategories()"></app-infinite-scroll-trigger>
+    }
+
+  } @else {
+    <div class="text-center py-16">
+      <h2 class="text-2xl font-semibold text-zinc-400">No content found</h2>
+      <p class="text-zinc-500 mt-2">Try a different filter.</p>
+    </div>
   }
 </div>

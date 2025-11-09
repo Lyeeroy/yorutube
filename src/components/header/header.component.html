@@ -3,9 +3,7 @@
     <!-- Mobile Search View -->
     <div class="flex items-center w-full relative">
       <button (click)="closeMobileSearch()" class="p-2 rounded-full hover:bg-zinc-800 focus:outline-none">
-        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <span class="material-symbols-outlined text-white">arrow_back</span>
       </button>
       <div class="flex-1 flex items-center h-10 ml-2 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black">
         <input 
@@ -21,18 +19,14 @@
         >
         @if (searchQuery()) {
           <button (click)="clearSearchQuery()" class="p-2 text-zinc-400 hover:text-white">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <span class="material-symbols-outlined text-lg">close</span>
           </button>
         }
         <button 
           (click)="onSearch()"
           class="h-full bg-zinc-800 hover:bg-zinc-700 text-white px-6 rounded-r-3xl border-l border-zinc-700 flex items-center justify-center"
         >
-          <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <span class="material-symbols-outlined text-zinc-400">search</span>
         </button>
       </div>
       <!-- Search History Panel (Mobile) -->
@@ -43,15 +37,11 @@
               (click)="onHistorySearch(item)"
               class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm">
               <div class="flex items-center min-w-0">
-                <svg class="h-4 w-4 mr-3 text-zinc-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <span class="material-symbols-outlined text-base mr-3 text-zinc-400 shrink-0">history</span>
                 <span class="truncate">{{ item }}</span>
               </div>
               <button (click)="removeHistoryItem($event, item)" class="p-1 rounded-full hover:bg-zinc-600 text-zinc-400 hover:text-white shrink-0">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <span class="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
           }
@@ -63,9 +53,7 @@
     <!-- Left Section -->
     <div class="flex items-center space-x-2 sm:space-x-4">
       <button (click)="hamburgerClick.emit()" class="p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <span class="material-symbols-outlined text-white">menu</span>
       </button>
       <button (click)="onLogoClick()" class="flex items-center space-x-2 focus:outline-none">
         <svg class="h-7 w-auto" viewBox="0 0 120 80">
@@ -93,18 +81,14 @@
           >
           @if (searchQuery()) {
             <button (click)="clearSearchQuery()" class="p-2 text-zinc-400 hover:text-white">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <span class="material-symbols-outlined text-lg">close</span>
             </button>
           }
           <button 
             (click)="onSearch()"
             class="h-full bg-zinc-800 hover:bg-zinc-700 text-white px-6 rounded-r-3xl border-l border-zinc-700 flex items-center justify-center"
           >
-            <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <span class="material-symbols-outlined text-zinc-400">search</span>
           </button>
         </div>
          <!-- Search History Panel -->
@@ -115,24 +99,18 @@
                 (click)="onHistorySearch(item)"
                 class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm">
                 <div class="flex items-center min-w-0">
-                  <svg class="h-4 w-4 mr-3 text-zinc-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <span class="material-symbols-outlined text-base mr-3 text-zinc-400 shrink-0">history</span>
                   <span class="truncate">{{ item }}</span>
                 </div>
                 <button (click)="removeHistoryItem($event, item)" class="p-1 rounded-full hover:bg-zinc-600 text-zinc-400 hover:text-white shrink-0">
-                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <span class="material-symbols-outlined text-sm">close</span>
                 </button>
               </div>
             }
           </div>
         }
         <button class="ml-4 h-10 w-10 flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none">
-          <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"></path>
-          </svg>
+          <span class="material-symbols-outlined text-white">mic</span>
         </button>
       </div>
     </div>
@@ -140,22 +118,16 @@
     <!-- Right Section -->
     <div class="flex items-center space-x-2">
        <button (click)="openMobileSearch()" class="p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white sm:hidden">
-        <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+        <span class="material-symbols-outlined text-white">search</span>
       </button>
       <button class="hidden sm:flex p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9A2.25 2.25 0 0 0 13.5 5.25h-9A2.25 2.25 0 0 0 2.25 7.5v9A2.25 2.25 0 0 0 4.5 18.75Z" />
-        </svg>
+        <span class="material-symbols-outlined text-white">video_call</span>
       </button>
 
       <!-- Notification Bell -->
       <div class="relative hidden sm:inline-flex">
         <button (click)="toggleNotifications($event)" class="relative p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-          <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-          </svg>
+          <span class="material-symbols-outlined text-white">notifications</span>
           @if (unreadNotificationCount() > 0) {
             <span class="absolute top-1.5 right-1.5 flex h-4 w-4">
               <span class="relative inline-flex rounded-full h-4 w-4 bg-red-600 text-white text-xs items-center justify-center font-bold">
@@ -206,9 +178,7 @@
       </div>
 
       <button (click)="signInClicked.emit()" class="flex items-center space-x-2 border border-zinc-700 text-white hover:bg-zinc-700 active:bg-zinc-600 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-red-500">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-        </svg>
+        <span class="material-symbols-outlined text-xl">account_circle</span>
         <span>Sign in</span>
       </button>
     </div>

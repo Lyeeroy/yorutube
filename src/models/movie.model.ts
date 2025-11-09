@@ -198,7 +198,8 @@ export interface DiscoverParams {
   page?: number;
   with_genres?: number[];
   with_network?: number;
-  with_company?: number;
+  // FIX: Allow string for pipe-separated company IDs to enable OR queries.
+  with_company?: number | string;
   sort_by?: string;
   primary_release_year?: number;
   first_air_date_year?: number;

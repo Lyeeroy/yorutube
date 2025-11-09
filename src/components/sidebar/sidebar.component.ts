@@ -20,33 +20,37 @@ export class SidebarComponent {
   constructor() {
     effect(() => {
       const state = this.navigationService.currentView();
+      let newActiveItem = ''; // Default to nothing active
+
       if (state.view === 'home') {
-        this.activeItem.set('Home');
+        newActiveItem = 'Home';
       } else if (state.view === 'discover') {
-        this.activeItem.set('Discover');
+        newActiveItem = 'Discover';
       } else if (state.view === 'calendar') {
-        this.activeItem.set('Calendar');
+        newActiveItem = 'Calendar';
       } else if (state.view === 'channels') {
-        this.activeItem.set('Channels');
+        newActiveItem = 'Channels';
       } else if (state.view === 'collections' || state.view === 'collection-detail') {
-        this.activeItem.set('Collections');
+        newActiveItem = 'Collections';
       } else if (state.view === 'history') {
-        this.activeItem.set('History');
+        newActiveItem = 'History';
       } else if (state.view === 'watchlist') {
-        this.activeItem.set('Watchlist');
+        newActiveItem = 'Watchlist';
       } else if (state.view === 'playlists' || state.view === 'playlist-detail') {
-        this.activeItem.set('Playlists');
+        newActiveItem = 'Playlists';
       } else if (state.view === 'subscriptions') {
-        this.activeItem.set('Subscriptions');
+        newActiveItem = 'Subscriptions';
       } else if (state.view === 'channel') {
         const channelId = state.params?.id;
         if (channelId) {
             const sub = this.subscriptions().find(s => s.id === channelId);
             if (sub) {
-              this.activeItem.set(sub.name);
+              newActiveItem = sub.name;
             }
         }
       }
+      
+      this.activeItem.set(newActiveItem);
     });
   }
 

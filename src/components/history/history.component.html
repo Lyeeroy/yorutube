@@ -13,11 +13,11 @@
         >
         @if (searchQuery()) {
             <button (click)="clearSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                <span class="material-symbols-outlined text-lg">close</span>
             </button>
         } @else {
             <div class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <span class="material-symbols-outlined">search</span>
             </div>
         }
       </div>
@@ -30,7 +30,7 @@
           (click)="onClearHistory()" 
           class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium"
           [class.text-red-500]="confirmingClear()">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          <span class="material-symbols-outlined">delete</span>
           @if(confirmingClear()) {
              <span>Confirm Clear?</span>
           } @else {
@@ -40,10 +40,10 @@
 
         <button (click)="togglePauseHistory()" class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium">
           @if (isHistoryPaused()) {
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span class="material-symbols-outlined">play_circle</span>
             <span>Turn on watch history</span>
           } @else {
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span class="material-symbols-outlined">pause_circle</span>
             <span>Pause watch history</span>
           }
         </button>
@@ -54,7 +54,9 @@
   </div>
 
   <!-- Main Content: history list (now appears on the left for md+) -->
-  <div class="flex-grow">
+  <div class="flex-grow min-w-0">
+    <app-continue-watching></app-continue-watching>
+
     <h1 class="text-3xl font-bold text-white mb-6">Watch History</h1>
     @if (history().length > 0) {
       @if(groupedHistory().length > 0) {
@@ -84,9 +86,7 @@
       }
     } @else {
       <div class="text-center py-16">
-        <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-16 w-16 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <span class="material-symbols-outlined text-7xl text-zinc-600">history</span>
         <h2 class="mt-4 text-2xl font-semibold text-zinc-400">Your watch history is empty</h2>
         <p class="text-zinc-500 mt-2">Videos you watch will appear here.</p>
       </div>
