@@ -1,23 +1,16 @@
 import { Component, ChangeDetectionStrategy, signal, inject, computed, effect, viewChild, ElementRef, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { firstValueFrom, fromEvent } from 'rxjs';
+import { fromEvent } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { HistoryService } from '../../services/history.service';
-import { PlaybackProgressService } from '../../services/playback-progress.service';
+import { ContinueWatchingService } from '../../services/continue-watching.service';
 import { MovieService } from '../../services/movie.service';
 import { NavigationService } from '../../services/navigation.service';
 import { VideoCardComponent } from '../video-card/video-card.component';
 
-import { HistoryItem } from '../../models/history.model';
+import { ContinueWatchingItem } from '../../models/continue-watching.model';
 import { MediaType, Episode, TvShow } from '../../models/movie.model';
-import { PlaybackProgress } from '../../models/playback-progress.model';
-
-interface ContinueWatchingSuggestion {
-  media: MediaType;
-  episode?: Episode;
-}
 
 @Component({
   selector: 'app-continue-watching',
@@ -27,14 +20,13 @@ interface ContinueWatchingSuggestion {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ContinueWatchingComponent {
-  private historyService = inject(HistoryService);
-  private playbackProgressService = inject(PlaybackProgressService);
+  private continueWatchingService = inject(ContinueWatchingService);
   private movieService = inject(MovieService);
   private navigationService = inject(NavigationService);
   private destroyRef = inject(DestroyRef);
 
-  suggestions = signal<ContinueWatchingSuggestion[] | null>(null);
-  isLoading = signal(true);
+  suggestions = this.continueWatchingService.items;
+  isLoading = signal(false);
   genreMap = toSignal(this.movieService.getCombinedGenreMap(), { initialValue: new Map() });
 
   // --- Scrolling Logic ---
@@ -50,12 +42,6 @@ export class ContinueWatchingComponent {
   // --- End Scrolling Logic ---
 
   constructor() {
-    effect(() => {
-      const history = this.historyService.history();
-      const progressData = this.playbackProgressService.progressData();
-      this.findSuggestions(history, progressData);
-    });
-
     // --- Scrolling Effect ---
     effect(() => {
       this.suggestions(); 
@@ -75,75 +61,8 @@ export class ContinueWatchingComponent {
     ).subscribe(() => this.checkScroll());
     // --- End Scrolling Effect ---
   }
-
-  private async findSuggestions(history: HistoryItem[], progressData: Record<number, PlaybackProgress>): Promise<void> {
-    this.isLoading.set(true);
-    const newSuggestions: ContinueWatchingSuggestion[] = [];
-    const processedTvShows = new Set<number>();
-
-    for (const historyItem of history) {
-      if (historyItem.media.media_type === 'movie') {
-        const progress = progressData[historyItem.media.id];
-        if (progress && progress.progress < 95) {
-          newSuggestions.push({ media: historyItem.media });
-        }
-      } else if (historyItem.media.media_type === 'tv') {
-        const tvShowId = historyItem.media.id;
-        if (processedTvShows.has(tvShowId)) {
-          continue;
-        }
-
-        const progressId = historyItem.episode ? historyItem.episode.id : historyItem.media.id;
-        const progress = progressData[progressId];
-        const progressPercent = progress ? progress.progress : 0;
-
-        if (progressPercent < 95) {
-          if (historyItem.episode) { // Only add if there is a specific episode
-            newSuggestions.push({ media: historyItem.media, episode: historyItem.episode });
-            processedTvShows.add(tvShowId);
-          }
-        } else {
-          if (historyItem.episode) {
-            const nextEpisodeSuggestion = await this.findNextEpisode(historyItem.media, historyItem.episode);
-            if (nextEpisodeSuggestion) {
-              newSuggestions.push(nextEpisodeSuggestion);
-              processedTvShows.add(tvShowId);
-            }
-          }
-        }
-      }
-    }
-    
-    this.suggestions.set(newSuggestions);
-    this.isLoading.set(false);
-  }
-
-  private async findNextEpisode(tvShow: MediaType, currentEpisode: Episode): Promise<ContinueWatchingSuggestion | null> {
-    try {
-      const tvShowDetails = await firstValueFrom(this.movieService.getTvShowDetails(tvShow.id));
-      const seasonDetails = await firstValueFrom(this.movieService.getSeasonDetails(tvShow.id, currentEpisode.season_number));
-      const currentIndex = seasonDetails.episodes.findIndex(e => e.id === currentEpisode.id);
-
-      if (currentIndex > -1 && currentIndex < seasonDetails.episodes.length - 1) {
-        return { media: tvShow, episode: seasonDetails.episodes[currentIndex + 1] };
-      }
-
-      const nextSeason = tvShowDetails.seasons.find(s => s.season_number === currentEpisode.season_number + 1);
-      if (nextSeason?.episode_count > 0) {
-        const nextSeasonDetails = await firstValueFrom(this.movieService.getSeasonDetails(tvShow.id, nextSeason.season_number));
-        if (nextSeasonDetails.episodes.length > 0) {
-          return { media: tvShow, episode: nextSeasonDetails.episodes[0] };
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error(`Error finding next episode for TV show ID ${tvShow.id}:`, error);
-      return null;
-    }
-  }
   
-  getCardMedia(suggestion: ContinueWatchingSuggestion): MediaType {
+  getCardMedia(suggestion: ContinueWatchingItem): MediaType {
     if (suggestion.episode) {
       const tvShow = suggestion.media as TvShow;
       const episode = suggestion.episode;
@@ -160,7 +79,7 @@ export class ContinueWatchingComponent {
     return suggestion.media;
   }
 
-  onMediaClicked(suggestion: ContinueWatchingSuggestion): void {
+  onMediaClicked(suggestion: ContinueWatchingItem): void {
     if (this.hasDragged) return;
 
     const params: any = {
@@ -174,6 +93,11 @@ export class ContinueWatchingComponent {
     }
     this.navigationService.navigateTo('watch', params);
   }
+
+  onRemove(suggestion: ContinueWatchingItem): void {
+    this.continueWatchingService.removeItem(suggestion.id);
+  }
+
 
   // --- Scrolling Methods ---
   checkScroll(): void {

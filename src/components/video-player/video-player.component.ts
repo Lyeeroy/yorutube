@@ -38,6 +38,8 @@ import { VideoPlayerPlaylistComponent } from "../video-player-playlist/video-pla
 import { PlayerService, PlayerType } from "../../services/player.service";
 import { PlaybackProgressService } from "../../services/playback-progress.service";
 import { PlaybackProgress } from "../../models/playback-progress.model";
+import { ContinueWatchingService } from "../../services/continue-watching.service";
+import { ContinueWatchingItem } from "../../models/continue-watching.model";
 
 const isMovie = (media: MediaType | TvShowDetails): media is Movie =>
   media.media_type === "movie";
@@ -68,6 +70,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private playlistService = inject(PlaylistService);
   private playerService = inject(PlayerService);
   private playbackProgressService = inject(PlaybackProgressService);
+  private continueWatchingService = inject(ContinueWatchingService);
   private destroyRef = inject(DestroyRef);
 
   params = input.required<any>();
@@ -456,6 +459,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       );
       this.historyAdded.set(true);
     }
+    
+    // Update continue watching list based on current progress
+    if (progressPercent >= 5 && progressPercent < 95) {
+      const continueWatchingItem: Omit<ContinueWatchingItem, 'updatedAt'> = {
+        id: media.id,
+        media: media,
+        episode: episode || undefined,
+      };
+      this.continueWatchingService.addItem(continueWatchingItem);
+    } else if (progressPercent >= 95) {
+      this.continueWatchingService.removeItem(media.id);
+    }
+
 
     // Auto-play next episode for vidlink when video completes
     if (

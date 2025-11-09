@@ -1,5 +1,5 @@
 {
-  "name": "YoruTube - YouTube Clone",
+  "name": "YoruTube - YouTube clone",
   "description": "A streaming website application with a UI that mimics YouTube, using The Movie Database (TMDB) to display a grid of movies and TV shows.",
   "requestFramePermissions": []
 }

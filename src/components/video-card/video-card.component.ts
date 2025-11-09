@@ -24,7 +24,10 @@ export class VideoCardComponent {
   genreMap = input.required<Map<number, string>>();
   isPriority = input<boolean>(false);
   layout = input<'grid' | 'list'>('grid');
+  showRemoveFromContinueWatching = input<boolean>(false);
+  progressMediaId = input<number | null>(null);
   mediaClicked = output<void>();
+  removeFromContinueWatching = output<void>();
 
   private movieService = inject(MovieService);
   private watchlistService = inject(WatchlistService);
@@ -39,7 +42,7 @@ export class VideoCardComponent {
   showDetailsModal = signal(false);
 
   progress = computed(() => {
-    const mediaId = this.media().id;
+    const mediaId = this.progressMediaId() ?? this.media().id;
     const progressData = this.playbackProgressService.getProgress(mediaId);
     if (progressData) {
       return progressData.progress;
@@ -89,6 +92,12 @@ export class VideoCardComponent {
   openDetailsModal(event: Event): void {
     event.stopPropagation();
     this.showDetailsModal.set(true);
+    this.showOptionsMenu.set(false);
+  }
+  
+  onRemoveFromContinueWatching(event: Event): void {
+    event.stopPropagation();
+    this.removeFromContinueWatching.emit();
     this.showOptionsMenu.set(false);
   }
 
