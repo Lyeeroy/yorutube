@@ -37,7 +37,7 @@ export class VideoCardComponent {
   private elementRef = inject(ElementRef);
   details = signal<MovieDetails | TvShowDetails | null>(null);
 
-  showOptionsMenu = signal(false);
+  menuStyle = signal<{ top: string; right: string } | null>(null);
   showPlaylistModal = signal(false);
   showDetailsModal = signal(false);
 
@@ -71,34 +71,48 @@ export class VideoCardComponent {
     });
   }
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    if (this.showOptionsMenu() && !this.elementRef.nativeElement.contains(event.target)) {
-      this.showOptionsMenu.set(false);
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.menuStyle()) {
+      this.menuStyle.set(null);
     }
   }
 
-  toggleOptionsMenu(event: Event): void {
+  toggleOptionsMenu(event: MouseEvent): void {
     event.stopPropagation();
-    this.showOptionsMenu.update(v => !v);
+    if (this.menuStyle()) {
+      this.menuStyle.set(null);
+      return;
+    }
+
+    const button = event.currentTarget as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+
+    const style = {
+      top: `${rect.bottom + 4}px`,
+      right: `${viewportWidth - (rect.left + rect.width / 2)}px`,
+    };
+    
+    this.menuStyle.set(style);
   }
 
   openPlaylistModal(event: Event): void {
     event.stopPropagation();
     this.showPlaylistModal.set(true);
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
 
   openDetailsModal(event: Event): void {
     event.stopPropagation();
     this.showDetailsModal.set(true);
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
   
   onRemoveFromContinueWatching(event: Event): void {
     event.stopPropagation();
     this.removeFromContinueWatching.emit();
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
 
   isOnWatchlist = computed(() => this.watchlistService.isOnWatchlist(this.media().id));

@@ -34,7 +34,7 @@ export class HistoryItemCardComponent {
   private elementRef = inject(ElementRef);
   details = signal<MovieDetails | TvShowDetails | null>(null);
   showPlaylistModal = signal(false);
-  showOptionsMenu = signal(false);
+  menuStyle = signal<{ top: string; right: string } | null>(null);
   showDetailsModal = signal(false);
 
   isOnWatchlist = computed(() => this.watchlistService.isOnWatchlist(this.item().media.id));
@@ -71,16 +71,30 @@ export class HistoryItemCardComponent {
     });
   }
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    if (this.showOptionsMenu() && !this.elementRef.nativeElement.contains(event.target)) {
-      this.showOptionsMenu.set(false);
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.menuStyle()) {
+      this.menuStyle.set(null);
     }
   }
 
-  toggleOptionsMenu(event: Event): void {
+  toggleOptionsMenu(event: MouseEvent): void {
     event.stopPropagation();
-    this.showOptionsMenu.update(v => !v);
+    if (this.menuStyle()) {
+      this.menuStyle.set(null);
+      return;
+    }
+
+    const button = event.currentTarget as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+
+    const style = {
+      top: `${rect.bottom + 4}px`,
+      right: `${viewportWidth - (rect.left + rect.width / 2)}px`,
+    };
+    
+    this.menuStyle.set(style);
   }
 
   toggleWatchlist(event: Event) {
@@ -91,25 +105,25 @@ export class HistoryItemCardComponent {
     } else {
       this.watchlistService.addToWatchlist(currentMedia);
     }
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
 
   openPlaylistModal(event: Event): void {
     event.stopPropagation();
     this.showPlaylistModal.set(true);
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
 
   openDetailsModal(event: Event): void {
     event.stopPropagation();
     this.showDetailsModal.set(true);
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
 
   onRemove(event: Event): void {
     event.stopPropagation();
     this.remove.emit(this.item().id);
-    this.showOptionsMenu.set(false);
+    this.menuStyle.set(null);
   }
 
   onChannelClick(event: Event): void {
