@@ -133,7 +133,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     );
 
     const resumeTime =
-      progress && progress.progress > 5 && progress.progress < 95
+      progress && progress.progress > 5 && progress.progress < 100
         ? progress.timestamp
         : 0;
 
@@ -518,13 +518,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
 
-    // Auto-play next episode for vidlink when video completes
+    // Auto-play next episode for VIDLINK or VIDSRC when video completes
     if (
-      this.selectedPlayer() === "VIDLINK" &&
+      (this.selectedPlayer() === 'VIDLINK' || this.selectedPlayer() === 'VIDSRC') &&
       this.playerService.autoNextEnabled() &&
-      media.media_type === "tv" &&
+      media.media_type === 'tv' &&
       !this.autoPlayNextTriggered() &&
-      progressPercent >= 100
+      // Use a threshold to catch end of video reliably for players that don't send an 'ended' event
+      progressPercent >= 99.5
     ) {
       this.autoPlayNextTriggered.set(true);
       this.playNextEpisode(media as TvShowDetails);
