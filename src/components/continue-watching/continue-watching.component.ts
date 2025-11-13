@@ -121,6 +121,16 @@ export class ContinueWatchingComponent {
   }
 
   onMouseDown(e: MouseEvent): void {
+    // FIX: Check if the click originated inside a modal or other fixed element.
+    // This prevents the drag-scroll from interfering with modal interactions.
+    let targetElement = e.target as HTMLElement | null;
+    while (targetElement && targetElement !== e.currentTarget) {
+        if (window.getComputedStyle(targetElement).position === 'fixed') {
+            return; // It's a modal, don't start drag.
+        }
+        targetElement = targetElement.parentElement;
+    }
+
     const element = this.scrollContainer()?.nativeElement;
     if (!element) return;
     e.preventDefault();
