@@ -411,16 +411,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
         // Handle player start and progress
         if (payload.type === "PLAYER_EVENT") {
+          const isTimeEvent = d.event === "timeupdate" || d.event === "time";
           if (
             d.event === "play" ||
-            (d.event === "timeupdate" && d.currentTime > 0)
+            (isTimeEvent && d.currentTime > 0)
           ) {
             if (!this.playerHasStarted()) {
               this.playerHasStarted.set(true);
             }
           }
           if (
-            d.event === "timeupdate" &&
+            isTimeEvent &&
             typeof d.duration === "number" &&
             d.duration > 0
           ) {
