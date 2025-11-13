@@ -22,27 +22,21 @@ export class PlaylistsComponent {
   newPlaylistName = signal('');
   newPlaylistDescription = signal('');
 
-  getThumbnail(playlist: Playlist): string {
-    if (playlist.items.length > 0) {
-      const firstItem = playlist.items[0];
-      if (firstItem.backdrop_path) {
-        return `https://image.tmdb.org/t/p/w780${firstItem.backdrop_path}`;
-      }
-    }
-    return 'https://picsum.photos/480/270?grayscale';
-  }
-
   onPlaylistClicked(playlist: Playlist): void {
     this.navigationService.navigateTo('playlist-detail', { id: playlist.id });
+  }
+
+  cancelCreate(): void {
+    this.showCreateForm.set(false);
+    this.newPlaylistName.set('');
+    this.newPlaylistDescription.set('');
   }
 
   createNewPlaylist(): void {
     const name = this.newPlaylistName().trim();
     if (name) {
       this.playlistService.createPlaylist(name, this.newPlaylistDescription().trim());
-      this.newPlaylistName.set('');
-      this.newPlaylistDescription.set('');
-      this.showCreateForm.set(false);
+      this.cancelCreate();
     }
   }
 }

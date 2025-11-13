@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { map, Observable, shareReplay, forkJoin, switchMap, of, catchError } from 'rxjs';
-import { MediaResponse, VideoResponse, GenreResponse, MediaType, TvShowDetails, SeasonDetails, Movie, TvShow, MovieDetails, Episode, Network, DiscoverParams, ProductionCompany, GroupedNetworks, GroupedProductionCompanies, SubscribableChannel, SearchResult, Collection } from '../models/movie.model';
+import { MediaResponse, VideoResponse, GenreResponse, MediaType, TvShowDetails, SeasonDetails, Movie, TvShow, MovieDetails, Episode, Network, DiscoverParams, ProductionCompany, SubscribableChannel, SearchResult, Collection } from '../models/movie.model';
 
 @Injectable({
   providedIn: 'root'
@@ -16,9 +16,9 @@ export class MovieService {
   private tvGenreMapCache$: Observable<Map<number, string>> | null = null;
   private movieDetailsCache = new Map<number, Observable<MovieDetails>>();
   private tvShowDetailsCache = new Map<number, Observable<TvShowDetails>>();
-  private popularNetworksCache$: Observable<GroupedNetworks> | null = null;
-  private popularMovieStudiosCache$: Observable<GroupedProductionCompanies> | null = null;
-  private popularAnimeStudiosCache$: Observable<GroupedProductionCompanies> | null = null;
+  private popularNetworksCache$: Observable<Network[]> | null = null;
+  private popularMovieStudiosCache$: Observable<ProductionCompany[]> | null = null;
+  private popularAnimeStudiosCache$: Observable<ProductionCompany[]> | null = null;
 
   private createGenreMapObservable(url: string): Observable<Map<number, string>> {
     return this.http.get<GenreResponse>(url).pipe(
@@ -253,8 +253,7 @@ export class MovieService {
       let networks$: Observable<SubscribableChannel[]> = of([]);
       if (page === 1) { // Only search networks on the first page
           networks$ = this.getPopularNetworks().pipe(
-              map(groupedNetworks => {
-                  const allNetworks = [...groupedNetworks.popular, ...groupedNetworks.other];
+              map(allNetworks => {
                   return allNetworks
                       .filter(n => n.name.toLowerCase().includes(query.toLowerCase()))
                       .map(n => ({ ...n, type: 'network' as const }));
@@ -418,7 +417,7 @@ export class MovieService {
     }
   }
 
-  getPopularNetworks(): Observable<GroupedNetworks> {
+  getPopularNetworks(): Observable<Network[]> {
     if (this.popularNetworksCache$) {
       return this.popularNetworksCache$;
     }
@@ -466,28 +465,17 @@ export class MovieService {
             }
         });
 
-        const uniqueNetworksWithLogos = Array.from(allNetworksMap.values());
-        
-        // Group into popular and other
-        const popular = uniqueNetworksWithLogos.filter((n: Network) => popularNetworkIds.has(n.id));
-        const other = uniqueNetworksWithLogos.filter((n: Network) => !popularNetworkIds.has(n.id));
-
-        // Sort both groups alphabetically
-        popular.sort((a: Network, b: Network) => a.name.localeCompare(b.name));
-        other.sort((a: Network, b: Network) => a.name.localeCompare(b.name));
-        
-        return { popular, other };
+        return Array.from(allNetworksMap.values());
       }),
       shareReplay(1)
     );
     return this.popularNetworksCache$;
   }
 
-  getPopularMovieStudios(): Observable<GroupedProductionCompanies> {
+  getPopularMovieStudios(): Observable<ProductionCompany[]> {
     if (this.popularMovieStudiosCache$) {
       return this.popularMovieStudiosCache$;
     }
-    const popularStudioIds = new Set([174, 2, 33, 4, 5, 420, 3, 1]); // Warner, Disney, Universal, Paramount, Columbia, Marvel, Pixar, Lucasfilm
     const pageRequests = [1, 2, 3, 4, 5].map(page =>
       this.http.get<{ results: Movie[] }>(`${this.BASE_URL}/movie/popular?api_key=${this.API_KEY}&page=${page}`)
     );
@@ -501,26 +489,17 @@ export class MovieService {
       map(detailedMovies => {
         const companies = detailedMovies.flatMap(movie => movie.production_companies || []);
         const uniqueCompanies = Array.from(new Map(companies.map(c => [c.id, c])).values());
-        const withLogos = uniqueCompanies.filter((c: ProductionCompany) => c.logo_path);
-
-        const popular = withLogos.filter((c: ProductionCompany) => popularStudioIds.has(c.id));
-        const other = withLogos.filter((c: ProductionCompany) => !popularStudioIds.has(c.id));
-
-        popular.sort((a: ProductionCompany, b: ProductionCompany) => a.name.localeCompare(b.name));
-        other.sort((a: ProductionCompany, b: ProductionCompany) => a.name.localeCompare(b.name));
-        
-        return { popular, other };
+        return uniqueCompanies.filter((c: ProductionCompany) => c.logo_path);
       }),
       shareReplay(1)
     );
     return this.popularMovieStudiosCache$;
   }
 
-  getPopularAnimeStudios(): Observable<GroupedProductionCompanies> {
+  getPopularAnimeStudios(): Observable<ProductionCompany[]> {
     if (this.popularAnimeStudiosCache$) {
       return this.popularAnimeStudiosCache$;
     }
-    const popularStudioIds = new Set([10342, 5542, 91409, 4323, 4141, 3391, 9557, 1258, 529, 537, 2289, 11018]); // Ghibli, Toei, MAPPA, ufotable, Bones, Madhouse, Wit, Sunrise, Production I.G, Kyoto Animation, A-1 Pictures, CoMix Wave Films
     const pageRequests = [1, 2, 3, 4, 5].map(page =>
       this.http.get<{ results: Movie[] }>(`${this.BASE_URL}/discover/movie?api_key=${this.API_KEY}&with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`)
     );
@@ -534,15 +513,7 @@ export class MovieService {
       map(detailedAnimes => {
         const companies = detailedAnimes.flatMap(anime => anime.production_companies || []);
         const uniqueCompanies = Array.from(new Map(companies.map(c => [c.id, c])).values());
-        const withLogos = uniqueCompanies.filter((c: ProductionCompany) => c.logo_path);
-
-        const popular = withLogos.filter((c: ProductionCompany) => popularStudioIds.has(c.id));
-        const other = withLogos.filter((c: ProductionCompany) => !popularStudioIds.has(c.id));
-
-        popular.sort((a: ProductionCompany, b: ProductionCompany) => a.name.localeCompare(b.name));
-        other.sort((a: ProductionCompany, b: ProductionCompany) => a.name.localeCompare(b.name));
-        
-        return { popular, other };
+        return uniqueCompanies.filter((c: ProductionCompany) => c.logo_path);
       }),
       shareReplay(1)
     );

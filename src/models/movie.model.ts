@@ -131,14 +131,6 @@ export interface SubscribableChannel extends ChannelEntity {
   companyId?: number;
 }
 
-export interface Grouped<T> {
-  popular: T[];
-  other: T[];
-}
-export type GroupedNetworks = Grouped<Network>;
-export type GroupedProductionCompanies = Grouped<ProductionCompany>;
-
-
 // =======================================
 // API Response & Search Types
 // =======================================

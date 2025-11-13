@@ -37,22 +37,45 @@
     </div>
   </div>
 
-  <!-- Search Bar -->
-  <div class="relative w-full max-w-md">
-    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">search</span>
-    <input 
-      type="text" 
-      placeholder="Search channels..."
-      [value]="searchQuery()"
-      (input)="updateSearchQuery($event)"
-      class="w-full bg-zinc-800 border border-zinc-700 text-white rounded-full pl-10 pr-10 py-2 focus:outline-none focus:ring-1 focus:ring-red-500"
-    >
-    @if (searchQuery()) {
-      <button (click)="clearSearchQuery()" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
-        <span class="material-symbols-outlined text-lg">close</span>
-      </button>
-    }
+  <!-- Filter Bar -->
+  <div class="flex flex-col md:flex-row gap-4 justify-between items-center">
+    <div class="relative w-full md:max-w-xs">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">search</span>
+      <input 
+        type="text" 
+        placeholder="Search channels..."
+        [value]="searchQuery()"
+        (input)="updateSearchQuery($event)"
+        class="w-full bg-zinc-800 border border-zinc-700 text-white rounded-full pl-10 pr-10 py-2 focus:outline-none focus:ring-1 focus:ring-red-500"
+      >
+      @if (searchQuery()) {
+        <button (click)="clearSearchQuery()" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      }
+    </div>
+    
+    <div class="flex items-center gap-2 self-stretch md:self-auto">
+      <select 
+        [value]="sortBy()" 
+        (change)="onSortChange($event)"
+        class="flex-1 md:flex-none bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm">
+        <option value="relevance">Sort by: Relevance</option>
+        <option value="name_asc">A-Z</option>
+        <option value="name_desc">Z-A</option>
+      </select>
+      <select 
+        [value]="selectedCountry()" 
+        (change)="onCountryChange($event)"
+        class="flex-1 md:flex-none bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm">
+        <option value="all">All Countries</option>
+        @for (country of availableCountries(); track country.code) {
+          <option [value]="country.code">{{ country.name }}</option>
+        }
+      </select>
+    </div>
   </div>
+
 
   <!-- Content -->
   <div class="mt-4">
@@ -70,42 +93,20 @@
             }
           </div>
         } @else {
-          @if (filteredNetworks().popular.length === 0 && filteredNetworks().other.length === 0) {
+          @if (filteredChannels().length === 0) {
             <div class="text-center py-16">
-              <h2 class="text-2xl font-semibold text-zinc-400">No networks found for "{{ searchQuery() }}"</h2>
-              <p class="text-zinc-500 mt-2">Try a different search.</p>
+              <h2 class="text-2xl font-semibold text-zinc-400">No networks found</h2>
+              <p class="text-zinc-500 mt-2">Try adjusting your search or filters.</p>
             </div>
           } @else {
-            <div class="flex flex-col space-y-8">
-              @if (filteredNetworks().popular.length > 0) {
-                <div>
-                  <h2 class="text-2xl font-bold text-white mb-4">Popular Networks</h2>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
-                    @for (network of filteredNetworks().popular; track network.id) {
-                      <app-channel-card
-                        [channel]="network"
-                        [isSubscribed]="isSubscribed(network.id)"
-                        (subscribeClicked)="toggleSubscription(network, 'network')"
-                        (cardClicked)="onChannelSelected(network, 'network')"
-                      ></app-channel-card>
-                    }
-                  </div>
-                </div>
-              }
-              @if (filteredNetworks().other.length > 0) {
-                <div>
-                  <h2 class="text-2xl font-bold text-white mb-4">All Networks</h2>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
-                    @for (network of filteredNetworks().other; track network.id) {
-                      <app-channel-card
-                        [channel]="network"
-                        [isSubscribed]="isSubscribed(network.id)"
-                        (subscribeClicked)="toggleSubscription(network, 'network')"
-                        (cardClicked)="onChannelSelected(network, 'network')"
-                      ></app-channel-card>
-                    }
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+              @for (network of filteredChannels(); track network.id) {
+                <app-channel-card
+                  [channel]="network"
+                  [isSubscribed]="isSubscribed(network.id)"
+                  (subscribeClicked)="toggleSubscription(network, 'network')"
+                  (cardClicked)="onChannelSelected(network, 'network')"
+                ></app-channel-card>
               }
             </div>
           }
@@ -124,42 +125,20 @@
             }
           </div>
         } @else {
-          @if (filteredMovieStudios().popular.length === 0 && filteredMovieStudios().other.length === 0) {
+          @if (filteredChannels().length === 0) {
             <div class="text-center py-16">
-              <h2 class="text-2xl font-semibold text-zinc-400">No movie studios found for "{{ searchQuery() }}"</h2>
-              <p class="text-zinc-500 mt-2">Try a different search.</p>
+              <h2 class="text-2xl font-semibold text-zinc-400">No movie studios found</h2>
+              <p class="text-zinc-500 mt-2">Try adjusting your search or filters.</p>
             </div>
           } @else {
-            <div class="flex flex-col space-y-8">
-              @if (filteredMovieStudios().popular.length > 0) {
-                <div>
-                  <h2 class="text-2xl font-bold text-white mb-4">Popular Movie Studios</h2>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
-                    @for (studio of filteredMovieStudios().popular; track studio.id) {
-                      <app-channel-card
-                        [channel]="studio"
-                        [isSubscribed]="isSubscribed(studio.id)"
-                        (subscribeClicked)="toggleSubscription(studio, 'company')"
-                        (cardClicked)="onChannelSelected(studio, 'company')"
-                      ></app-channel-card>
-                    }
-                  </div>
-                </div>
-              }
-              @if (filteredMovieStudios().other.length > 0) {
-                <div>
-                  <h2 class="text-2xl font-bold text-white mb-4">All Movie Studios</h2>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
-                    @for (studio of filteredMovieStudios().other; track studio.id) {
-                      <app-channel-card
-                        [channel]="studio"
-                        [isSubscribed]="isSubscribed(studio.id)"
-                        (subscribeClicked)="toggleSubscription(studio, 'company')"
-                        (cardClicked)="onChannelSelected(studio, 'company')"
-                      ></app-channel-card>
-                    }
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+              @for (studio of filteredChannels(); track studio.id) {
+                <app-channel-card
+                  [channel]="studio"
+                  [isSubscribed]="isSubscribed(studio.id)"
+                  (subscribeClicked)="toggleSubscription(studio, 'company')"
+                  (cardClicked)="onChannelSelected(studio, 'company')"
+                ></app-channel-card>
               }
             </div>
           }
@@ -178,42 +157,20 @@
             }
           </div>
         } @else {
-          @if (filteredAnimeStudios().popular.length === 0 && filteredAnimeStudios().other.length === 0) {
+          @if (filteredChannels().length === 0) {
             <div class="text-center py-16">
-              <h2 class="text-2xl font-semibold text-zinc-400">No anime studios found for "{{ searchQuery() }}"</h2>
-              <p class="text-zinc-500 mt-2">Try a different search.</p>
+              <h2 class="text-2xl font-semibold text-zinc-400">No anime studios found</h2>
+              <p class="text-zinc-500 mt-2">Try adjusting your search or filters.</p>
             </div>
           } @else {
-            <div class="flex flex-col space-y-8">
-              @if (filteredAnimeStudios().popular.length > 0) {
-                <div>
-                  <h2 class="text-2xl font-bold text-white mb-4">Popular Anime Studios</h2>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
-                    @for (studio of filteredAnimeStudios().popular; track studio.id) {
-                      <app-channel-card
-                        [channel]="studio"
-                        [isSubscribed]="isSubscribed(studio.id)"
-                        (subscribeClicked)="toggleSubscription(studio, 'company')"
-                        (cardClicked)="onChannelSelected(studio, 'company')"
-                      ></app-channel-card>
-                    }
-                  </div>
-                </div>
-              }
-              @if (filteredAnimeStudios().other.length > 0) {
-                <div>
-                  <h2 class="text-2xl font-bold text-white mb-4">All Anime Studios</h2>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
-                    @for (studio of filteredAnimeStudios().other; track studio.id) {
-                      <app-channel-card
-                        [channel]="studio"
-                        [isSubscribed]="isSubscribed(studio.id)"
-                        (subscribeClicked)="toggleSubscription(studio, 'company')"
-                        (cardClicked)="onChannelSelected(studio, 'company')"
-                      ></app-channel-card>
-                    }
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+              @for (studio of filteredChannels(); track studio.id) {
+                <app-channel-card
+                  [channel]="studio"
+                  [isSubscribed]="isSubscribed(studio.id)"
+                  (subscribeClicked)="toggleSubscription(studio, 'company')"
+                  (cardClicked)="onChannelSelected(studio, 'company')"
+                ></app-channel-card>
               }
             </div>
           }

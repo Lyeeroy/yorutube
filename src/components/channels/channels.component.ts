@@ -19,42 +19,73 @@ export class ChannelsComponent {
   private navigationService = inject(NavigationService);
 
   activeTab = signal<'networks' | 'movieStudios' | 'animeStudios'>('networks');
+  
+  // Filters
   searchQuery = signal('');
+  sortBy = signal<'relevance' | 'name_asc' | 'name_desc'>('relevance');
+  selectedCountry = signal<string>('all');
 
   loading = signal({ networks: true, movieStudios: true, animeStudios: true });
   
-  networks = signal<{ popular: Network[], other: Network[] }>({ popular: [], other: [] });
-  movieStudios = signal<{ popular: ProductionCompany[], other: ProductionCompany[] }>({ popular: [], other: [] });
-  animeStudios = signal<{ popular: ProductionCompany[], other: ProductionCompany[] }>({ popular: [], other: [] });
+  networks = signal<Network[]>([]);
+  movieStudios = signal<ProductionCompany[]>([]);
+  animeStudios = signal<ProductionCompany[]>([]);
+  
+  availableCountries = computed(() => {
+    const tab = this.activeTab();
+    let channels: (Network | ProductionCompany)[] = [];
+    if (tab === 'networks') channels = this.networks();
+    else if (tab === 'movieStudios') channels = this.movieStudios();
+    else if (tab === 'animeStudios') channels = this.animeStudios();
 
-  filteredNetworks = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
-    const data = this.networks();
-    if (!query) return data;
-    return {
-      popular: data.popular.filter(item => item.name.toLowerCase().includes(query)),
-      other: data.other.filter(item => item.name.toLowerCase().includes(query))
-    };
+    const countryCodes = new Set(channels.map(c => c.origin_country).filter(Boolean));
+    
+    try {
+        const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+        const countries = Array.from(countryCodes).map(code => ({
+            code,
+            name: displayNames.of(code) || code
+        })).filter(c => c.name !== c.code); // Filter out codes that couldn't be converted
+
+        return countries.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (e) {
+        console.error('Intl.DisplayNames not supported or error:', e);
+        return [];
+    }
   });
 
-  filteredMovieStudios = computed(() => {
+  filteredChannels = computed(() => {
+    const tab = this.activeTab();
     const query = this.searchQuery().toLowerCase().trim();
-    const data = this.movieStudios();
-    if (!query) return data;
-    return {
-      popular: data.popular.filter(item => item.name.toLowerCase().includes(query)),
-      other: data.other.filter(item => item.name.toLowerCase().includes(query))
-    };
-  });
+    const country = this.selectedCountry();
+    const sort = this.sortBy();
 
-  filteredAnimeStudios = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
-    const data = this.animeStudios();
-    if (!query) return data;
-    return {
-      popular: data.popular.filter(item => item.name.toLowerCase().includes(query)),
-      other: data.other.filter(item => item.name.toLowerCase().includes(query))
-    };
+    let channels: (Network | ProductionCompany)[] = [];
+    if (tab === 'networks') channels = this.networks();
+    else if (tab === 'movieStudios') channels = this.movieStudios();
+    else channels = this.animeStudios();
+    
+    // 1. Filter
+    let filtered = channels;
+    if (query) {
+      filtered = filtered.filter(item => item.name.toLowerCase().includes(query));
+    }
+    if (country !== 'all') {
+      filtered = filtered.filter(item => item.origin_country === country);
+    }
+    
+    // 2. Sort
+    if (sort === 'relevance') {
+      return filtered; // Use default order from service
+    }
+
+    return [...filtered].sort((a, b) => {
+      if (sort === 'name_asc') {
+        return a.name.localeCompare(b.name);
+      } else { // name_desc
+        return b.name.localeCompare(a.name);
+      }
+    });
   });
 
   constructor() {
@@ -73,8 +104,11 @@ export class ChannelsComponent {
   }
   
   setActiveTab(tab: 'networks' | 'movieStudios' | 'animeStudios'): void {
+    if (this.activeTab() === tab) return;
     this.activeTab.set(tab);
     this.searchQuery.set('');
+    this.sortBy.set('relevance');
+    this.selectedCountry.set('all');
   }
 
   updateSearchQuery(event: Event): void {
@@ -83,6 +117,14 @@ export class ChannelsComponent {
 
   clearSearchQuery(): void {
     this.searchQuery.set('');
+  }
+
+  onSortChange(event: Event): void {
+    this.sortBy.set((event.target as HTMLSelectElement).value as 'relevance' | 'name_asc' | 'name_desc');
+  }
+  
+  onCountryChange(event: Event): void {
+    this.selectedCountry.set((event.target as HTMLSelectElement).value);
   }
 
   isSubscribed(networkId: number): boolean {
