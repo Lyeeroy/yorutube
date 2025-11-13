@@ -226,6 +226,27 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     return `${baseUrl}?${queryString}`;
   });
 
+  vidsrcUrl = computed<string | null>(() => {
+    const media = this.selectedMediaItem();
+    if (!media) return null;
+
+    const queryParams: string[] = ['color=ff0000'];
+
+    if (this.autoplay()) {
+      queryParams.push('autoPlay=true');
+    }
+
+    const queryString = queryParams.join('&');
+
+    let baseUrl: string;
+    if (media.media_type === 'movie') {
+      baseUrl = `https://vidsrc.cc/v2/embed/movie/${media.id}`;
+    } else { // TV show
+      baseUrl = `https://vidsrc.cc/v2/embed/tv/${media.id}`;
+    }
+    return `${baseUrl}?${queryString}`;
+  });
+
   playerUrl = computed<string | null>(() => {
     switch (this.selectedPlayer()) {
       case "YouTube":
@@ -234,6 +255,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         return this.videasyUrl();
       case "VIDLINK":
         return this.vidlinkUrl();
+      case "VIDSRC":
+        return this.vidsrcUrl();
       default:
         return null;
     }
@@ -353,6 +376,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       const allowedOrigins = [
         "https://player.videasy.net",
         "https://vidlink.pro",
+        "https://vidsrc.cc",
       ];
       if (!allowedOrigins.includes(event.origin)) return;
 
@@ -418,6 +442,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
               episodeChangeData = { season, episode };
             }
           }
+        } else if (
+          event.origin === "https://vidsrc.cc" &&
+          payload?.type === "PLAYER_EVENT" &&
+          typeof d.season === "number" &&
+          typeof d.episode === "number"
+        ) {
+          episodeChangeData = { season: d.season, episode: d.episode };
         }
 
         if (this.playerHasStarted() && episodeChangeData) {

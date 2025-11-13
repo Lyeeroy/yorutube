@@ -1,16 +1,17 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, inject, effect, DestroyRef } from '@angular/core';
 import { MediaType, Movie, TvShow, TvShowDetails, SubscribableChannel } from '../../models/movie.model';
-import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { MovieService } from '../../services/movie.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { VideoCardComponent } from '../video-card/video-card.component';
+import { Observable } from 'rxjs';
 
 const isMovie = (media: MediaType | TvShowDetails): media is Movie => media.media_type === 'movie';
 
 @Component({
   selector: 'app-related-videos',
   standalone: true,
-  imports: [CommonModule, NgOptimizedImage, VideoCardComponent],
+  imports: [CommonModule, VideoCardComponent],
   templateUrl: './related-videos.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -36,7 +37,8 @@ export class RelatedVideosComponent {
     this.loading.set(true);
     this.mediaItems.set([]);
 
-    const recommendations$ = isMovie(media)
+    // FIX: Explicitly typing `recommendations$` resolves an issue where its type was inferred as `unknown` by TypeScript.
+    const recommendations$: Observable<MediaType[]> = isMovie(media)
       ? this.movieService.getMovieRecommendations(media.id)
       : this.movieService.getTvShowRecommendations(media.id);
 

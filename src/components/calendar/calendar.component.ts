@@ -4,7 +4,6 @@ import { MovieService } from '../../services/movie.service';
 import { MediaType, Movie, TvShow } from '../../models/movie.model';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MediaDetailModalComponent } from '../media-detail-modal/media-detail-modal.component';
-import { NgOptimizedImage } from '@angular/common';
 import { DayDetailModalComponent } from '../day-detail-modal/day-detail-modal.component';
 
 interface CalendarDay {
@@ -21,7 +20,7 @@ interface CalendarWeek {
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [CommonModule, MediaDetailModalComponent, NgOptimizedImage, DatePipe, DayDetailModalComponent],
+  imports: [CommonModule, MediaDetailModalComponent, DatePipe, DayDetailModalComponent],
   templateUrl: './calendar.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, signal, inject, computed, DestroyRef, HostListener, ElementRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MovieService } from '../../services/movie.service';
-import { DiscoverParams, MediaType } from '../../models/movie.model';
+import { DiscoverParams, MediaType, Network, ProductionCompany } from '../../models/movie.model';
 import { VideoGridComponent } from '../video-grid/video-grid.component';
 import { InfiniteScrollTriggerComponent } from '../infinite-scroll-trigger/infinite-scroll-trigger.component';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -38,9 +38,9 @@ export class DiscoverComponent implements OnInit {
   // Filter options
   private movieGenres = toSignal(this.movieService.getMovieGenreMap());
   private tvGenres = toSignal(this.movieService.getTvGenreMap());
-  availableNetworks = toSignal(this.movieService.getPopularNetworks());
-  availableMovieStudios = toSignal(this.movieService.getPopularMovieStudios(), { initialValue: { popular: [], other: [] } });
-  availableAnimeStudios = toSignal(this.movieService.getPopularAnimeStudios(), { initialValue: { popular: [], other: [] } });
+  private _allAvailableNetworks = toSignal(this.movieService.getPopularNetworks(), { initialValue: [] as Network[] });
+  private _allAvailableMovieStudios = toSignal(this.movieService.getPopularMovieStudios(), { initialValue: [] as ProductionCompany[] });
+  private _allAvailableAnimeStudios = toSignal(this.movieService.getPopularAnimeStudios(), { initialValue: [] as ProductionCompany[] });
 
   // Selected filters
   selectedGenres = signal<number[]>([]);
@@ -52,9 +52,25 @@ export class DiscoverComponent implements OnInit {
   // Channel search filter
   channelSearchQuery = signal('');
 
+  private readonly popularNetworkIds = new Set([213, 49, 2739, 1024, 453, 2552, 3353]);
+
+  availableNetworks = computed(() => {
+    const networks = this._allAvailableNetworks();
+    const popular = networks.filter(n => this.popularNetworkIds.has(n.id));
+    const other = networks.filter(n => !this.popularNetworkIds.has(n.id));
+    return { popular, other };
+  });
+
+  private availableMovieStudios = computed(() => {
+    return { popular: this._allAvailableMovieStudios(), other: [] };
+  });
+
+  private availableAnimeStudios = computed(() => {
+    return { popular: this._allAvailableAnimeStudios(), other: [] };
+  });
+
   filteredNetworks = computed(() => {
     const networks = this.availableNetworks();
-    if (!networks) return { popular: [], other: [] };
     const query = this.channelSearchQuery().toLowerCase().trim();
     if (!query) return networks;
 
@@ -141,11 +157,12 @@ export class DiscoverComponent implements OnInit {
 
     if (networkId) {
         const networks = this.availableNetworks();
-        return [...(networks?.popular ?? []), ...(networks?.other ?? [])].find(n => n.id === networkId)?.name;
+        return [...networks.popular, ...networks.other].find(n => n.id === networkId)?.name;
     }
     if (companyId) {
         const studios = this.availableStudios();
-        return [...(studios?.popular ?? []), ...(studios?.other ?? [])].find(c => c.id === companyId)?.name;
+        if (!studios) return null;
+        return [...studios.popular, ...studios.other].find(c => c.id === companyId)?.name;
     }
     return null;
   });

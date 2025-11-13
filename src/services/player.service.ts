@@ -1,6 +1,6 @@
 import { Injectable, signal, effect } from '@angular/core';
 
-export type PlayerType = 'YouTube' | 'VIDEASY' | 'VIDLINK';
+export type PlayerType = 'YouTube' | 'VIDEASY' | 'VIDLINK' | 'VIDSRC';
 const PLAYER_STORAGE_KEY = 'yorutube-player';
 const AUTO_NEXT_STORAGE_KEY = 'yorutube-auto-next';
 
@@ -8,7 +8,7 @@ const AUTO_NEXT_STORAGE_KEY = 'yorutube-auto-next';
   providedIn: 'root'
 })
 export class PlayerService {
-  players: PlayerType[] = ['YouTube', 'VIDEASY', 'VIDLINK'];
+  players: PlayerType[] = ['YouTube', 'VIDEASY', 'VIDLINK', 'VIDSRC'];
   selectedPlayer = signal<PlayerType>('VIDLINK');
   autoNextEnabled = signal<boolean>(true);
 

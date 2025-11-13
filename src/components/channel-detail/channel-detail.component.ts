@@ -209,7 +209,7 @@ export class ChannelDetailComponent {
             });
         } else { // type === 'company'
             mergeCheckSub = this.movieService.getPopularNetworks().pipe(
-                map(grouped => [...grouped.popular, ...grouped.other].find(n => n.name.toLowerCase() === name.toLowerCase())),
+                map(networks => networks.find(n => n.name.toLowerCase() === name.toLowerCase())),
                 catchError(() => of(undefined))
             ).subscribe(network => {
                 if (network) {
