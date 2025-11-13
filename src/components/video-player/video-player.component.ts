@@ -230,6 +230,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const media = this.selectedMediaItem();
     if (!media) return null;
 
+    const episode = this.currentEpisode();
     const queryParams: string[] = ['color=ff0000'];
 
     if (this.autoplay()) {
@@ -241,8 +242,20 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     let baseUrl: string;
     if (media.media_type === 'movie') {
       baseUrl = `https://vidsrc.cc/v2/embed/movie/${media.id}`;
-    } else { // TV show
-      baseUrl = `https://vidsrc.cc/v2/embed/tv/${media.id}`;
+    } else if (media.media_type === 'tv' && episode) {
+      baseUrl = `https://vidsrc.cc/v2/embed/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
+    } else if (media.media_type === 'tv') {
+      const tvDetails = media as TvShowDetails;
+      const firstSeason =
+        tvDetails.seasons.find((s) => s.season_number > 0) ||
+        tvDetails.seasons[0];
+       if (firstSeason) {
+        baseUrl = `https://vidsrc.cc/v2/embed/tv/${media.id}/${firstSeason.season_number}/1`;
+      } else {
+        return null;
+      }
+    } else {
+      return null;
     }
     return `${baseUrl}?${queryString}`;
   });
@@ -526,8 +539,35 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       episode: data.episode,
     };
 
-    const lastPlayerState = this.lastPlayerEpisodeState();
+    // Get the current episode from our app's state (from params)
+    const currentParams = untracked(() => this.params());
+    const appEpisodeState: PlayerEpisodeState | null =
+      currentParams?.season && currentParams?.episode
+        ? { season: +currentParams.season, episode: +currentParams.episode }
+        : null;
 
+    // If the player state already matches the app state,
+    // just update our internal 'last state' and exit to prevent a navigation loop.
+    if (
+      appEpisodeState &&
+      appEpisodeState.season === playerEpisode.season &&
+      appEpisodeState.episode === playerEpisode.episode
+    ) {
+      const lastPlayerState = this.lastPlayerEpisodeState();
+      // Only set if it's not already set, to avoid extra signal writes.
+      if (
+        !lastPlayerState ||
+        lastPlayerState.season !== playerEpisode.season ||
+        lastPlayerState.episode !== playerEpisode.episode
+      ) {
+        this.lastPlayerEpisodeState.set(playerEpisode);
+      }
+      return;
+    }
+
+    // If we've reached here, it means the player has navigated to a DIFFERENT episode
+    // than what our app's URL params say. We need to sync our app.
+    const lastPlayerState = this.lastPlayerEpisodeState();
     const hasPlayerChangedEpisode =
       !lastPlayerState ||
       lastPlayerState.season !== playerEpisode.season ||
@@ -536,19 +576,20 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (hasPlayerChangedEpisode) {
       this.lastPlayerEpisodeState.set(playerEpisode);
 
-      // This is a crucial fix: update the application's navigation state
-      // to match the player's internal state without reloading the iframe.
-      // This prevents issues when the player's internal "next" button is used.
+      // Tell the component not to reload the iframe since the player did it internally.
       this.skipNextPlayerUpdate.set(true);
+
+      // Update the URL and app state to match the player.
       this.navigationService.navigateTo("watch", {
         mediaType: "tv",
         id: media.id,
         season: playerEpisode.season,
         episode: playerEpisode.episode,
         playlistId: this.playlist()?.id,
-        autoplay: true, // Auto-next implies we want to autoplay the new content
+        autoplay: true,
       });
 
+      // Update the currentEpisode signal so the UI reflects the change.
       this.movieService
         .getSeasonDetails(media.id, playerEpisode.season)
         .pipe(takeUntilDestroyed(this.destroyRef))
@@ -560,8 +601,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           if (newEpisode) {
             this.currentEpisode.set(newEpisode);
             this.historyAdded.set(false);
-            // Reset the auto-play trigger for the new episode, allowing VIDLINK's
-            // auto-play to function correctly for the newly loaded episode.
             this.autoPlayNextTriggered.set(false);
           }
         });
