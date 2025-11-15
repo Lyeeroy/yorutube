@@ -30,7 +30,7 @@ export class VideasyPlayerProvider implements IPlayerProvider {
     }
 
     if (resumeTime && resumeTime > 5) {
-      queryParams.push(`t=${Math.floor(resumeTime)}`);
+      queryParams.push(`progress=${Math.floor(resumeTime)}`);
     }
 
     if (autoplay) {

@@ -18,7 +18,7 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
   readonly origin = "https://vidlink.pro";
 
   generateUrl(config: PlayerUrlConfig): string | null {
-    const { media, episode, autoplay, autoNext } = config;
+    const { media, episode, autoplay, autoNext, resumeTime } = config;
 
     const queryParams: string[] = [
       "primaryColor=ff0000",
@@ -36,6 +36,11 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
 
     if (autoplay) {
       queryParams.push("autoplay=true");
+    }
+
+    // Support resuming playback from a specific time (seconds) for Vidlink
+    if (resumeTime && resumeTime > 5) {
+      queryParams.push(`startAt=${Math.floor(resumeTime)}`);
     }
 
     const queryString = queryParams.join("&");

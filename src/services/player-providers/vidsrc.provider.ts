@@ -17,12 +17,17 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
   readonly origin = "https://vidsrc.cc";
 
   generateUrl(config: PlayerUrlConfig): string | null {
-    const { media, episode, autoplay } = config;
+    const { media, episode, autoplay, resumeTime } = config;
 
     const queryParams: string[] = ["color=ff0000"];
 
     if (autoplay) {
       queryParams.push("autoPlay=true");
+    }
+
+    // Support resuming playback from a specific time (seconds) for Vidsrc
+    if (resumeTime && resumeTime > 5) {
+      queryParams.push(`startAt=${Math.floor(resumeTime)}`);
     }
 
     const queryString = queryParams.join("&");
