@@ -1,0 +1,41 @@
+/**
+ * Player Providers Registry
+ *
+ * This is the ONLY file you need to edit when adding a new player provider.
+ *
+ * To add a new provider:
+ * 1. Create your provider file (e.g., newplayer.provider.ts)
+ * 2. Import it below
+ * 3. Add it to the REGISTERED_PROVIDERS array
+ *
+ * That's it! The provider will automatically:
+ * - Appear in the player selection dropdown
+ * - Be available for playback
+ * - Handle all postMessage events
+ *
+ * No need to modify ANY other files!
+ */
+
+import { IPlayerProvider } from "../../models/player-provider.model";
+// import { YouTubePlayerProvider } from "./youtube.provider";
+import { VideasyPlayerProvider } from "./videasy.provider";
+import { VidlinkPlayerProvider } from "./vidlink.provider";
+import { VidsrcPlayerProvider } from "./vidsrc.provider";
+
+/**
+ * Central registry of all player providers.
+ * Add new provider instances here to make them available app-wide.
+ * The order here determines the order in the UI dropdown.
+ */
+export const REGISTERED_PROVIDERS: IPlayerProvider[] = [
+  //   new YouTubePlayerProvider(),
+  new VideasyPlayerProvider(),
+  new VidlinkPlayerProvider(),
+  new VidsrcPlayerProvider(),
+];
+
+// Optional: Export individual providers for direct access if needed
+// export { YouTubePlayerProvider } from "./youtube.provider";
+export { VideasyPlayerProvider } from "./videasy.provider";
+export { VidlinkPlayerProvider } from "./vidlink.provider";
+export { VidsrcPlayerProvider } from "./vidsrc.provider";

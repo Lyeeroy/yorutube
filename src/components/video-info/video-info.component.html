@@ -1,47 +1,67 @@
 <div class="text-white">
   <h1 class="text-xl md:text-2xl font-bold">{{ mediaTitle() }}</h1>
 
-  <div class="flex flex-col md:flex-row md:flex-wrap md:items-center justify-between mt-3 gap-4">
+  <div
+    class="flex flex-col md:flex-row md:flex-wrap md:items-center justify-between mt-3 gap-4"
+  >
     <!-- Channel Info & Subscribe Button -->
     <div class="flex items-center justify-between">
       @if (channelInfo(); as channel) {
-        <div (click)="onChannelClick()" class="flex items-center space-x-3 min-w-0" [class.cursor-pointer]="subscribableChannel()">
-          @if (channel.logoUrl) {
-            <div class="h-10 w-10 rounded-full bg-white flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity relative">
-              <img [ngSrc]="channel.logoUrl" [alt]="channel.name + ' Logo'" fill class="p-1.5 object-contain">
-            </div>
-          } @else {
-             <div class="h-10 w-10 rounded-full bg-zinc-700 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity">
-              <span class="material-symbols-outlined text-2xl text-zinc-400">auto_awesome</span>
-            </div>
-          }
-          <div class="min-w-0">
-            <p class="text-white font-semibold truncate hover:text-red-500 transition-colors">{{ channel.name }}</p>
-          </div>
+      <div
+        (click)="onChannelClick()"
+        class="flex items-center space-x-3 min-w-0"
+        [class.cursor-pointer]="subscribableChannel()"
+      >
+        @if (channel.logoUrl) {
+        <div
+          class="h-10 w-10 rounded-full bg-white flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity relative"
+        >
+          <img
+            [ngSrc]="channel.logoUrl"
+            [alt]="channel.name + ' Logo'"
+            fill
+            class="p-1.5 object-contain"
+          />
         </div>
+        } @else {
+        <div
+          class="h-10 w-10 rounded-full bg-zinc-700 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
+        >
+          <span class="material-symbols-outlined text-2xl text-zinc-400"
+            >auto_awesome</span
+          >
+        </div>
+        }
+        <div class="min-w-0">
+          <p
+            class="text-white font-semibold truncate hover:text-red-500 transition-colors"
+          >
+            {{ channel.name }}
+          </p>
+        </div>
+      </div>
       } @else {
-        <!-- Skeleton loader for channel info -->
-        <div class="flex items-center space-x-3 animate-pulse min-w-0">
-          <div class="h-10 w-10 rounded-full bg-zinc-700"></div>
-          <div class="flex-1 space-y-2">
-            <div class="h-4 bg-zinc-700 rounded w-48"></div>
-            <div class="h-3 bg-zinc-700 rounded w-32"></div>
-          </div>
+      <!-- Skeleton loader for channel info -->
+      <div class="flex items-center space-x-3 animate-pulse min-w-0">
+        <div class="h-10 w-10 rounded-full bg-zinc-700"></div>
+        <div class="flex-1 space-y-2">
+          <div class="h-4 bg-zinc-700 rounded w-48"></div>
+          <div class="h-3 bg-zinc-700 rounded w-32"></div>
         </div>
-      }
-
-      @if (subscribableChannel()) {
-        <button 
-          (click)="toggleSubscription()"
-          class="ml-4 text-sm font-bold py-2 px-5 rounded-full transition-colors shrink-0"
-          [class.bg-white]="!isSubscribed()"
-          [class.text-black]="!isSubscribed()"
-          [class.hover:bg-zinc-200]="!isSubscribed()"
-          [class.bg-zinc-600]="isSubscribed()"
-          [class.hover:bg-zinc-500]="isSubscribed()"
-          [class.text-white]="isSubscribed()">
-          {{ isSubscribed() ? 'Subscribed' : 'Subscribe' }}
-        </button>
+      </div>
+      } @if (subscribableChannel()) {
+      <button
+        (click)="toggleSubscription()"
+        class="ml-4 text-sm font-bold py-2 px-5 rounded-full transition-colors shrink-0"
+        [class.bg-white]="!isSubscribed()"
+        [class.text-black]="!isSubscribed()"
+        [class.hover:bg-zinc-200]="!isSubscribed()"
+        [class.bg-zinc-600]="isSubscribed()"
+        [class.hover:bg-zinc-500]="isSubscribed()"
+        [class.text-white]="isSubscribed()"
+      >
+        {{ isSubscribed() ? "Subscribed" : "Subscribe" }}
+      </button>
       }
     </div>
 
@@ -49,165 +69,215 @@
     <div class="flex items-center space-x-2">
       <!-- Sources Dropdown -->
       <div class="relative">
-        <button (click)="toggleSourcesDropdown($event)" class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full">
+        <button
+          (click)="toggleSourcesDropdown($event)"
+          class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+        >
           <span class="material-symbols-outlined text-xl">play_circle</span>
           <span class="hidden md:inline">Sources</span>
-           <span class="material-symbols-outlined text-base transition-transform" [class.rotate-180]="showSourcesDropdown()">expand_more</span>
+          <span
+            class="material-symbols-outlined text-base transition-transform"
+            [class.rotate-180]="showSourcesDropdown()"
+            >expand_more</span
+          >
         </button>
         @if (showSourcesDropdown()) {
-          <div (click)="$event.stopPropagation()" class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1">
-            <button (click)="selectPlayer('VIDLINK')" class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-              <span>VIDLINK</span>
-              @if (selectedPlayer() === 'VIDLINK') {
-                <span class="material-symbols-outlined text-xl text-red-500">check</span>
-              }
-            </button>
-            <button (click)="selectPlayer('VIDEASY')" class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-              <span>VIDEASY</span>
-              @if (selectedPlayer() === 'VIDEASY') {
-                <span class="material-symbols-outlined text-xl text-red-500">check</span>
-              }
-            </button>
-            <button (click)="selectPlayer('VIDSRC')" class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-              <span>VIDSRC</span>
-              @if (selectedPlayer() === 'VIDSRC') {
-                <span class="material-symbols-outlined text-xl text-red-500">check</span>
-              }
-            </button>
-          </div>
+        <div
+          (click)="$event.stopPropagation()"
+          class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
+        >
+          @for (player of availablePlayers(); track player) {
+          <button
+            (click)="selectPlayer(player)"
+            class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+          >
+            <span>{{ player }}</span>
+            @if (selectedPlayer() === player) {
+            <span class="material-symbols-outlined text-xl text-red-500"
+              >check</span
+            >
+            }
+          </button>
+          }
+        </div>
         }
       </div>
 
-      <button (click)="toggleWatchlist()" class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full">
-       <span class="material-symbols-outlined text-xl" [class.material-symbols-filled]="isOnWatchlist()">watch_later</span>
-       <span class="hidden md:inline">{{ isOnWatchlist() ? 'Added' : 'Watchlist' }}</span>
-     </button>
-     <button (click)="showPlaylistModal.set(true)" class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full">
-       <span class="material-symbols-outlined text-xl">{{ isInPlaylist() ? 'playlist_add_check' : 'playlist_add' }}</span>
-       <span class="hidden md:inline">{{ isInPlaylist() ? 'Saved' : 'Save' }}</span>
-     </button>
-     
-     <!-- More Options Menu -->
-     <div class="relative">
-       <button (click)="toggleMoreOptionsMenu($event)" class="flex items-center justify-center w-10 h-10 bg-zinc-800 hover:bg-zinc-700 rounded-full">
-         <span class="material-symbols-outlined text-xl">more_vert</span>
-       </button>
+      <button
+        (click)="toggleWatchlist()"
+        class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+      >
+        <span
+          class="material-symbols-outlined text-xl"
+          [class.material-symbols-filled]="isOnWatchlist()"
+          >watch_later</span
+        >
+        <span class="hidden md:inline">{{
+          isOnWatchlist() ? "Added" : "Watchlist"
+        }}</span>
+      </button>
+      <button
+        (click)="showPlaylistModal.set(true)"
+        class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+      >
+        <span class="material-symbols-outlined text-xl">{{
+          isInPlaylist() ? "playlist_add_check" : "playlist_add"
+        }}</span>
+        <span class="hidden md:inline">{{
+          isInPlaylist() ? "Saved" : "Save"
+        }}</span>
+      </button>
 
-       @if (showMoreOptionsMenu()) {
-         <div (click)="$event.stopPropagation()" class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1">
-           @if (videoDetails()) {
-             <button (click)="onWatchTrailerClick()" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-                <span class="material-symbols-outlined text-xl">play_arrow</span>
-               <span>Watch Trailer</span>
-             </button>
-           }
-           <button (click)="toggleAutoNext()" class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
+      <!-- More Options Menu -->
+      <div class="relative">
+        <button
+          (click)="toggleMoreOptionsMenu($event)"
+          class="flex items-center justify-center w-10 h-10 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+        >
+          <span class="material-symbols-outlined text-xl">more_vert</span>
+        </button>
+
+        @if (showMoreOptionsMenu()) {
+        <div
+          (click)="$event.stopPropagation()"
+          class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
+        >
+          @if (videoDetails()) {
+          <button
+            (click)="onWatchTrailerClick()"
+            class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+          >
+            <span class="material-symbols-outlined text-xl">play_arrow</span>
+            <span>Watch Trailer</span>
+          </button>
+          }
+          <button
+            (click)="toggleAutoNext()"
+            class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+          >
             <div class="flex items-center space-x-3">
-               <span class="material-symbols-outlined text-xl">skip_next</span>
-               <span>Auto Next</span>
+              <span class="material-symbols-outlined text-xl">skip_next</span>
+              <span>Auto Next</span>
             </div>
             <!-- Toggle Switch UI -->
-            <div class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors" [class.bg-red-600]="autoNextEnabled()" [class.bg-zinc-600]="!autoNextEnabled()">
-               <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform" [class.translate-x-6]="autoNextEnabled()" [class.translate-x-1]="!autoNextEnabled()"></span>
+            <div
+              class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+              [class.bg-red-600]="autoNextEnabled()"
+              [class.bg-zinc-600]="!autoNextEnabled()"
+            >
+              <span
+                class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+                [class.translate-x-6]="autoNextEnabled()"
+                [class.translate-x-1]="!autoNextEnabled()"
+              ></span>
             </div>
           </button>
-          <button (click)="onRefreshPlayerClick()" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
+          <button
+            (click)="onRefreshPlayerClick()"
+            class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+          >
             <span class="material-symbols-outlined text-xl">refresh</span>
             <span>Refresh Player</span>
           </button>
-           <button class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-             <span class="material-symbols-outlined text-xl">share</span>
-             <span>Share</span>
-           </button>
-         </div>
-       }
-     </div>
-   </div>
+          <button
+            class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+          >
+            <span class="material-symbols-outlined text-xl">share</span>
+            <span>Share</span>
+          </button>
+        </div>
+        }
+      </div>
+    </div>
   </div>
 
   <!-- Description Box -->
-  <div 
+  <div
     (click)="toggleDescription()"
-    class="bg-zinc-800 rounded-xl mt-4 text-sm text-zinc-300 cursor-pointer hover:bg-zinc-700/50 transition-colors">
+    class="bg-zinc-800 rounded-xl mt-4 text-sm text-zinc-300 cursor-pointer hover:bg-zinc-700/50 transition-colors"
+  >
     <div class="p-4">
       <!-- Header: Always visible -->
       <p class="font-semibold text-white">{{ releaseDateInfo() }}</p>
 
       @if (descriptionExpanded()) {
-        <!-- Expanded Content -->
-        <div class="mt-3">
-          @if (overview()) {
-            <p class="leading-relaxed whitespace-pre-wrap">
-              {{ overview() }}
-            </p>
-          }
-          <div class="mt-4 pt-4 border-t border-zinc-700 space-y-3">
-            @if (runtimeInfo()) {
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
-                <span class="font-semibold text-zinc-400">Duration</span>
-                <span class="sm:col-span-2">{{ runtimeInfo() }}</span>
-              </div>
-            }
-             @if (genres().length > 0) {
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
-                <span class="font-semibold text-zinc-400">Genre</span>
-                <span class="sm:col-span-2">{{ genresString() }}</span>
-              </div>
-            }
-            @if (castString()) {
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
-                <span class="font-semibold text-zinc-400">Starring</span>
-                <span class="sm:col-span-2">{{ castString() }}</span>
-              </div>
-            }
-            @if (director()) {
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
-                <span class="font-semibold text-zinc-400">Director</span>
-                <span class="sm:col-span-2">{{ director() }}</span>
-              </div>
-            }
-             @if (creatorsString()) {
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
-                <span class="font-semibold text-zinc-400">Creators</span>
-                <span class="sm:col-span-2">{{ creatorsString() }}</span>
-              </div>
-            }
-            @if(movieDetails()?.belongs_to_collection; as collection) {
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
-                  <span class="font-semibold text-zinc-400">Part of</span>
-                  <button (click)="$event.stopPropagation(); goToCollection(collection)" class="text-red-500 hover:underline text-left sm:col-span-2">{{ collection.name }}</button>
-              </div>
-            }
+      <!-- Expanded Content -->
+      <div class="mt-3">
+        @if (overview()) {
+        <p class="leading-relaxed whitespace-pre-wrap">
+          {{ overview() }}
+        </p>
+        }
+        <div class="mt-4 pt-4 border-t border-zinc-700 space-y-3">
+          @if (runtimeInfo()) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
+            <span class="font-semibold text-zinc-400">Duration</span>
+            <span class="sm:col-span-2">{{ runtimeInfo() }}</span>
           </div>
-          <span class="font-semibold mt-4 text-white inline-block">Show less</span>
-        </div>
-      } @else {
-        <!-- Collapsed Content -->
-        <div class="mt-1">
-          @if (overview()) {
-            <p class="leading-relaxed whitespace-pre-wrap line-clamp-2 text-zinc-400">
-              {{ overview() }}
-            </p>
+          } @if (genres().length > 0) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
+            <span class="font-semibold text-zinc-400">Genre</span>
+            <span class="sm:col-span-2">{{ genresString() }}</span>
+          </div>
+          } @if (castString()) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
+            <span class="font-semibold text-zinc-400">Starring</span>
+            <span class="sm:col-span-2">{{ castString() }}</span>
+          </div>
+          } @if (director()) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
+            <span class="font-semibold text-zinc-400">Director</span>
+            <span class="sm:col-span-2">{{ director() }}</span>
+          </div>
+          } @if (creatorsString()) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
+            <span class="font-semibold text-zinc-400">Creators</span>
+            <span class="sm:col-span-2">{{ creatorsString() }}</span>
+          </div>
+          } @if(movieDetails()?.belongs_to_collection; as collection) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-2">
+            <span class="font-semibold text-zinc-400">Part of</span>
+            <button
+              (click)="$event.stopPropagation(); goToCollection(collection)"
+              class="text-red-500 hover:underline text-left sm:col-span-2"
+            >
+              {{ collection.name }}
+            </button>
+          </div>
           }
-          <span class="font-semibold mt-2 text-white inline-block">...more</span>
         </div>
+        <span class="font-semibold mt-4 text-white inline-block"
+          >Show less</span
+        >
+      </div>
+      } @else {
+      <!-- Collapsed Content -->
+      <div class="mt-1">
+        @if (overview()) {
+        <p
+          class="leading-relaxed whitespace-pre-wrap line-clamp-2 text-zinc-400"
+        >
+          {{ overview() }}
+        </p>
+        }
+        <span class="font-semibold mt-2 text-white inline-block">...more</span>
+      </div>
       }
     </div>
   </div>
 
   <!-- Seasons & Episodes Section -->
   @if (tvShowDetails(); as tv) {
-    <app-episode-selector
-      [tvShowDetails]="tv"
-      [currentEpisode]="currentEpisode()"
-      (episodeSelected)="episodeSelected.emit($event)">
-    </app-episode-selector>
-  }
-  
-  @if (showPlaylistModal()) {
-    <app-add-to-playlist-modal 
-      [media]="media()"
-      (close)="showPlaylistModal.set(false)"
-    />
+  <app-episode-selector
+    [tvShowDetails]="tv"
+    [currentEpisode]="currentEpisode()"
+    (episodeSelected)="episodeSelected.emit($event)"
+  >
+  </app-episode-selector>
+  } @if (showPlaylistModal()) {
+  <app-add-to-playlist-modal
+    [media]="media()"
+    (close)="showPlaylistModal.set(false)"
+  />
   }
 </div>

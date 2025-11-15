@@ -40,6 +40,8 @@ import { PlaybackProgressService } from "../../services/playback-progress.servic
 import { PlaybackProgress } from "../../models/playback-progress.model";
 import { ContinueWatchingService } from "../../services/continue-watching.service";
 import { ContinueWatchingItem } from "../../models/continue-watching.model";
+import { PlayerProviderService } from "../../services/player-provider.service";
+import { PlayerUrlConfig } from "../../models/player-provider.model";
 
 const isMovie = (media: MediaType | TvShowDetails): media is Movie =>
   media.media_type === "movie";
@@ -71,6 +73,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private playerService = inject(PlayerService);
   private playbackProgressService = inject(PlaybackProgressService);
   private continueWatchingService = inject(ContinueWatchingService);
+  private playerProviderService = inject(PlayerProviderService);
   private destroyRef = inject(DestroyRef);
 
   params = input.required<any>();
@@ -100,6 +103,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Track if auto-play next has been triggered for current episode
   private autoPlayNextTriggered = signal(false);
 
+  // Track the previous media key to avoid blanking iframe on no-op param syncs
+  private previousMediaKey = signal<string | null>(null);
+
   selectedPlayer = this.playerService.selectedPlayer;
 
   // Autoplay state
@@ -121,13 +127,24 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     return `https://www.youtube.com/embed/${video.key}${autoplayParam}`;
   });
 
-  videasyUrl = computed<string | null>(() => {
+  playerUrl = computed<string | null>(() => {
+    const selectedPlayerId = this.selectedPlayer();
+
+    // YouTube uses trailer, handle separately
+    if (selectedPlayerId === "YouTube") {
+      return this.youtubeUrl();
+    }
+
     const media = this.selectedMediaItem();
     if (!media) return null;
+
+    const provider = this.playerProviderService.getProvider(selectedPlayerId);
+    if (!provider) return null;
 
     const episode = this.currentEpisode();
     const progressId = episode ? episode.id : media.id;
 
+    // Get resume time for supported players
     const progress = untracked(() =>
       this.playbackProgressService.getProgress(progressId)
     );
@@ -137,142 +154,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         ? progress.timestamp
         : 0;
 
-    const queryParams: string[] = [
-      "color=FF0000",
-      "nextEpisode=true",
-      "episodeSelector=true",
-    ];
+    const config: PlayerUrlConfig = {
+      media,
+      episode: episode || undefined,
+      autoplay: this.autoplay(),
+      autoNext: this.playerService.autoNextEnabled(),
+      resumeTime,
+    };
 
-    if (this.playerService.autoNextEnabled()) {
-      queryParams.push("autoplayNextEpisode=true");
-    }
-
-    if (resumeTime > 5) {
-      queryParams.push(`t=${Math.floor(resumeTime)}`);
-    }
-    if (this.autoplay()) {
-      queryParams.push("autoplay=1");
-    }
-
-    const queryString = queryParams.join("&");
-
-    let baseUrl: string;
-    if (media.media_type === "movie") {
-      baseUrl = `https://player.videasy.net/movie/${media.id}`;
-    } else if (media.media_type === "tv" && episode) {
-      baseUrl = `https://player.videasy.net/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
-    } else if (media.media_type === "tv") {
-      const tvDetails = media as TvShowDetails;
-      const firstSeason =
-        tvDetails.seasons.find((s) => s.season_number > 0) ||
-        tvDetails.seasons[0];
-      if (firstSeason) {
-        baseUrl = `https://player.videasy.net/tv/${media.id}/${firstSeason.season_number}/1`;
-      } else {
-        return null;
-      }
-    } else {
-      return null;
-    }
-
-    return `${baseUrl}?${queryString}`;
-  });
-
-  vidlinkUrl = computed<string | null>(() => {
-    const media = this.selectedMediaItem();
-    if (!media) return null;
-
-    const episode = this.currentEpisode();
-
-    const queryParams: string[] = [
-      "primaryColor=ff0000",
-      "secondaryColor=a2a2a2",
-      "iconColor=eefdec",
-      "icons=default",
-      "player=jw",
-      "title=true",
-      "poster=true",
-    ];
-
-    if (this.playerService.autoNextEnabled()) {
-      queryParams.push("nextbutton=true");
-    }
-
-    if (this.autoplay()) {
-      queryParams.push("autoplay=true");
-    }
-
-    const queryString = queryParams.join("&");
-
-    let baseUrl: string;
-    if (media.media_type === "movie") {
-      baseUrl = `https://vidlink.pro/movie/${media.id}`;
-    } else if (media.media_type === "tv" && episode) {
-      baseUrl = `https://vidlink.pro/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
-    } else if (media.media_type === "tv") {
-      const tvDetails = media as TvShowDetails;
-      const firstSeason =
-        tvDetails.seasons.find((s) => s.season_number > 0) ||
-        tvDetails.seasons[0];
-      if (firstSeason) {
-        baseUrl = `https://vidlink.pro/tv/${media.id}/${firstSeason.season_number}/1`;
-      } else {
-        return null;
-      }
-    } else {
-      return null;
-    }
-
-    return `${baseUrl}?${queryString}`;
-  });
-
-  vidsrcUrl = computed<string | null>(() => {
-    const media = this.selectedMediaItem();
-    if (!media) return null;
-
-    const episode = this.currentEpisode();
-    const queryParams: string[] = ['color=ff0000'];
-
-    if (this.autoplay()) {
-      queryParams.push('autoPlay=true');
-    }
-
-    const queryString = queryParams.join('&');
-
-    let baseUrl: string;
-    if (media.media_type === 'movie') {
-      baseUrl = `https://vidsrc.cc/v2/embed/movie/${media.id}`;
-    } else if (media.media_type === 'tv' && episode) {
-      baseUrl = `https://vidsrc.cc/v2/embed/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
-    } else if (media.media_type === 'tv') {
-      const tvDetails = media as TvShowDetails;
-      const firstSeason =
-        tvDetails.seasons.find((s) => s.season_number > 0) ||
-        tvDetails.seasons[0];
-       if (firstSeason) {
-        baseUrl = `https://vidsrc.cc/v2/embed/tv/${media.id}/${firstSeason.season_number}/1`;
-      } else {
-        return null;
-      }
-    } else {
-      return null;
-    }
-    return `${baseUrl}?${queryString}`;
-  });
-
-  playerUrl = computed<string | null>(() => {
-    switch (this.selectedPlayer()) {
-      case "YouTube":
-        return this.youtubeUrl();
-      case "VIDEASY":
-        return this.videasyUrl();
-      case "VIDLINK":
-        return this.vidlinkUrl();
-      case "VIDSRC":
-        return this.vidsrcUrl();
-      default:
-        return null;
-    }
+    return provider.generateUrl(config);
   });
 
   safeConstructedPlayerUrl = computed<SafeResourceUrl>(() => {
@@ -301,14 +191,28 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       this.autoplay.set(!!autoplay);
 
-      // Reset player state tracking when params change
-      this.playerHasStarted.set(false);
-      this.lastPlayerEpisodeState.set(null);
-      this.autoPlayNextTriggered.set(false);
+      // Compute a key representing the current media identity
+      const currentMediaKey = `${mediaType}:${id}:${season ?? ""}:${
+        episode ?? ""
+      }`;
+      const prevKey = this.previousMediaKey();
+      const isActualMediaChange = prevKey !== currentMediaKey;
+
+      if (isActualMediaChange) {
+        // Reset player state tracking only when media actually changes
+        this.playerHasStarted.set(false);
+        this.lastPlayerEpisodeState.set(null);
+        this.autoPlayNextTriggered.set(false);
+        this.lastKnownPlaybackTime.set(0);
+        this.previousMediaKey.set(currentMediaKey);
+        // Unlock any auto-next if we just navigated to a different media
+        this.playerService.unlockAutoNext();
+      }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
 
-      if (shouldReloadPlayer) {
+      // Only blank the iframe when we're actually changing media content
+      if (shouldReloadPlayer && isActualMediaChange) {
         this.constructedPlayerUrl.set("about:blank");
       }
 
@@ -386,12 +290,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (typeof window === "undefined") return;
 
     this.messageHandler = (event: MessageEvent) => {
-      const allowedOrigins = [
-        "https://player.videasy.net",
-        "https://vidlink.pro",
-        "https://vidsrc.cc",
-      ];
+      // Get allowed origins from provider registry
+      const allowedOrigins = this.playerProviderService.getAllowedOrigins();
       if (!allowedOrigins.includes(event.origin)) return;
+
+      // Get the provider for this origin
+      const provider = this.playerProviderService.getProviderByOrigin(
+        event.origin
+      );
+      if (!provider) return;
 
       let payload: any;
       try {
@@ -405,69 +312,48 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         (payload?.type === "PLAYER_EVENT" || payload?.type === "MEDIA_DATA") &&
         payload.data
       ) {
-        const d = payload.data;
         const media = this.selectedMediaItem();
         if (!media) return;
 
-        // Handle player start and progress
-        if (payload.type === "PLAYER_EVENT") {
-          const isTimeEvent = d.event === "timeupdate" || d.event === "time";
-          if (
-            d.event === "play" ||
-            (isTimeEvent && d.currentTime > 0)
-          ) {
-            if (!this.playerHasStarted()) {
-              this.playerHasStarted.set(true);
-            }
-          }
-          if (
-            isTimeEvent &&
-            typeof d.duration === "number" &&
-            d.duration > 0
-          ) {
-            this.handlePlaybackProgress(d, media);
-          }
-        } else if (
-          payload.type === "MEDIA_DATA" &&
-          event.origin === "https://vidlink.pro"
-        ) {
-          if (!this.playerHasStarted()) {
-            this.playerHasStarted.set(true);
-          }
-        }
-
-        // Normalize and handle episode changes from different players
-        if (media.media_type !== "tv") return;
-
-        let episodeChangeData: { season: number; episode: number } | null =
-          null;
-
+        // Store MEDIA_DATA in localStorage for Vidlink per their documentation
         if (
-          event.origin === "https://player.videasy.net" &&
-          typeof d.season === "number" &&
-          typeof d.episode === "number"
+          event.origin === "https://vidlink.pro" &&
+          payload.type === "MEDIA_DATA"
         ) {
-          episodeChangeData = { season: d.season, episode: d.episode };
-        } else if (event.origin === "https://vidlink.pro") {
-          if (d.season !== undefined && d.episode !== undefined) {
-            const season = parseInt(String(d.season), 10);
-            const episode = parseInt(String(d.episode), 10) + 1;
-            if (!isNaN(season) && !isNaN(episode)) {
-              episodeChangeData = { season, episode };
-            }
+          try {
+            localStorage.setItem(
+              "vidLinkProgress",
+              JSON.stringify(payload.data)
+            );
+          } catch (e) {
+            console.error("Failed to store Vidlink progress:", e);
           }
-        } else if (
-          event.origin === "https://vidsrc.cc" &&
-          payload?.type === "PLAYER_EVENT" &&
-          typeof d.season === "number" &&
-          typeof d.episode === "number"
-        ) {
-          episodeChangeData = { season: d.season, episode: d.episode };
         }
 
-        if (this.playerHasStarted() && episodeChangeData) {
+        // Use provider to handle the message
+        const result = provider.handleMessage(
+          payload.data,
+          this.currentEpisode()
+        );
+
+        // Handle player started
+        if (result.playerStarted && !this.playerHasStarted()) {
+          this.playerHasStarted.set(true);
+        }
+
+        // Handle playback progress
+        if (result.playbackProgress) {
+          this.handlePlaybackProgress(result.playbackProgress, media);
+        }
+
+        // Handle episode changes (TV shows only)
+        if (
+          media.media_type === "tv" &&
+          result.episodeChange &&
+          this.playerHasStarted()
+        ) {
           this.handleEpisodeChangeDetection(
-            episodeChangeData,
+            result.episodeChange,
             media as TvShowDetails
           );
         }
@@ -477,37 +363,46 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     window.addEventListener("message", this.messageHandler);
   }
 
+  // Track last known currentTime to prevent premature episode-change navigation
+  private lastKnownPlaybackTime = signal(0);
+
   private handlePlaybackProgress(
-    data: any,
+    progressData: {
+      currentTime: number;
+      duration: number;
+      progressPercent: number;
+    },
     media: MovieDetails | TvShowDetails
   ): void {
-    const progressPercent = (data.currentTime / data.duration) * 100;
+    const { currentTime, duration, progressPercent } = progressData;
 
-    const progressData: Omit<PlaybackProgress, "updatedAt"> = {
+    // Update last known playback time
+    if (typeof currentTime === "number" && currentTime > 0) {
+      this.lastKnownPlaybackTime.set(currentTime);
+    }
+
+    const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
       progress: progressPercent,
-      timestamp: data.currentTime,
-      duration: data.duration,
+      timestamp: currentTime,
+      duration: duration,
     };
 
     const episode = this.currentEpisode();
     const progressId = episode ? episode.id : media.id;
-    this.playbackProgressService.updateProgress(progressId, progressData);
+    this.playbackProgressService.updateProgress(progressId, playbackData);
 
     // Add to history after significant playback (30 seconds or 5% progress)
-    if (
-      !this.historyAdded() &&
-      (data.currentTime > 30 || progressPercent > 5)
-    ) {
+    if (!this.historyAdded() && (currentTime > 30 || progressPercent > 5)) {
       this.historyService.addToHistory(
         media,
         this.currentEpisode() || undefined
       );
       this.historyAdded.set(true);
     }
-    
+
     // Update continue watching list based on current progress
     if (progressPercent >= 5 && progressPercent < 95) {
-      const continueWatchingItem: Omit<ContinueWatchingItem, 'updatedAt'> = {
+      const continueWatchingItem: Omit<ContinueWatchingItem, "updatedAt"> = {
         id: media.id,
         media: media,
         episode: episode || undefined,
@@ -517,13 +412,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.continueWatchingService.removeItem(media.id);
     }
 
-
     // Auto-play next episode for VIDLINK or VIDSRC when video completes
     if (
-      (this.selectedPlayer() === 'VIDLINK' || this.selectedPlayer() === 'VIDSRC') &&
+      (this.selectedPlayer() === "VIDLINK" ||
+        this.selectedPlayer() === "VIDSRC") &&
       this.playerService.autoNextEnabled() &&
-      media.media_type === 'tv' &&
+      media.media_type === "tv" &&
+      this.playerHasStarted() &&
       !this.autoPlayNextTriggered() &&
+      this.playerService.tryLockAutoNext() &&
+      // Require meaningful playback time to avoid false triggers from initial duration weirdness
+      currentTime > 30 &&
       // Use a threshold to catch end of video reliably for players that don't send an 'ended' event
       progressPercent >= 99.5
     ) {
@@ -576,6 +475,58 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       lastPlayerState.episode !== playerEpisode.episode;
 
     if (hasPlayerChangedEpisode) {
+      // CRITICAL: Only allow episode-change navigation if we have meaningful playback time (>5s)
+      // This prevents the initial "I'm on episode X" message from causing a spurious reload
+      const currentPlaybackTime = this.lastKnownPlaybackTime();
+      if (currentPlaybackTime < 5) {
+        // Too early - this is likely just the player reporting initial state
+        // Update our tracking without navigating, but still reflect the
+        // player's current episode in the UI so child components (like
+        // EpisodeSelector) highlight the correct item.
+        this.lastPlayerEpisodeState.set(playerEpisode);
+
+        // Fetch season details and update currentEpisode to match the player's
+        // reported state. This keeps the UI in sync even when we don't
+        // navigate (avoids a reload and respects the "too early" guard).
+        this.movieService
+          .getSeasonDetails(media.id, playerEpisode.season)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((seasonDetails) => {
+            const newEpisode = seasonDetails.episodes.find(
+              (e) => e.episode_number === playerEpisode.episode
+            );
+
+            if (newEpisode) {
+              this.currentEpisode.set(newEpisode);
+            }
+          });
+
+        return;
+      }
+
+      // Try to acquire lock to prevent duplicate navigation from both player and progress events
+      // Only navigate if we haven't already triggered auto-next OR if we can acquire the lock
+      if (!this.playerService.tryLockAutoNext()) {
+        // Lock already held, just update our tracking and exit
+        // But still update the UI to reflect the player's state
+        this.lastPlayerEpisodeState.set(playerEpisode);
+
+        this.movieService
+          .getSeasonDetails(media.id, playerEpisode.season)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((seasonDetails) => {
+            const newEpisode = seasonDetails.episodes.find(
+              (e) => e.episode_number === playerEpisode.episode
+            );
+
+            if (newEpisode) {
+              this.currentEpisode.set(newEpisode);
+            }
+          });
+
+        return;
+      }
+
       this.lastPlayerEpisodeState.set(playerEpisode);
 
       // Tell the component not to reload the iframe since the player did it internally.
@@ -590,6 +541,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         playlistId: this.playlist()?.id,
         autoplay: true,
       });
+      // Navigation complete, unlock for future auto-next
+      this.playerService.unlockAutoNext();
 
       // Update the currentEpisode signal so the UI reflects the change.
       this.movieService
@@ -613,6 +566,26 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const currentEp = this.currentEpisode();
     if (!currentEp) return;
 
+    // If playing from a playlist, prefer the explicit playlist order first
+    const playlistId = this.playlist()?.id;
+    if (playlistId) {
+      const nextItem = this.playlistService.getNextItemFromPlaylist(
+        playlistId,
+        tvShow.id
+      );
+      if (nextItem) {
+        // Navigate to the playlist's next item
+        this.navigationService.navigateTo("watch", {
+          mediaType: nextItem.media_type,
+          id: nextItem.id,
+          playlistId: playlistId,
+          autoplay: true,
+        });
+        // ensure lock is kept until navigation resets state
+        return;
+      }
+    }
+
     // Get current season details to find next episode
     this.movieService
       .getSeasonDetails(tvShow.id, currentEp.season_number)
@@ -626,7 +599,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         if (currentIndex === -1) {
           // Failsafe: if current episode not found, maybe it was removed.
           // Don't auto-play to avoid unexpected behavior.
-          console.warn('Could not find current episode in season details. Auto-play cancelled.');
+          console.warn(
+            "Could not find current episode in season details. Auto-play cancelled."
+          );
           return;
         }
 
@@ -640,18 +615,32 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           );
         } else {
           // This is the last episode of the current season. Try to find the next season.
-          const currentSeasonIndex = tvShow.seasons.findIndex(s => s.season_number === currentEp.season_number);
-          
+          const currentSeasonIndex = tvShow.seasons.findIndex(
+            (s) => s.season_number === currentEp.season_number
+          );
+
           if (currentSeasonIndex > -1) {
-             // Search for the next season with episodes, skipping empty seasons.
-             for (let i = currentSeasonIndex + 1; i < tvShow.seasons.length; i++) {
-                const nextSeasonObj = tvShow.seasons[i];
-                // Also check for season_number > 0 to skip "specials" seasons
-                if (nextSeasonObj && nextSeasonObj.episode_count > 0 && nextSeasonObj.season_number > 0) {
-                    this.navigateToEpisode(tvShow.id, nextSeasonObj.season_number, 1);
-                    return; // Found and navigated, so exit.
-                }
-             }
+            // Search for the next season with episodes, skipping empty seasons.
+            for (
+              let i = currentSeasonIndex + 1;
+              i < tvShow.seasons.length;
+              i++
+            ) {
+              const nextSeasonObj = tvShow.seasons[i];
+              // Also check for season_number > 0 to skip "specials" seasons
+              if (
+                nextSeasonObj &&
+                nextSeasonObj.episode_count > 0 &&
+                nextSeasonObj.season_number > 0
+              ) {
+                this.navigateToEpisode(
+                  tvShow.id,
+                  nextSeasonObj.season_number,
+                  1
+                );
+                return; // Found and navigated, so exit.
+              }
+            }
           }
           // If no next season/episode is found, do nothing (end of series).
         }
