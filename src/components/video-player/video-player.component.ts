@@ -98,6 +98,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Track if player has started playing (to avoid false episode detection on initial load)
   private playerHasStarted = signal(false);
 
+  // Track if we're in the middle of a user-initiated navigation (to ignore stale player messages)
+  private isNavigating = signal(false);
+
   private constructedPlayerUrl = signal<string>("about:blank");
 
   // Track if auto-play next has been triggered for current episode
@@ -207,6 +210,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.previousMediaKey.set(currentMediaKey);
         // Unlock any auto-next if we just navigated to a different media
         this.playerService.unlockAutoNext();
+        
+        // Mark that we're navigating to prevent stale player messages from interfering
+        this.isNavigating.set(true);
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -232,7 +238,26 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         return;
       }
 
-      this.currentEpisode.set(null);
+      // For TV shows, immediately set the expected episode from params to avoid race conditions
+      // This ensures currentEpisode is correct before any async operations or player messages
+      if (mediaType === "tv" && season && episode) {
+        // Create a temporary episode object with the expected state
+        // This will be replaced with full episode details once loaded
+        const expectedEpisode: Partial<Episode> = {
+          season_number: +season,
+          episode_number: +episode,
+          id: 0, // Temporary, will be replaced
+        };
+        this.currentEpisode.set(expectedEpisode as Episode);
+        
+        // Also update lastPlayerEpisodeState to match our navigation intent
+        this.lastPlayerEpisodeState.set({
+          season: +season,
+          episode: +episode,
+        });
+      } else {
+        this.currentEpisode.set(null);
+      }
 
       const media$: Observable<MovieDetails | TvShowDetails> =
         mediaType === "movie"
@@ -362,10 +387,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         }
 
         // Handle episode changes (TV shows only)
+        // Only process if: player has started, we're not in middle of navigation,
+        // and we have meaningful playback time
         if (
           media.media_type === "tv" &&
           result.episodeChange &&
-          this.playerHasStarted()
+          this.playerHasStarted() &&
+          !this.isNavigating() &&
+          this.lastKnownPlaybackTime() >= 5
         ) {
           this.handleEpisodeChangeDetection(
             result.episodeChange,
@@ -394,6 +423,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Update last known playback time
     if (typeof currentTime === "number" && currentTime > 0) {
       this.lastKnownPlaybackTime.set(currentTime);
+      
+      // Once we have meaningful playback (>5s), clear the navigation flag
+      // This allows episode change detection to work for auto-next
+      if (currentTime >= 5 && this.isNavigating()) {
+        this.isNavigating.set(false);
+      }
     }
 
     const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
@@ -490,59 +525,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       lastPlayerState.episode !== playerEpisode.episode;
 
     if (hasPlayerChangedEpisode) {
-      // CRITICAL: Only allow episode-change navigation if we have meaningful playback time (>5s)
-      // This prevents the initial "I'm on episode X" message from causing a spurious reload
-      const currentPlaybackTime = this.lastKnownPlaybackTime();
-      if (currentPlaybackTime < 5) {
-        // Too early - this is likely just the player reporting initial state
-        // Update our tracking without navigating, but still reflect the
-        // player's current episode in the UI so child components (like
-        // EpisodeSelector) highlight the correct item.
-        this.lastPlayerEpisodeState.set(playerEpisode);
-
-        // Fetch season details and update currentEpisode to match the player's
-        // reported state. This keeps the UI in sync even when we don't
-        // navigate (avoids a reload and respects the "too early" guard).
-        this.movieService
-          .getSeasonDetails(media.id, playerEpisode.season)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe((seasonDetails) => {
-            const newEpisode = seasonDetails.episodes.find(
-              (e) => e.episode_number === playerEpisode.episode
-            );
-
-            if (newEpisode) {
-              this.currentEpisode.set(newEpisode);
-            }
-          });
-
-        return;
-      }
-
       // Try to acquire lock to prevent duplicate navigation from both player and progress events
-      // Only navigate if we haven't already triggered auto-next OR if we can acquire the lock
       if (!this.playerService.tryLockAutoNext()) {
         // Lock already held, just update our tracking and exit
-        // But still update the UI to reflect the player's state
         this.lastPlayerEpisodeState.set(playerEpisode);
-
-        this.movieService
-          .getSeasonDetails(media.id, playerEpisode.season)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe((seasonDetails) => {
-            const newEpisode = seasonDetails.episodes.find(
-              (e) => e.episode_number === playerEpisode.episode
-            );
-
-            if (newEpisode) {
-              this.currentEpisode.set(newEpisode);
-            }
-          });
-
         return;
       }
 
       this.lastPlayerEpisodeState.set(playerEpisode);
+      
+      // Mark that we're starting a navigation
+      this.isNavigating.set(true);
 
       // Tell the component not to reload the iframe since the player did it internally.
       this.skipNextPlayerUpdate.set(true);
@@ -668,6 +661,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     episode: number
   ): void {
     this.skipNextPlayerUpdate.set(false);
+    this.isNavigating.set(true);
 
     this.navigationService.navigateTo("watch", {
       mediaType: "tv",
@@ -741,6 +735,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (tvShow?.media_type !== "tv") return;
 
     this.skipNextPlayerUpdate.set(false);
+    this.isNavigating.set(true);
 
     this.navigationService.navigateTo("watch", {
       mediaType: "tv",
@@ -753,6 +748,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   onSelectMedia(media: MediaType): void {
     this.skipNextPlayerUpdate.set(false);
+    this.isNavigating.set(true);
 
     this.navigationService.navigateTo("watch", {
       mediaType: media.media_type,

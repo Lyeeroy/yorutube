@@ -25,16 +25,39 @@ export class VidfastPlayerProvider implements IPlayerProvider {
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, autoNext, resumeTime } = config;
 
-    const params: string[] = ["autoPlay=true", "title=true", "poster=true"];
+    // Default to showing title/poster but don't force autoplay unless
+    // explicitly enabled via the config. VidFast treats duplicate query
+    // parameters oddly and some combinations can lead to 500s, so avoid
+    // adding `autoPlay=true` twice.
+    const params: string[] = ["title=true", "poster=true"];
 
-    if (autoplay) params.push("autoPlay=true");
+    if (autoplay) {
+      // Add both variants to improve compatibility (some embed domains use
+      // `autoPlay`, others `autoplay`). We'll deduplicate case-insensitively
+      // so only one ends up in the final URL.
+      params.push("autoPlay=true");
+      params.push("autoplay=true");
+    }
     if (autoNext) params.push("autoNext=true", "nextButton=true");
 
     if (resumeTime && resumeTime > 5) {
       params.push(`startAt=${Math.floor(resumeTime)}`);
     }
 
-    const query = params.join("&");
+    // Deduplicate params by key to avoid repeated keys (some servers react badly
+    // to duplicate query params). This protects against accidental duplicate
+    // values such as 'autoPlay=true' occurring twice.
+    // Deduplicate parameter keys case-insensitively and preserve the last
+    // occurrence of each key (so explicit values like `autoplay` will override
+    // any earlier `autoPlay`). This avoids duplicate query params which can
+    // cause server-side errors.
+    const uniqueParams = Array.from(
+      new Map(
+        params.map((p) => [p.split("=")[0].toLowerCase(), p])
+      ).values()
+    );
+
+    const query = uniqueParams.join("&");
 
     if (media.media_type === "movie") {
       return `${this.origin}/movie/${media.id}?${query}`;
@@ -82,12 +105,21 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       if (data.currentTime > 0) result.playerStarted = true;
     }
 
-    // VidFast may include season/episode info
+    // VidFast may include season/episode info in messages, but we only want
+    // to trigger navigation if the episode actually changed from what we're
+    // currently watching. This prevents spurious reloads on every timeupdate.
     if (typeof data.season === "number" && typeof data.episode === "number") {
-      result.episodeChange = {
-        season: data.season,
-        episode: data.episode,
-      };
+      // Only report an episode change if it differs from the current episode
+      if (
+        !currentEpisode ||
+        currentEpisode.season_number !== data.season ||
+        currentEpisode.episode_number !== data.episode
+      ) {
+        result.episodeChange = {
+          season: data.season,
+          episode: data.episode,
+        };
+      }
     }
 
     return result;

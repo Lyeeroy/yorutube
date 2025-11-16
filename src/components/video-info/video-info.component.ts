@@ -294,23 +294,21 @@ export class VideoInfoComponent {
       params.episode = this.currentEpisode().episode_number;
     }
 
-    const url = this.navigationService.getUrl('watch', params);
+    const url = this.navigationService.getUrl("watch", params);
 
-    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+    if (typeof navigator !== "undefined" && (navigator as any).share) {
       // Use Web Share API when available
-      (navigator as any)
-        .share({ title: this.mediaTitle(), url })
-        .catch(() => {
-          // Ignore errors from share
-        });
-    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      (navigator as any).share({ title: this.mediaTitle(), url }).catch(() => {
+        // Ignore errors from share
+      });
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard
         .writeText(url)
-        .then(() => alert('Link copied to clipboard'))
-        .catch(() => alert('Copy failed: ' + url));
+        .then(() => alert("Link copied to clipboard"))
+        .catch(() => alert("Copy failed: " + url));
     } else {
       // Fallback to prompt for older browsers
-      window.prompt('Copy this link', url);
+      window.prompt("Copy this link", url);
     }
 
     this.showMoreOptionsMenu.set(false);

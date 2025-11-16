@@ -7,6 +7,7 @@
         <iframe 
           class="absolute top-0 left-0 w-full h-full" 
           [src]="safeConstructedPlayerUrl()"
+          (load)="onPlayerIframeLoad()"
           [class.invisible]="loadingTrailer() || !playerUrl()"
           title="Video player" 
           frameborder="0" 
