@@ -280,6 +280,42 @@ export class VideoInfoComponent {
     }
   }
 
+  shareMedia(): void {
+    const media = this.media();
+    if (!media) return;
+
+    const params: any = {
+      mediaType: media.media_type,
+      id: media.id,
+    };
+
+    if (this.currentEpisode()) {
+      params.season = this.currentEpisode().season_number;
+      params.episode = this.currentEpisode().episode_number;
+    }
+
+    const url = this.navigationService.getUrl('watch', params);
+
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+      // Use Web Share API when available
+      (navigator as any)
+        .share({ title: this.mediaTitle(), url })
+        .catch(() => {
+          // Ignore errors from share
+        });
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => alert('Link copied to clipboard'))
+        .catch(() => alert('Copy failed: ' + url));
+    } else {
+      // Fallback to prompt for older browsers
+      window.prompt('Copy this link', url);
+    }
+
+    this.showMoreOptionsMenu.set(false);
+  }
+
   toggleMoreOptionsMenu(event: MouseEvent): void {
     event.stopPropagation();
     this.showSourcesDropdown.set(false);

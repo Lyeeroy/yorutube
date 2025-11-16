@@ -163,6 +163,7 @@ export class SearchResultsComponent {
   }
 
   onMediaClicked(media: MediaType) {
+    // Use history navigation with URL update so sharing / deep linking works
     this.navigationService.navigateTo('watch', { mediaType: media.media_type, id: media.id });
   }
 
