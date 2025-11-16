@@ -330,6 +330,21 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           }
         }
 
+        // Store MEDIA_DATA for VidFast native embed (VidFast can send MEDIA_DATA)
+        if (
+          event.origin === "https://vidfast.pro" &&
+          payload.type === "MEDIA_DATA"
+        ) {
+          try {
+            localStorage.setItem(
+              "vidFastProgress",
+              JSON.stringify(payload.data)
+            );
+          } catch (e) {
+            console.error("Failed to store VidFast progress:", e);
+          }
+        }
+
         // Use provider to handle the message
         const result = provider.handleMessage(
           payload.data,

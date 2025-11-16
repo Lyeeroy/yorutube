@@ -21,6 +21,7 @@ import { IPlayerProvider } from "../../models/player-provider.model";
 import { VideasyPlayerProvider } from "./videasy.provider";
 import { VidlinkPlayerProvider } from "./vidlink.provider";
 import { VidsrcPlayerProvider } from "./vidsrc.provider";
+import { VidfastPlayerProvider } from "./vidfast.provider";
 
 /**
  * Central registry of all player providers.
@@ -31,6 +32,7 @@ export const REGISTERED_PROVIDERS: IPlayerProvider[] = [
   //   new YouTubePlayerProvider(),
   new VideasyPlayerProvider(),
   new VidlinkPlayerProvider(),
+  new VidfastPlayerProvider(),
   new VidsrcPlayerProvider(),
 ];
 
@@ -39,3 +41,4 @@ export const REGISTERED_PROVIDERS: IPlayerProvider[] = [
 export { VideasyPlayerProvider } from "./videasy.provider";
 export { VidlinkPlayerProvider } from "./vidlink.provider";
 export { VidsrcPlayerProvider } from "./vidsrc.provider";
+export { VidfastPlayerProvider } from "./vidfast.provider";
