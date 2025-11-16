@@ -73,10 +73,13 @@ export class VideoInfoComponent {
   showPlaylistModal = signal(false);
   showMoreOptionsMenu = signal(false);
   showSourcesDropdown = signal(false);
+  showAutoNextThreshold = signal(false);
 
   // --- DERIVED & ASYNC STATE ---
   selectedPlayer = this.playerService.selectedPlayer;
   autoNextEnabled = this.playerService.autoNextEnabled;
+  autoNextThreshold = this.playerService.autoNextThreshold;
+  autoplayEnabled = this.playerService.autoplayEnabled;
   availablePlayers = this.playerService.players;
 
   // Media type-specific details derived from input
@@ -371,6 +374,22 @@ export class VideoInfoComponent {
 
   toggleAutoNext(): void {
     this.playerService.toggleAutoNext();
+  }
+
+  toggleAutoNextThreshold(event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.autoNextEnabled()) {
+      this.showAutoNextThreshold.update((v) => !v);
+    }
+  }
+
+  setAutoNextThreshold(value: any): void {
+    const num = Number(value);
+    if (!isNaN(num)) this.playerService.setAutoNextThreshold(num);
+  }
+
+  toggleAutoplay(): void {
+    this.playerService.toggleAutoplay();
   }
 
   onRefreshPlayerClick(): void {

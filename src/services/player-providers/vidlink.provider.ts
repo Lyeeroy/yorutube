@@ -34,8 +34,12 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
       queryParams.push("nextbutton=true");
     }
 
+    // Pass explicit autoplay value so providers that default to autoplay
+    // when the param is missing are overridden by a user-controlled setting.
     if (autoplay) {
       queryParams.push("autoplay=true");
+    } else {
+      queryParams.push("autoplay=false");
     }
 
     // Support resuming playback from a specific time (seconds) for Vidlink

@@ -9,6 +9,8 @@ export type PlayerType = string;
 
 const PLAYER_STORAGE_KEY = "yorutube-player";
 const AUTO_NEXT_STORAGE_KEY = "yorutube-auto-next";
+const AUTOPLAY_STORAGE_KEY = "yorutube-autoplay";
+const AUTO_NEXT_THRESHOLD_KEY = "yorutube-auto-next-threshold";
 
 @Injectable({
   providedIn: "root",
@@ -26,6 +28,11 @@ export class PlayerService {
 
   selectedPlayer = signal<PlayerType>("VIDLINK");
   autoNextEnabled = signal<boolean>(true);
+  // Percentage threshold (0-100) at which the app will auto-advance to the next episode
+  autoNextThreshold = signal<number>(100);
+  // Default to enabled so new users get autoplay as a sane default; stored
+  // preference (localStorage) will still override if present.
+  autoplayEnabled = signal<boolean>(true);
   // Lock to prevent duplicate auto-next navigations (progress vs player events)
   private autoNextLock = signal(false);
   private autoNextLockTimeoutId: any | null = null;
@@ -49,6 +56,19 @@ export class PlayerService {
       if (storedAutoNext !== null) {
         this.autoNextEnabled.set(storedAutoNext === "true");
       }
+      const storedAutoplay = localStorage.getItem(AUTOPLAY_STORAGE_KEY);
+      if (storedAutoplay !== null) {
+        this.autoplayEnabled.set(storedAutoplay === "true");
+      }
+      const storedAutoNextThreshold = localStorage.getItem(
+        AUTO_NEXT_THRESHOLD_KEY
+      );
+      if (storedAutoNextThreshold !== null) {
+        const parsed = parseInt(storedAutoNextThreshold, 10);
+        if (!isNaN(parsed)) {
+          this.autoNextThreshold.set(Math.max(0, Math.min(100, parsed)));
+        }
+      }
     }
   }
 
@@ -59,6 +79,14 @@ export class PlayerService {
         AUTO_NEXT_STORAGE_KEY,
         String(this.autoNextEnabled())
       );
+      localStorage.setItem(
+        AUTOPLAY_STORAGE_KEY,
+        String(this.autoplayEnabled())
+      );
+      localStorage.setItem(
+        AUTO_NEXT_THRESHOLD_KEY,
+        String(this.autoNextThreshold())
+      );
     }
   }
 
@@ -68,6 +96,15 @@ export class PlayerService {
 
   toggleAutoNext(): void {
     this.autoNextEnabled.update((v) => !v);
+  }
+
+  toggleAutoplay(): void {
+    this.autoplayEnabled.update((v) => !v);
+  }
+
+  setAutoNextThreshold(value: number): void {
+    const clamped = Math.max(0, Math.min(100, Math.round(value)));
+    this.autoNextThreshold.set(clamped);
   }
 
   // Try to acquire the auto-next lock. Returns true if lock acquired, false if already locked.

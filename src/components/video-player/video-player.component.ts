@@ -126,7 +126,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   youtubeUrl = computed<string | null>(() => {
     const video = this.videoDetails();
     if (!video) return null;
-    const autoplayParam = this.autoplay() ? "?autoplay=1" : "";
+    const autoplayParam =
+      this.autoplay() || this.playerService.autoplayEnabled()
+        ? "?autoplay=1"
+        : "?autoplay=0";
     return `https://www.youtube.com/embed/${video.key}${autoplayParam}`;
   });
 
@@ -160,7 +163,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const config: PlayerUrlConfig = {
       media,
       episode: episode || undefined,
-      autoplay: this.autoplay(),
+      autoplay: this.autoplay() || this.playerService.autoplayEnabled(),
       autoNext: this.playerService.autoNextEnabled(),
       resumeTime,
       // For VidFast we allow passing a small theme override. If you need
@@ -478,7 +481,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       // Require meaningful playback time to avoid false triggers from initial duration weirdness
       currentTime > 30 &&
       // Use a threshold to catch end of video reliably for players that don't send an 'ended' event
-      progressPercent >= 99.5
+      // Allow user to change the threshold via PlayerService; default 100% maps to 99.5
+      (() => {
+        const threshold = this.playerService.autoNextThreshold();
+        const effective = threshold === 100 ? 99.5 : threshold;
+        return progressPercent >= effective;
+      })()
     ) {
       this.autoPlayNextTriggered.set(true);
       this.playNextEpisode(media as TvShowDetails);

@@ -31,12 +31,16 @@ export class VidfastPlayerProvider implements IPlayerProvider {
     // adding `autoPlay=true` twice.
     const params: string[] = ["title=true", "poster=true"];
 
+    // Always set an explicit autoplay param so the provider receives an
+    // explicit true/false value. Some embed domains treat the absence of the
+    // parameter as 'true' by default; to ensure deterministic behavior we
+    // always send a value when the app explicitly decides autoplay state.
     if (autoplay) {
-      // Add both variants to improve compatibility (some embed domains use
-      // `autoPlay`, others `autoplay`). We'll deduplicate case-insensitively
-      // so only one ends up in the final URL.
       params.push("autoPlay=true");
       params.push("autoplay=true");
+    } else {
+      params.push("autoPlay=false");
+      params.push("autoplay=false");
     }
     if (autoNext) params.push("autoNext=true", "nextButton=true");
 

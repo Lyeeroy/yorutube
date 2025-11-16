@@ -33,9 +33,9 @@ export class VideasyPlayerProvider implements IPlayerProvider {
       queryParams.push(`progress=${Math.floor(resumeTime)}`);
     }
 
-    if (autoplay) {
-      queryParams.push("autoplay=1");
-    }
+    // Explicitly set autoplay (1/0) so we can disable autoplay reliably
+    // when the app or user turns it off.
+    queryParams.push(`autoplay=${autoplay ? "1" : "0"}`);
 
     const queryString = queryParams.join("&");
 

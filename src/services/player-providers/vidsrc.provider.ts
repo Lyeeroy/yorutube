@@ -21,8 +21,12 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
 
     const queryParams: string[] = ["color=ff0000"];
 
+    // If autoplay is explicitly controlled, pass explicit value. This avoids
+    // relying on provider defaults and makes behavior deterministic.
     if (autoplay) {
       queryParams.push("autoPlay=true");
+    } else {
+      queryParams.push("autoPlay=false");
     }
 
     // Support resuming playback from a specific time (seconds) for Vidsrc

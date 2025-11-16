@@ -44,7 +44,10 @@ export class YouTubePlayerProvider implements IPlayerProvider {
     // In practice, you'd build a URL like https://www.youtube.com/embed/<id>?autoplay=1
     const exampleVideoKey = "EXAMPLE_KEY"; // Replace after fetching real video id
     const query = [];
-    if (autoplay) query.push("autoplay=1");
+    // Always set explicit autoplay flag. Some embed contexts assume autoplay
+    // by default; setting autoplay=0 ensures autoplay is disabled when the
+    // app requests it.
+    query.push(`autoplay=${autoplay ? "1" : "0"}`);
     if (typeof resumeTime === "number" && resumeTime > 5) {
       // YouTube accepts `start` param in seconds
       query.push(`start=${Math.floor(resumeTime)}`);

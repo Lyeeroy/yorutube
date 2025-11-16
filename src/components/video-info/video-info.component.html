@@ -151,24 +151,75 @@
             <span>Watch Trailer</span>
           </button>
           }
+          <div class="w-full">
+            <button
+              (click)="toggleAutoNextThreshold($event)"
+              class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+            >
+              <div class="flex items-center space-x-3">
+                <span class="material-symbols-outlined text-xl">skip_next</span>
+                <span>Auto Next</span>
+                @if (autoNextEnabled()) {
+                <span
+                  class="material-symbols-outlined text-base transition-transform"
+                  [class.rotate-180]="showAutoNextThreshold()"
+                  >expand_more</span
+                >
+                }
+              </div>
+              <!-- Toggle Switch UI -->
+              <div
+                (click)="$event.stopPropagation(); toggleAutoNext()"
+                class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+                [class.bg-red-600]="autoNextEnabled()"
+                [class.bg-zinc-600]="!autoNextEnabled()"
+              >
+                <span
+                  class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+                  [class.translate-x-6]="autoNextEnabled()"
+                  [class.translate-x-1]="!autoNextEnabled()"
+                ></span>
+              </div>
+            </button>
+            @if (autoNextEnabled() && showAutoNextThreshold()) {
+            <div class="w-full px-3 py-3 text-sm text-left text-zinc-200">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-zinc-400">Play next at</span>
+                <span class="text-xs text-zinc-200"
+                  >{{ autoNextThreshold() }}%</span
+                >
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                [value]="autoNextThreshold()"
+                (input)="setAutoNextThreshold($any($event.target).value)"
+                class="w-full h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer"
+                style="accent-color: #dc2626"
+              />
+            </div>
+            }
+          </div>
           <button
-            (click)="toggleAutoNext()"
+            (click)="toggleAutoplay()"
             class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
           >
             <div class="flex items-center space-x-3">
-              <span class="material-symbols-outlined text-xl">skip_next</span>
-              <span>Auto Next</span>
+              <span class="material-symbols-outlined text-xl">play_arrow</span>
+              <span>Autoplay</span>
             </div>
             <!-- Toggle Switch UI -->
             <div
               class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
-              [class.bg-red-600]="autoNextEnabled()"
-              [class.bg-zinc-600]="!autoNextEnabled()"
+              [class.bg-red-600]="autoplayEnabled()"
+              [class.bg-zinc-600]="!autoplayEnabled()"
             >
               <span
                 class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
-                [class.translate-x-6]="autoNextEnabled()"
-                [class.translate-x-1]="!autoNextEnabled()"
+                [class.translate-x-6]="autoplayEnabled()"
+                [class.translate-x-1]="!autoplayEnabled()"
               ></span>
             </div>
           </button>
