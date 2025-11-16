@@ -105,10 +105,24 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       if (data.currentTime > 0) result.playerStarted = true;
     }
 
-    // VidFast may include season/episode info in messages, but we only want
-    // to trigger navigation if the episode actually changed from what we're
-    // currently watching. This prevents spurious reloads on every timeupdate.
-    if (typeof data.season === "number" && typeof data.episode === "number") {
+    // VidFast includes season/episode info in many message types, but we should
+    // ONLY report episode changes for actual navigation events, not routine
+    // timeupdate/progress events. This prevents spurious reloads and navigation
+    // conflicts when VidFast sends episode metadata during normal playback.
+    //
+    // Episode changes should only be reported for events like:
+    // - 'ended' followed by auto-next
+    // - explicit user navigation within the player
+    // - NOT on 'timeupdate', 'time', 'play', 'pause', etc.
+    if (
+      typeof data.season === "number" &&
+      typeof data.episode === "number" &&
+      // Only process episode changes for specific events, not routine updates
+      data.event &&
+      !["timeupdate", "time", "play", "pause", "playing", "seeking", "seeked"].includes(
+        data.event
+      )
+    ) {
       // Only report an episode change if it differs from the current episode
       if (
         !currentEpisode ||

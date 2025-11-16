@@ -91,12 +91,27 @@ export class VideasyPlayerProvider implements IPlayerProvider {
       result.playerStarted = true;
     }
 
-    // Handle episode changes
-    if (typeof data.season === "number" && typeof data.episode === "number") {
-      result.episodeChange = {
-        season: data.season,
-        episode: data.episode,
-      };
+    // Handle episode changes - only for actual navigation events, not routine updates
+    // This prevents spurious reloads if the player sends episode info during timeupdate
+    if (
+      typeof data.season === "number" &&
+      typeof data.episode === "number" &&
+      data.event &&
+      !["timeupdate", "time", "play", "pause", "playing", "seeking", "seeked"].includes(
+        data.event
+      )
+    ) {
+      // Only report if it differs from current episode
+      if (
+        !currentEpisode ||
+        currentEpisode.season_number !== data.season ||
+        currentEpisode.episode_number !== data.episode
+      ) {
+        result.episodeChange = {
+          season: data.season,
+          episode: data.episode,
+        };
+      }
     }
 
     return result;
