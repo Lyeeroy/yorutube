@@ -1,93 +1,141 @@
 @if (tvShowDetails(); as tv) {
-  <div class="mt-6">
-    <h2 class="text-xl font-bold mb-3">Seasons & Episodes</h2>
-    <div class="bg-zinc-800 rounded-xl p-4">
-      <!-- Season Selector -->
-      <div class="border-b border-zinc-700 pb-3 mb-3">
-        <div class="relative group/slider">
-          @if (canScrollLeft()) {
-            <button 
-              (click)="scroll('left')"
-              aria-label="Scroll left"
-              class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 group-hover/slider:opacity-100 focus:opacity-100 focus:outline-none">
-              <span class="material-symbols-outlined">chevron_left</span>
-            </button>
-          }
+<div class="mt-6">
+  <h2 class="text-xl font-bold mb-3">Seasons & Episodes</h2>
+  <div class="bg-zinc-800 rounded-xl p-4">
+    <!-- Season Selector -->
+    <div class="border-b border-zinc-700 pb-3 mb-3">
+      <div class="relative group/slider">
+        @if (canScrollLeft()) {
+        <button
+          (click)="scroll('left')"
+          aria-label="Scroll left"
+          class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 group-hover/slider:opacity-100 focus:opacity-100 focus:outline-none"
+        >
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        }
 
-          <div 
-            #scrollContainer 
-            (scroll)="checkScroll()" 
-            (mousedown)="onMouseDown($event)"
-            (mouseleave)="onMouseLeave()"
-            (mouseup)="onMouseUp()"
-            (mousemove)="onMouseMove($event)"
-            class="flex items-center space-x-2 overflow-x-auto cursor-grab"
-            [class.cursor-grabbing]="isGrabbing()"
-            [class.select-none]="isGrabbing()"
-            style="scrollbar-width: none; -ms-overflow-style: none;">
-            @for (season of tv.seasons; track season.id) {
-              <button 
-                (click)="onSeasonClick(season)"
-                class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
-                [class.bg-white]="selectedSeasonDetails()?.season_number === season.season_number"
-                [class.text-black]="selectedSeasonDetails()?.season_number === season.season_number"
-                [class.bg-zinc-700]="selectedSeasonDetails()?.season_number !== season.season_number"
-                [class.text-white]="selectedSeasonDetails()?.season_number !== season.season_number"
-                [class.hover:bg-zinc-600]="selectedSeasonDetails()?.season_number !== season.season_number">
-                {{ season.name }}
-              </button>
-            }
+        <div
+          #scrollContainer
+          (scroll)="checkScroll()"
+          (mousedown)="onMouseDown($event)"
+          (mouseleave)="onMouseLeave()"
+          (mouseup)="onMouseUp()"
+          (mousemove)="onMouseMove($event)"
+          class="flex items-center space-x-2 overflow-x-auto"
+          [class.cursor-grabbing]="isGrabbing()"
+          [class.select-none]="isGrabbing()"
+          style="scrollbar-width: none; -ms-overflow-style: none"
+        >
+          @for (season of tv.seasons; track season.id) {
+          <button
+            (click)="onSeasonClick(season)"
+            class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+            [class.bg-white]="
+              selectedSeasonDetails()?.season_number === season.season_number
+            "
+            [class.text-black]="
+              selectedSeasonDetails()?.season_number === season.season_number
+            "
+            [class.bg-zinc-700]="
+              selectedSeasonDetails()?.season_number !== season.season_number
+            "
+            [class.text-white]="
+              selectedSeasonDetails()?.season_number !== season.season_number
+            "
+            [class.hover:bg-zinc-600]="
+              selectedSeasonDetails()?.season_number !== season.season_number
+            "
+          >
+            {{ season.name }}
+          </button>
+          }
+        </div>
+
+        @if (canScrollRight()) {
+        <button
+          (click)="scroll('right')"
+          aria-label="Scroll right"
+          class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 group-hover/slider:opacity-100 focus:opacity-100 focus:outline-none"
+        >
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+        }
+      </div>
+    </div>
+
+    <!-- Episode List -->
+    @if (loadingSeason()) {
+    <div class="flex justify-center items-center h-48">
+      <div
+        class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"
+      ></div>
+    </div>
+    } @else if (selectedSeasonDetails(); as season) {
+    <div class="flex flex-col space-y-2 max-h-96 overflow-y-auto pr-2">
+      @for (episode of season.episodes; track episode.id) {
+      <div
+        class="flex items-start p-2 rounded-lg hover:bg-zinc-700 cursor-pointer transition-colors"
+        [class.bg-zinc-700]="currentEpisode()?.id === episode.id"
+        (click)="selectEpisode(episode, season.season_number)"
+      >
+        <span class="text-zinc-400 w-8 text-center pt-1 shrink-0">{{
+          episode.episode_number
+        }}</span>
+        <div class="relative w-24 sm:w-32 shrink-0 rounded-md overflow-hidden">
+          <img
+            [ngSrc]="
+              episode.still_path
+                ? 'https://image.tmdb.org/t/p/w300' + episode.still_path
+                : 'https://picsum.photos/seed/' +
+                  episode.id +
+                  '/300/169?grayscale'
+            "
+            alt="Episode {{ episode.episode_number }} thumbnail"
+            width="300"
+            height="169"
+            class="w-full object-cover"
+          />
+          @if(getProgress(episode.id) > 0) {
+          <div class="absolute bottom-0 left-0 w-full h-1 bg-zinc-700/80">
+            <div
+              class="h-full bg-red-600"
+              [style.width.%]="getProgress(episode.id)"
+            ></div>
           </div>
-
-          @if (canScrollRight()) {
-            <button 
-              (click)="scroll('right')"
-              aria-label="Scroll right"
-              class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 group-hover/slider:opacity-100 focus:opacity-100 focus:outline-none">
-              <span class="material-symbols-outlined">chevron_right</span>
-            </button>
           }
+        </div>
+        <div class="flex-1 min-w-0 pl-3">
+          <div class="flex justify-between items-start">
+            <h4 class="font-semibold text-sm text-white line-clamp-1">
+              {{ episode.name }}
+            </h4>
+            <span class="text-xs text-zinc-400 shrink-0">{{
+              getRelativeTime(episode.air_date)
+            }}</span>
+          </div>
+          <p
+            class="text-xs text-zinc-400 mt-1"
+            [class.line-clamp-2]="expandedEpisodeId() !== episode.id"
+            (click)="
+              $event.stopPropagation(); toggleEpisodeDescription(episode.id)
+            "
+          >
+            {{ episode.overview }}
+          </p>
         </div>
       </div>
-      
-      <!-- Episode List -->
-      @if (loadingSeason()) {
-          <div class="flex justify-center items-center h-48">
-              <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
-          </div>
-      } @else if (selectedSeasonDetails(); as season) {
-        <div class="flex flex-col space-y-2 max-h-96 overflow-y-auto pr-2">
-          @for (episode of season.episodes; track episode.id) {
-            <div 
-              class="flex items-start p-2 rounded-lg hover:bg-zinc-700 cursor-pointer transition-colors"
-              [class.bg-zinc-700]="currentEpisode()?.id === episode.id"
-              (click)="selectEpisode(episode, season.season_number)">
-              <span class="text-zinc-400 w-8 text-center pt-1 shrink-0">{{ episode.episode_number }}</span>
-              <div class="relative w-24 sm:w-32 shrink-0 rounded-md overflow-hidden">
-                <img [ngSrc]="episode.still_path ? 'https://image.tmdb.org/t/p/w300' + episode.still_path : 'https://picsum.photos/seed/' + episode.id + '/300/169?grayscale'" alt="Episode {{ episode.episode_number }} thumbnail" width="300" height="169" class="w-full object-cover">
-                @if(getProgress(episode.id) > 0) {
-                  <div class="absolute bottom-0 left-0 w-full h-1 bg-zinc-700/80">
-                    <div class="h-full bg-red-600" [style.width.%]="getProgress(episode.id)"></div>
-                  </div>
-                }
-              </div>
-              <div class="flex-1 min-w-0 pl-3">
-                <div class="flex justify-between items-start">
-                  <h4 class="font-semibold text-sm text-white line-clamp-1">{{ episode.name }}</h4>
-                  <span class="text-xs text-zinc-400 shrink-0">{{ getRelativeTime(episode.air_date) }}</span>
-                </div>
-                <p class="text-xs text-zinc-400 mt-1" [class.line-clamp-2]="expandedEpisodeId() !== episode.id" (click)="$event.stopPropagation(); toggleEpisodeDescription(episode.id)">{{ episode.overview }}</p>
-              </div>
-            </div>
-          } @empty {
-            <p class="text-zinc-500 text-center py-8">No episode information available for this season.</p>
-          }
-        </div>
-      } @else {
-        <div class="flex justify-center items-center h-48">
-          <p class="text-zinc-500">Select a season to view episodes.</p>
-        </div>
+      } @empty {
+      <p class="text-zinc-500 text-center py-8">
+        No episode information available for this season.
+      </p>
       }
     </div>
+    } @else {
+    <div class="flex justify-center items-center h-48">
+      <p class="text-zinc-500">Select a season to view episodes.</p>
+    </div>
+    }
   </div>
+</div>
 }

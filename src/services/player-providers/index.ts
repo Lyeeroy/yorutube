@@ -30,8 +30,9 @@ import { VidfastPlayerProvider } from "./vidfast.provider";
  */
 export const REGISTERED_PROVIDERS: IPlayerProvider[] = [
   //   new YouTubePlayerProvider(),
-  new VideasyPlayerProvider(),
+  // dropdown by registering it first so the UI lists it at the top.
   new VidlinkPlayerProvider(),
+  new VideasyPlayerProvider(),
   new VidfastPlayerProvider(),
   new VidsrcPlayerProvider(),
 ];
