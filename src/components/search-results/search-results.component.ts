@@ -122,7 +122,12 @@ export class SearchResultsComponent {
 
   constructor() {
     effect((onCleanup) => {
-      const query = this.params().q;
+      // Accept either `q` or `query` in params for compatibility. We prefer
+      // `q` as the canonical query key because it's used in the browser URL
+      // (e.g., /search?q=funny). This makes it easy to preserve search state
+      // across page reloads.
+      const query =
+        this.params().q ?? (this.params().query as string | undefined);
       this.searchQuery.set(query || "");
       this.searchResults.set(null); // Clear for skeleton
       this.loading.set(true);

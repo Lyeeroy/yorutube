@@ -163,6 +163,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       autoplay: this.autoplay(),
       autoNext: this.playerService.autoNextEnabled(),
       resumeTime,
+      // For VidFast we allow passing a small theme override. If you need
+      // other colors or per-user settings consider adding a UI control.
+      // VidFast expects hex values without the leading '#', e.g. 'dc2626'.
+      playerTheme: selectedPlayerId === "VIDFAST" ? "dc2626" : undefined,
     };
 
     return provider.generateUrl(config);
@@ -210,7 +214,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.previousMediaKey.set(currentMediaKey);
         // Unlock any auto-next if we just navigated to a different media
         this.playerService.unlockAutoNext();
-        
+
         // Mark that we're navigating to prevent stale player messages from interfering
         this.isNavigating.set(true);
       }
@@ -249,7 +253,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           id: 0, // Temporary, will be replaced
         };
         this.currentEpisode.set(expectedEpisode as Episode);
-        
+
         // Also update lastPlayerEpisodeState to match our navigation intent
         this.lastPlayerEpisodeState.set({
           season: +season,
@@ -423,7 +427,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Update last known playback time
     if (typeof currentTime === "number" && currentTime > 0) {
       this.lastKnownPlaybackTime.set(currentTime);
-      
+
       // Once we have meaningful playback (>5s), clear the navigation flag
       // This allows episode change detection to work for auto-next
       if (currentTime >= 5 && this.isNavigating()) {
@@ -533,7 +537,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }
 
       this.lastPlayerEpisodeState.set(playerEpisode);
-      
+
       // Mark that we're starting a navigation
       this.isNavigating.set(true);
 

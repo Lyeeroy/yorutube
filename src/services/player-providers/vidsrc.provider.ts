@@ -90,9 +90,15 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
       typeof data.season === "number" &&
       typeof data.episode === "number" &&
       data.event &&
-      !["timeupdate", "time", "play", "pause", "playing", "seeking", "seeked"].includes(
-        data.event
-      )
+      ![
+        "timeupdate",
+        "time",
+        "play",
+        "pause",
+        "playing",
+        "seeking",
+        "seeked",
+      ].includes(data.event)
     ) {
       // Only report if it differs from current episode
       if (

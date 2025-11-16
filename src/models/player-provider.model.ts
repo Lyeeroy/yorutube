@@ -29,6 +29,8 @@ export interface PlayerUrlConfig {
   autoplay?: boolean;
   autoNext?: boolean;
   resumeTime?: number;
+  /** Optional hex theme color (without '#') for players that support custom theming */
+  playerTheme?: string;
 }
 
 /**

@@ -72,7 +72,10 @@ export class NavigationService {
       }
       case "search": {
         const qp = new URLSearchParams();
-        if (params?.query) qp.set("q", String(params.query));
+        // Support `q` param as the canonical query key. Also accept `query`
+        // for back-compat but prefer `q` in URLs.
+        if (params?.q ?? params?.query)
+          qp.set("q", String(params.q ?? params.query));
         return qp.toString() ? `/search?${qp.toString()}` : "/search";
       }
       case "channel":
@@ -174,7 +177,11 @@ export class NavigationService {
     // Parse search
     if (pathname.startsWith("/search")) {
       const query = params.get("q");
-      this.currentView.set({ view: "search", params: { query } });
+      // Store search params using the `q` key to match what the UI uses
+      // (header and search results expect `params.q`). This keeps the
+      // route param in the URL and makes reloads return the user to the
+      // same search results.
+      this.currentView.set({ view: "search", params: { q: query } });
       return;
     }
 
@@ -235,9 +242,7 @@ export class NavigationService {
     return `m${toBase36(params.id)}`;
   }
 
-  private decodeWatchId(
-    code: string
-  ): {
+  private decodeWatchId(code: string): {
     mediaType: "movie" | "tv";
     id: number;
     season?: number;

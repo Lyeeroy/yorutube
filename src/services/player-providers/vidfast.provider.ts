@@ -44,6 +44,19 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       params.push(`startAt=${Math.floor(resumeTime)}`);
     }
 
+    // Theme support: some VidFast embeds support a `theme` query parameter
+    // which should be a hex string WITHOUT the leading '#'. Accept both 'abc' and 'abcdef'.
+    if (config.playerTheme) {
+      const sanitized = config.playerTheme.replace(/^#/, "").trim();
+      // Simple validation: accept 3 or 6 hex chars
+      if (
+        /^[0-9a-fA-F]{3}$/.test(sanitized) ||
+        /^[0-9a-fA-F]{6}$/.test(sanitized)
+      ) {
+        params.push(`theme=${sanitized}`);
+      }
+    }
+
     // Deduplicate params by key to avoid repeated keys (some servers react badly
     // to duplicate query params). This protects against accidental duplicate
     // values such as 'autoPlay=true' occurring twice.
@@ -52,9 +65,7 @@ export class VidfastPlayerProvider implements IPlayerProvider {
     // any earlier `autoPlay`). This avoids duplicate query params which can
     // cause server-side errors.
     const uniqueParams = Array.from(
-      new Map(
-        params.map((p) => [p.split("=")[0].toLowerCase(), p])
-      ).values()
+      new Map(params.map((p) => [p.split("=")[0].toLowerCase(), p])).values()
     );
 
     const query = uniqueParams.join("&");
@@ -119,9 +130,15 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       typeof data.episode === "number" &&
       // Only process episode changes for specific events, not routine updates
       data.event &&
-      !["timeupdate", "time", "play", "pause", "playing", "seeking", "seeked"].includes(
-        data.event
-      )
+      ![
+        "timeupdate",
+        "time",
+        "play",
+        "pause",
+        "playing",
+        "seeking",
+        "seeked",
+      ].includes(data.event)
     ) {
       // Only report an episode change if it differs from the current episode
       if (
