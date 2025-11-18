@@ -88,4 +88,16 @@ export interface IPlayerProvider {
    * @returns Normalized episode number
    */
   normalizeEpisode(rawEpisode: any): number;
+
+  /** Optional hook for handling MEDIA_DATA or other provider-specific side-effects
+   * For example some providers ask the host page to persist provider-specific
+   * progress using a storage key. Providers that want to persist such data
+   * can implement this hook and the router will call it.
+   */
+  onMediaData?(rawData: any): void;
+
+  /** Optional flag indicating this provider manages or supports auto-next
+   * behavior. Use this instead of comparing provider IDs in UI code.
+   */
+  supportsAutoNext?: boolean;
 }

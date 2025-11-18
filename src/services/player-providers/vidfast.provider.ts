@@ -21,6 +21,7 @@ export class VidfastPlayerProvider implements IPlayerProvider {
   // here - if you embed VidFast from other domains listed in the docs, you can
   // add additional checks in the video player message handler.
   readonly origin = "https://vidfast.pro";
+  readonly supportsAutoNext = false;
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, autoNext, resumeTime } = config;
@@ -48,17 +49,18 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       params.push(`startAt=${Math.floor(resumeTime)}`);
     }
 
-    // Theme support: some VidFast embeds support a `theme` query parameter
-    // which should be a hex string WITHOUT the leading '#'. Accept both 'abc' and 'abcdef'.
-    if (config.playerTheme) {
-      const sanitized = config.playerTheme.replace(/^#/, "").trim();
-      // Simple validation: accept 3 or 6 hex chars
-      if (
-        /^[0-9a-fA-F]{3}$/.test(sanitized) ||
-        /^[0-9a-fA-F]{6}$/.test(sanitized)
-      ) {
-        params.push(`theme=${sanitized}`);
-      }
+    // Theme support: VidFast supports a `theme` query parameter which should be a
+    // hex string WITHOUT the leading '#'. Accept both 'abc' and 'abcdef'. If
+    // no theme was provided by the host, use the provider's default accent.
+    const defaultTheme = "dc2626"; // default app accent for VidFast
+    const rawTheme = (config.playerTheme ?? defaultTheme) as string;
+    const sanitized = String(rawTheme).replace(/^#/, "").trim();
+    // Simple validation: accept 3 or 6 hex chars
+    if (
+      /^[0-9a-fA-F]{3}$/.test(sanitized) ||
+      /^[0-9a-fA-F]{6}$/.test(sanitized)
+    ) {
+      params.push(`theme=${sanitized}`);
     }
 
     // Deduplicate params by key to avoid repeated keys (some servers react badly
@@ -163,5 +165,13 @@ export class VidfastPlayerProvider implements IPlayerProvider {
   normalizeEpisode(rawEpisode: any): number {
     const candidate = parseInt(String(rawEpisode), 10);
     return isNaN(candidate) ? NaN : candidate;
+  }
+
+  onMediaData(rawData: any): void {
+    try {
+      localStorage.setItem("vidFastProgress", JSON.stringify(rawData));
+    } catch (e) {
+      console.error("Failed to store VidFast progress (provider):", e);
+    }
   }
 }

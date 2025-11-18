@@ -15,6 +15,7 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
   readonly id = "VIDSRC";
   readonly name = "Vidsrc";
   readonly origin = "https://vidsrc.cc";
+  readonly supportsAutoNext = true;
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, resumeTime } = config;

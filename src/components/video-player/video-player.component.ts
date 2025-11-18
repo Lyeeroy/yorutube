@@ -41,6 +41,8 @@ import { PlaybackProgress } from "../../models/playback-progress.model";
 import { ContinueWatchingService } from "../../services/continue-watching.service";
 import { ContinueWatchingItem } from "../../models/continue-watching.model";
 import { PlayerProviderService } from "../../services/player-provider.service";
+import { PlayerMessageRouterService } from "../../services/player-message-router.service";
+import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
 import { PlayerUrlConfig } from "../../models/player-provider.model";
 
 const isMovie = (media: MediaType | TvShowDetails): media is Movie =>
@@ -74,6 +76,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private playbackProgressService = inject(PlaybackProgressService);
   private continueWatchingService = inject(ContinueWatchingService);
   private playerProviderService = inject(PlayerProviderService);
+  private playerMessageRouter = inject(PlayerMessageRouterService);
+  private continueWatchingManager = inject(ContinueWatchingManagerService);
   private destroyRef = inject(DestroyRef);
 
   params = input.required<any>();
@@ -87,7 +91,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   currentEpisode = signal<Episode | null>(null);
   playlist = signal<Playlist | null>(null);
   historyAdded = signal(false);
-  private messageHandler: ((event: MessageEvent) => void) | null = null;
+  // provider messages are routed through PlayerMessageRouterService
 
   // Track the last episode state reported by the player
   private lastPlayerEpisodeState = signal<PlayerEpisodeState | null>(null);
@@ -172,7 +176,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       // For VidFast we allow passing a small theme override. If you need
       // other colors or per-user settings consider adding a UI control.
       // VidFast expects hex values without the leading '#', e.g. 'dc2626'.
-      playerTheme: selectedPlayerId === "VIDFAST" ? "dc2626" : undefined,
+      // Theme selection moved into provider (VidFast applies a default accent color)
     };
 
     return provider.generateUrl(config);
@@ -312,179 +316,33 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Recommend the next episode for TV shows when the user has nearly finished the current episode.
-   * This is similar to handleCompletePlayback but does not remove the current item if no next
-   * episode exists — it simply refrains from recommending.
-   */
-  private recommendNextEpisode(media: TvShowDetails, episode?: Episode): void {
-    const playlistId = this.playlist()?.id;
-    if (playlistId) {
-      const nextItem = this.playlistService.getNextItemFromPlaylist(
-        playlistId,
-        media.id
-      );
-      if (nextItem) {
-        const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-          id: nextItem.id,
-          media: nextItem,
-          episode: undefined,
-        };
-        this.continueWatchingService.addItem(continueItem);
-        return;
-      }
-    }
-
-    const currentEp = episode || this.currentEpisode();
-    if (!currentEp) return;
-
-    this.movieService
-      .getSeasonDetails(media.id, currentEp.season_number)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((seasonDetails) => {
-        const episodes = seasonDetails.episodes || [];
-        const idx = episodes.findIndex(
-          (e) => e.episode_number === currentEp.episode_number
-        );
-
-        if (idx !== -1 && idx < episodes.length - 1) {
-          const nextEpisode = episodes[idx + 1];
-          const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-            id: media.id,
-            media: media,
-            episode: nextEpisode,
-          };
-          this.continueWatchingService.addItem(continueItem);
-          return;
-        }
-
-        // Check next seasons for first episode but if none found don't remove current item
-        const currentSeasonIndex = media.seasons.findIndex(
-          (s) => s.season_number === currentEp.season_number
-        );
-        if (currentSeasonIndex > -1) {
-          for (let i = currentSeasonIndex + 1; i < media.seasons.length; i++) {
-            const nextSeasonObj = media.seasons[i];
-            if (
-              nextSeasonObj &&
-              nextSeasonObj.episode_count > 0 &&
-              nextSeasonObj.season_number > 0
-            ) {
-              this.movieService
-                .getSeasonDetails(media.id, nextSeasonObj.season_number)
-                .pipe(takeUntilDestroyed(this.destroyRef))
-                .subscribe((sd) => {
-                  const firstEp = sd.episodes.find((e) => e.episode_number > 0);
-                  if (firstEp) {
-                    const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-                      id: media.id,
-                      media: media,
-                      episode: firstEp,
-                    };
-                    this.continueWatchingService.addItem(continueItem);
-                  }
-                });
-              return;
-            }
-          }
-        }
-      });
-  }
-
   ngOnInit(): void {
-    this.setupPostMessageHandler();
-  }
-
-  ngOnDestroy(): void {
-    if (this.messageHandler && typeof window !== "undefined") {
-      window.removeEventListener("message", this.messageHandler);
-    }
-  }
-
-  private setupPostMessageHandler(): void {
-    if (typeof window === "undefined") return;
-
-    this.messageHandler = (event: MessageEvent) => {
-      // Get allowed origins from provider registry
-      const allowedOrigins = this.playerProviderService.getAllowedOrigins();
-      if (!allowedOrigins.includes(event.origin)) return;
-
-      // Get the provider for this origin
-      const provider = this.playerProviderService.getProviderByOrigin(
-        event.origin
-      );
-      if (!provider) return;
-
-      let payload: any;
-      try {
-        payload =
-          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-      } catch {
-        return;
-      }
-
-      if (
-        (payload?.type === "PLAYER_EVENT" || payload?.type === "MEDIA_DATA") &&
-        payload.data
-      ) {
+    this.playerMessageRouter.start();
+    this.playerMessageRouter
+      .onMessage()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((routed) => {
         const media = this.selectedMediaItem();
         if (!media) return;
 
-        // Store MEDIA_DATA in localStorage for Vidlink per their documentation
-        if (
-          event.origin === "https://vidlink.pro" &&
-          payload.type === "MEDIA_DATA"
-        ) {
-          try {
-            localStorage.setItem(
-              "vidLinkProgress",
-              JSON.stringify(payload.data)
-            );
-          } catch (e) {
-            console.error("Failed to store Vidlink progress:", e);
-          }
-        }
+        const result = routed.provider
+          ? routed.provider.handleMessage(
+              routed.raw.data ?? routed.raw,
+              this.currentEpisode()
+            )
+          : undefined;
 
-        // Store MEDIA_DATA for VidFast native embed (VidFast can send MEDIA_DATA)
-        if (
-          event.origin === "https://vidfast.pro" &&
-          payload.type === "MEDIA_DATA"
-        ) {
-          try {
-            localStorage.setItem(
-              "vidFastProgress",
-              JSON.stringify(payload.data)
-            );
-          } catch (e) {
-            console.error("Failed to store VidFast progress:", e);
-          }
-        }
-
-        // Use provider to handle the message
-        const result = provider.handleMessage(
-          payload.data,
-          this.currentEpisode()
-        );
-
-        // Handle player started
-        if (result.playerStarted && !this.playerHasStarted()) {
+        if (result?.playerStarted && !this.playerHasStarted()) {
           this.playerHasStarted.set(true);
         }
 
-        // Handle playback progress
-        if (result.playbackProgress) {
+        if (result?.playbackProgress) {
           this.handlePlaybackProgress(result.playbackProgress, media);
         }
 
-        // Handle episode changes (TV shows only)
-        // Only process if the player has started and we're not in the middle of
-        // a navigation. We intentionally no longer require 5s of playback because
-        // some providers emit navigation events before significant playback. The
-        // provider itself filters out common playback events; this keeps UI in
-        // sync with the currently playing episode.
         if (
           media.media_type === "tv" &&
-          result.episodeChange &&
+          result?.episodeChange &&
           this.playerHasStarted() &&
           !this.isNavigating()
         ) {
@@ -494,26 +352,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           );
         }
 
-        // Sync currentEpisode from raw payload data (not just episodeChange events)
-        // This ensures episode-selector highlights correctly even during regular playback
-        // when providers send season/episode metadata in timeupdate/progress events
         if (media.media_type === "tv" && this.playerHasStarted()) {
           let season: number | undefined;
           let episode: number | undefined;
 
-          // First, try to use the provider's normalized episodeChange result
-          // This is preferred because providers handle their own quirks (e.g., Vidlink 0-based indexing)
-          if (result.episodeChange) {
+          if (result?.episodeChange) {
             season = result.episodeChange.season;
             episode = result.episodeChange.episode;
-          }
-          // Fallback: Check for standard season/episode fields in raw data
-          else if (
-            typeof payload.data.season === "number" &&
-            typeof payload.data.episode === "number"
+          } else if (
+            typeof routed.raw?.season === "number" &&
+            typeof routed.raw?.episode === "number"
           ) {
-            season = payload.data.season;
-            episode = payload.data.episode;
+            season = routed.raw.season;
+            episode = routed.raw.episode;
           }
 
           if (
@@ -528,10 +379,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             );
           }
         }
-      }
-    };
+      });
+  }
 
-    window.addEventListener("message", this.messageHandler);
+  ngOnDestroy(): void {
+    this.playerMessageRouter.stop();
   }
 
   // Track last known currentTime to prevent premature episode-change navigation
@@ -589,7 +441,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       // When playback completes, handle movies and TV shows differently.
       // Movies: remove from continue watching.
       // TV: place the next episode (or remove if this was the final episode).
-      this.handleCompletePlayback(media, this.currentEpisode());
+      this.continueWatchingManager.handleCompletePlayback(
+        media,
+        this.currentEpisode(),
+        this.playlist()?.id
+      );
     }
 
     // If the user has mostly finished a TV episode, proactively recommend the next
@@ -602,13 +458,20 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       progressPercent < 95
     ) {
       this.recommendedNextEpisodeSent.set(true);
-      this.recommendNextEpisode(media as TvShowDetails, episode || undefined);
+      this.continueWatchingManager.maybeRecommendNextEpisode(
+        media as TvShowDetails,
+        episode || undefined,
+        this.playlist()?.id
+      );
     }
 
     // Auto-play next episode for VIDLINK or VIDSRC when video completes
+    const provider = this.playerProviderService.getProvider(
+      this.selectedPlayer()
+    );
+
     if (
-      (this.selectedPlayer() === "VIDLINK" ||
-        this.selectedPlayer() === "VIDSRC") &&
+      provider?.supportsAutoNext &&
       this.playerService.autoNextEnabled() &&
       media.media_type === "tv" &&
       this.playerHasStarted() &&
@@ -635,108 +498,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
    * - For TV shows: try to add the next episode to Continue Watching; if none exists, remove.
    * - If a playlist next item exists, prefer that (keeps playlist semantics consistent with playNextEpisode)
    */
-  private handleCompletePlayback(
-    media: MovieDetails | TvShowDetails,
-    episode?: Episode | null
-  ): void {
-    // Remove directly on movies (no episodes to continue with)
-    if (media.media_type === "movie") {
-      this.continueWatchingService.removeItem(media.id);
-      return;
-    }
-
-    // For TV shows, prefer playlist next-item (if playing inside a playlist)
-    const playlistId = this.playlist()?.id;
-    if (playlistId) {
-      const nextItem = this.playlistService.getNextItemFromPlaylist(
-        playlistId,
-        media.id
-      );
-      if (nextItem) {
-        // Add the playlist next item to Continue Watching (no episode data available in playlists)
-        const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-          id: nextItem.id,
-          media: nextItem,
-          episode: undefined,
-        };
-        this.continueWatchingService.addItem(continueItem);
-        return;
-      }
-    }
-
-    // If we don't have an episode, there's nothing to advance to — remove the item.
-    const currentEp = episode || this.currentEpisode();
-    if (!currentEp) {
-      this.continueWatchingService.removeItem(media.id);
-      return;
-    }
-
-    // Fetch season details to find next episode in current season
-    this.movieService
-      .getSeasonDetails(media.id, currentEp.season_number)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((seasonDetails) => {
-        const episodes = seasonDetails.episodes || [];
-        const idx = episodes.findIndex(
-          (e) => e.episode_number === currentEp.episode_number
-        );
-
-        // If a later episode exists in the same season, add it
-        if (idx !== -1 && idx < episodes.length - 1) {
-          const nextEpisode = episodes[idx + 1];
-          const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-            id: media.id,
-            media: media,
-            episode: nextEpisode,
-          };
-          this.continueWatchingService.addItem(continueItem);
-          return;
-        }
-
-        // Otherwise, check following seasons for the first eligible episode
-        const currentSeasonIndex = media.seasons.findIndex(
-          (s) => s.season_number === currentEp.season_number
-        );
-        if (currentSeasonIndex > -1) {
-          for (
-            let i = currentSeasonIndex + 1;
-            i < media.seasons.length;
-            i++
-          ) {
-            const nextSeasonObj = media.seasons[i];
-            if (
-              nextSeasonObj &&
-              nextSeasonObj.episode_count > 0 &&
-              nextSeasonObj.season_number > 0
-            ) {
-              this.movieService
-                .getSeasonDetails(media.id, nextSeasonObj.season_number)
-                .pipe(takeUntilDestroyed(this.destroyRef))
-                .subscribe((sd) => {
-                  const firstEp = sd.episodes.find(
-                    (e) => e.episode_number > 0
-                  );
-                  if (firstEp) {
-                    const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-                      id: media.id,
-                      media: media,
-                      episode: firstEp,
-                    };
-                    this.continueWatchingService.addItem(continueItem);
-                  } else {
-                    // No episodes — remove
-                    this.continueWatchingService.removeItem(media.id);
-                  }
-                });
-              return;
-            }
-          }
-        }
-
-        // If no next season/episode found, remove from continue watching
-        this.continueWatchingService.removeItem(media.id);
-      });
-  }
+  // handleCompletePlayback moved to ContinueWatchingManagerService
 
   private handleEpisodeChangeDetection(
     data: { season: number; episode: number },

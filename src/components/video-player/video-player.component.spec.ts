@@ -9,6 +9,7 @@ import { PlayerService } from "../../services/player.service";
 import { PlaybackProgressService } from "../../services/playback-progress.service";
 import { HistoryService } from "../../services/history.service";
 import { PlayerProviderService } from "../../services/player-provider.service";
+import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
 import { ContinueWatchingItem } from "../../models/continue-watching.model";
 import { TvShowDetails, MovieDetails, Episode } from "../../models/movie.model";
 
@@ -16,10 +17,24 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
   let component: VideoPlayerComponent;
 
   const mockNavigationService = {} as any;
-  const mockPlayerService = { autoplayEnabled: () => false, autoNextEnabled: () => false, tryLockAutoNext: () => true, unlockAutoNext: () => {} } as any;
-  const mockPlaybackProgressService = { updateProgress: jasmine.createSpy("updateProgress"), getProgress: jasmine.createSpy("getProgress") } as any;
-  const mockHistoryService = { addToHistory: jasmine.createSpy("addToHistory") } as any;
-  const mockPlayerProviderService = { getAllowedOrigins: () => [], getProvider: () => undefined, getProviderByOrigin: () => undefined } as any;
+  const mockPlayerService = {
+    autoplayEnabled: () => false,
+    autoNextEnabled: () => false,
+    tryLockAutoNext: () => true,
+    unlockAutoNext: () => {},
+  } as any;
+  const mockPlaybackProgressService = {
+    updateProgress: jasmine.createSpy("updateProgress"),
+    getProgress: jasmine.createSpy("getProgress"),
+  } as any;
+  const mockHistoryService = {
+    addToHistory: jasmine.createSpy("addToHistory"),
+  } as any;
+  const mockPlayerProviderService = {
+    getAllowedOrigins: () => [],
+    getProvider: () => undefined,
+    getProviderByOrigin: () => undefined,
+  } as any;
 
   beforeEach(() => {
     const mockMovieService = {
@@ -43,9 +58,13 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
         { provide: PlaylistService, useValue: mockPlaylist },
         { provide: NavigationService, useValue: mockNavigationService },
         { provide: PlayerService, useValue: mockPlayerService },
-        { provide: PlaybackProgressService, useValue: mockPlaybackProgressService },
+        {
+          provide: PlaybackProgressService,
+          useValue: mockPlaybackProgressService,
+        },
         { provide: HistoryService, useValue: mockHistoryService },
         { provide: PlayerProviderService, useValue: mockPlayerProviderService },
+        ContinueWatchingManagerService,
       ],
       imports: [VideoPlayerComponent],
     });
@@ -58,7 +77,8 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
     const movie = { id: 100, media_type: "movie" } as MovieDetails;
     const mockContinue = TestBed.inject(ContinueWatchingService);
 
-    component["handleCompletePlayback"](movie, undefined);
+    const manager = TestBed.inject(ContinueWatchingManagerService);
+    manager.handleCompletePlayback(movie, undefined);
 
     expect(mockContinue.removeItem).toHaveBeenCalledWith(100);
   });
@@ -67,34 +87,64 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
     const tv: TvShowDetails = {
       id: 200,
       media_type: "tv",
-      seasons: [{ season_number: 1, episode_count: 3 }, { season_number: 2, episode_count: 2 }],
+      seasons: [
+        { season_number: 1, episode_count: 3 },
+        { season_number: 2, episode_count: 2 },
+      ],
     } as any;
-    const curEpisode: Episode = { id: 1, season_number: 1, episode_number: 2 } as any;
+    const curEpisode: Episode = {
+      id: 1,
+      season_number: 1,
+      episode_number: 2,
+    } as any;
 
     const mockMovieService = TestBed.inject(MovieService) as any;
-    mockMovieService.getSeasonDetails.and.returnValue(of({ episodes: [ { episode_number: 1 }, { episode_number: 2 }, { episode_number: 3 } ] } as any));
+    mockMovieService.getSeasonDetails.and.returnValue(
+      of({
+        episodes: [
+          { episode_number: 1 },
+          { episode_number: 2 },
+          { episode_number: 3 },
+        ],
+      } as any)
+    );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
 
-    component["handleCompletePlayback"](tv, curEpisode);
+    const manager = TestBed.inject(ContinueWatchingManagerService);
+    manager.handleCompletePlayback(tv, curEpisode);
 
     expect(mockMovieService.getSeasonDetails).toHaveBeenCalledWith(200, 1);
     expect(cw.addItem).toHaveBeenCalled();
-    const added = cw.addItem.calls.mostRecent().args[0] as Omit<ContinueWatchingItem, "updatedAt">;
+    const added = cw.addItem.calls.mostRecent().args[0] as Omit<
+      ContinueWatchingItem,
+      "updatedAt"
+    >;
     expect(added.id).toBe(200);
     expect(added.episode?.episode_number).toBe(3);
   });
 
   it("removes TV from continue watching when no next episode or season exists", () => {
-    const tv: TvShowDetails = { id: 300, media_type: "tv", seasons: [{ season_number: 1, episode_count: 1 }] } as any;
-    const curEpisode: Episode = { id: 2, season_number: 1, episode_number: 1 } as any;
+    const tv: TvShowDetails = {
+      id: 300,
+      media_type: "tv",
+      seasons: [{ season_number: 1, episode_count: 1 }],
+    } as any;
+    const curEpisode: Episode = {
+      id: 2,
+      season_number: 1,
+      episode_number: 1,
+    } as any;
 
     const mockMovieService = TestBed.inject(MovieService) as any;
-    mockMovieService.getSeasonDetails.and.returnValue(of({ episodes: [ { episode_number: 1 } ] } as any));
+    mockMovieService.getSeasonDetails.and.returnValue(
+      of({ episodes: [{ episode_number: 1 }] } as any)
+    );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
 
-    component["handleCompletePlayback"](tv, curEpisode);
+    const manager = TestBed.inject(ContinueWatchingManagerService);
+    manager.handleCompletePlayback(tv, curEpisode);
 
     expect(mockMovieService.getSeasonDetails).toHaveBeenCalledWith(300, 1);
     expect(cw.removeItem).toHaveBeenCalledWith(300);
@@ -106,10 +156,22 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
       media_type: "tv",
       seasons: [{ season_number: 1, episode_count: 3 }],
     } as any;
-    const curEpisode: Episode = { id: 10, season_number: 1, episode_number: 2 } as any;
+    const curEpisode: Episode = {
+      id: 10,
+      season_number: 1,
+      episode_number: 2,
+    } as any;
 
     const mockMovieService = TestBed.inject(MovieService) as any;
-    mockMovieService.getSeasonDetails.and.returnValue(of({ episodes: [ { episode_number: 1 }, { episode_number: 2 }, { episode_number: 3 } ] } as any));
+    mockMovieService.getSeasonDetails.and.returnValue(
+      of({
+        episodes: [
+          { episode_number: 1 },
+          { episode_number: 2 },
+          { episode_number: 3 },
+        ],
+      } as any)
+    );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
 
@@ -123,7 +185,10 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
 
     // We should have added an entry with the next episode (3)
     expect(cw.addItem).toHaveBeenCalled();
-    const added = cw.addItem.calls.mostRecent().args[0] as Omit<ContinueWatchingItem, "updatedAt">;
+    const added = cw.addItem.calls.mostRecent().args[0] as Omit<
+      ContinueWatchingItem,
+      "updatedAt"
+    >;
     expect(added.episode?.episode_number).toBe(3);
   });
 
@@ -133,18 +198,36 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
       media_type: "tv",
       seasons: [{ season_number: 1, episode_count: 3 }],
     } as any;
-    const curEpisode: Episode = { id: 12, season_number: 1, episode_number: 2 } as any;
+    const curEpisode: Episode = {
+      id: 12,
+      season_number: 1,
+      episode_number: 2,
+    } as any;
 
     const mockMovieService = TestBed.inject(MovieService) as any;
-    mockMovieService.getSeasonDetails.and.returnValue(of({ episodes: [ { episode_number: 1 }, { episode_number: 2 }, { episode_number: 3 } ] } as any));
+    mockMovieService.getSeasonDetails.and.returnValue(
+      of({
+        episodes: [
+          { episode_number: 1 },
+          { episode_number: 2 },
+          { episode_number: 3 },
+        ],
+      } as any)
+    );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
 
     component["currentEpisode"].set(curEpisode);
     // first time: triggers recommendation
-    component["handlePlaybackProgress"]({ currentTime: 30, duration: 120, progressPercent: 90 }, tv);
+    component["handlePlaybackProgress"](
+      { currentTime: 30, duration: 120, progressPercent: 90 },
+      tv
+    );
     // second time: should not recommend again
-    component["handlePlaybackProgress"]({ currentTime: 31, duration: 120, progressPercent: 92 }, tv);
+    component["handlePlaybackProgress"](
+      { currentTime: 31, duration: 120, progressPercent: 92 },
+      tv
+    );
 
     expect(cw.addItem.calls.count()).toBeGreaterThan(0);
     // Should only be recommended once by our signal guard

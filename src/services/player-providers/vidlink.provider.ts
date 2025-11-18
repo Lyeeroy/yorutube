@@ -16,6 +16,8 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
   readonly id = "VIDLINK";
   readonly name = "Vidlink";
   readonly origin = "https://vidlink.pro";
+  // Vidlink supports auto-next via internal controls
+  readonly supportsAutoNext = true;
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, autoNext, resumeTime } = config;
@@ -138,5 +140,13 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
     if (isNaN(candidate)) return NaN;
     // Vidlink uses 0-based indexing, so always add 1
     return candidate + 1;
+  }
+
+  onMediaData(rawData: any): void {
+    try {
+      localStorage.setItem("vidLinkProgress", JSON.stringify(rawData));
+    } catch (e) {
+      console.error("Failed to store Vidlink progress (provider):", e);
+    }
   }
 }
