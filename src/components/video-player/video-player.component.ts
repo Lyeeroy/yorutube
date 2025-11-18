@@ -106,6 +106,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Track if auto-play next has been triggered for current episode
   private autoPlayNextTriggered = signal(false);
 
+  // Track if we've recommended the next episode (at 90% watched)
+  private recommendedNextEpisodeSent = signal(false);
+
   // Track the previous media key to avoid blanking iframe on no-op param syncs
   private previousMediaKey = signal<string | null>(null);
 
@@ -213,6 +216,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.playerHasStarted.set(false);
         this.lastPlayerEpisodeState.set(null);
         this.autoPlayNextTriggered.set(false);
+        this.recommendedNextEpisodeSent.set(false);
         this.lastKnownPlaybackTime.set(0);
         this.previousMediaKey.set(currentMediaKey);
         // Unlock any auto-next if we just navigated to a different media
@@ -306,6 +310,85 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       onCleanup(() => sub.unsubscribe());
     });
+  }
+
+  /**
+   * Recommend the next episode for TV shows when the user has nearly finished the current episode.
+   * This is similar to handleCompletePlayback but does not remove the current item if no next
+   * episode exists — it simply refrains from recommending.
+   */
+  private recommendNextEpisode(media: TvShowDetails, episode?: Episode): void {
+    const playlistId = this.playlist()?.id;
+    if (playlistId) {
+      const nextItem = this.playlistService.getNextItemFromPlaylist(
+        playlistId,
+        media.id
+      );
+      if (nextItem) {
+        const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
+          id: nextItem.id,
+          media: nextItem,
+          episode: undefined,
+        };
+        this.continueWatchingService.addItem(continueItem);
+        return;
+      }
+    }
+
+    const currentEp = episode || this.currentEpisode();
+    if (!currentEp) return;
+
+    this.movieService
+      .getSeasonDetails(media.id, currentEp.season_number)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((seasonDetails) => {
+        const episodes = seasonDetails.episodes || [];
+        const idx = episodes.findIndex(
+          (e) => e.episode_number === currentEp.episode_number
+        );
+
+        if (idx !== -1 && idx < episodes.length - 1) {
+          const nextEpisode = episodes[idx + 1];
+          const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
+            id: media.id,
+            media: media,
+            episode: nextEpisode,
+          };
+          this.continueWatchingService.addItem(continueItem);
+          return;
+        }
+
+        // Check next seasons for first episode but if none found don't remove current item
+        const currentSeasonIndex = media.seasons.findIndex(
+          (s) => s.season_number === currentEp.season_number
+        );
+        if (currentSeasonIndex > -1) {
+          for (let i = currentSeasonIndex + 1; i < media.seasons.length; i++) {
+            const nextSeasonObj = media.seasons[i];
+            if (
+              nextSeasonObj &&
+              nextSeasonObj.episode_count > 0 &&
+              nextSeasonObj.season_number > 0
+            ) {
+              this.movieService
+                .getSeasonDetails(media.id, nextSeasonObj.season_number)
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe((sd) => {
+                  const firstEp = sd.episodes.find((e) => e.episode_number > 0);
+                  if (firstEp) {
+                    const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
+                      id: media.id,
+                      media: media,
+                      episode: firstEp,
+                    };
+                    this.continueWatchingService.addItem(continueItem);
+                  }
+                });
+              return;
+            }
+          }
+        }
+      });
   }
 
   ngOnInit(): void {
@@ -503,7 +586,23 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       };
       this.continueWatchingService.addItem(continueWatchingItem);
     } else if (progressPercent >= 95) {
-      this.continueWatchingService.removeItem(media.id);
+      // When playback completes, handle movies and TV shows differently.
+      // Movies: remove from continue watching.
+      // TV: place the next episode (or remove if this was the final episode).
+      this.handleCompletePlayback(media, this.currentEpisode());
+    }
+
+    // If the user has mostly finished a TV episode, proactively recommend the next
+    // episode in Continue Watching. We mark this once per media playback to avoid
+    // spamming the board with repeated writes.
+    if (
+      media.media_type === "tv" &&
+      !this.recommendedNextEpisodeSent() &&
+      progressPercent >= 90 &&
+      progressPercent < 95
+    ) {
+      this.recommendedNextEpisodeSent.set(true);
+      this.recommendNextEpisode(media as TvShowDetails, episode || undefined);
     }
 
     // Auto-play next episode for VIDLINK or VIDSRC when video completes
@@ -528,6 +627,115 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.autoPlayNextTriggered.set(true);
       this.playNextEpisode(media as TvShowDetails);
     }
+  }
+
+  /**
+   * Handle a completed playback event for the provided media.
+   * - For movies: remove from Continue Watching
+   * - For TV shows: try to add the next episode to Continue Watching; if none exists, remove.
+   * - If a playlist next item exists, prefer that (keeps playlist semantics consistent with playNextEpisode)
+   */
+  private handleCompletePlayback(
+    media: MovieDetails | TvShowDetails,
+    episode?: Episode | null
+  ): void {
+    // Remove directly on movies (no episodes to continue with)
+    if (media.media_type === "movie") {
+      this.continueWatchingService.removeItem(media.id);
+      return;
+    }
+
+    // For TV shows, prefer playlist next-item (if playing inside a playlist)
+    const playlistId = this.playlist()?.id;
+    if (playlistId) {
+      const nextItem = this.playlistService.getNextItemFromPlaylist(
+        playlistId,
+        media.id
+      );
+      if (nextItem) {
+        // Add the playlist next item to Continue Watching (no episode data available in playlists)
+        const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
+          id: nextItem.id,
+          media: nextItem,
+          episode: undefined,
+        };
+        this.continueWatchingService.addItem(continueItem);
+        return;
+      }
+    }
+
+    // If we don't have an episode, there's nothing to advance to — remove the item.
+    const currentEp = episode || this.currentEpisode();
+    if (!currentEp) {
+      this.continueWatchingService.removeItem(media.id);
+      return;
+    }
+
+    // Fetch season details to find next episode in current season
+    this.movieService
+      .getSeasonDetails(media.id, currentEp.season_number)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((seasonDetails) => {
+        const episodes = seasonDetails.episodes || [];
+        const idx = episodes.findIndex(
+          (e) => e.episode_number === currentEp.episode_number
+        );
+
+        // If a later episode exists in the same season, add it
+        if (idx !== -1 && idx < episodes.length - 1) {
+          const nextEpisode = episodes[idx + 1];
+          const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
+            id: media.id,
+            media: media,
+            episode: nextEpisode,
+          };
+          this.continueWatchingService.addItem(continueItem);
+          return;
+        }
+
+        // Otherwise, check following seasons for the first eligible episode
+        const currentSeasonIndex = media.seasons.findIndex(
+          (s) => s.season_number === currentEp.season_number
+        );
+        if (currentSeasonIndex > -1) {
+          for (
+            let i = currentSeasonIndex + 1;
+            i < media.seasons.length;
+            i++
+          ) {
+            const nextSeasonObj = media.seasons[i];
+            if (
+              nextSeasonObj &&
+              nextSeasonObj.episode_count > 0 &&
+              nextSeasonObj.season_number > 0
+            ) {
+              this.movieService
+                .getSeasonDetails(media.id, nextSeasonObj.season_number)
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe((sd) => {
+                  const firstEp = sd.episodes.find(
+                    (e) => e.episode_number > 0
+                  );
+                  if (firstEp) {
+                    const continueItem: Omit<ContinueWatchingItem, "updatedAt"> = {
+                      id: media.id,
+                      media: media,
+                      episode: firstEp,
+                    };
+                    this.continueWatchingService.addItem(continueItem);
+                  } else {
+                    // No episodes — remove
+                    this.continueWatchingService.removeItem(media.id);
+                  }
+                });
+              return;
+            }
+          }
+        }
+
+        // If no next season/episode found, remove from continue watching
+        this.continueWatchingService.removeItem(media.id);
+      });
   }
 
   private handleEpisodeChangeDetection(
