@@ -394,19 +394,56 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         }
 
         // Handle episode changes (TV shows only)
-        // Only process if: player has started, we're not in middle of navigation,
-        // and we have meaningful playback time
+        // Only process if the player has started and we're not in the middle of
+        // a navigation. We intentionally no longer require 5s of playback because
+        // some providers emit navigation events before significant playback. The
+        // provider itself filters out common playback events; this keeps UI in
+        // sync with the currently playing episode.
         if (
           media.media_type === "tv" &&
           result.episodeChange &&
           this.playerHasStarted() &&
-          !this.isNavigating() &&
-          this.lastKnownPlaybackTime() >= 5
+          !this.isNavigating()
         ) {
           this.handleEpisodeChangeDetection(
             result.episodeChange,
             media as TvShowDetails
           );
+        }
+
+        // Sync currentEpisode from raw payload data (not just episodeChange events)
+        // This ensures episode-selector highlights correctly even during regular playback
+        // when providers send season/episode metadata in timeupdate/progress events
+        if (media.media_type === "tv" && this.playerHasStarted()) {
+          let season: number | undefined;
+          let episode: number | undefined;
+
+          // First, try to use the provider's normalized episodeChange result
+          // This is preferred because providers handle their own quirks (e.g., Vidlink 0-based indexing)
+          if (result.episodeChange) {
+            season = result.episodeChange.season;
+            episode = result.episodeChange.episode;
+          }
+          // Fallback: Check for standard season/episode fields in raw data
+          else if (
+            typeof payload.data.season === "number" &&
+            typeof payload.data.episode === "number"
+          ) {
+            season = payload.data.season;
+            episode = payload.data.episode;
+          }
+
+          if (
+            season !== undefined &&
+            episode !== undefined &&
+            !isNaN(season) &&
+            !isNaN(episode)
+          ) {
+            this.syncCurrentEpisodeFromPlayerData(
+              { season, episode },
+              media as TvShowDetails
+            );
+          }
         }
       }
     };
@@ -525,6 +562,24 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       ) {
         this.lastPlayerEpisodeState.set(playerEpisode);
       }
+      // If the app params match the player but the current episode object is
+      // the temporary placeholder (created from params while we load details),
+      // fetch the season details so UI components like EpisodeSelector and
+      // watchlist highlight the correct episode instance.
+      const currentEp = this.currentEpisode();
+      if (currentEp && currentEp.id === 0) {
+        this.movieService
+          .getSeasonDetails(media.id, playerEpisode.season)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((seasonDetails) => {
+            const matching = seasonDetails.episodes.find(
+              (e) => e.episode_number === playerEpisode.episode
+            );
+            if (matching) {
+              this.currentEpisode.set(matching);
+            }
+          });
+      }
       return;
     }
 
@@ -577,6 +632,75 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             this.currentEpisode.set(newEpisode);
             this.historyAdded.set(false);
             this.autoPlayNextTriggered.set(false);
+          }
+        });
+    }
+  }
+
+  /**
+   * Sync currentEpisode from player metadata even if navigation isn't triggered.
+   * This ensures episode-selector highlights correctly when the player reports
+   * episode data that matches our current route params.
+   */
+  private syncCurrentEpisodeFromPlayerData(
+    data: { season: number; episode: number },
+    media: TvShowDetails
+  ): void {
+    const currentEp = this.currentEpisode();
+
+    // If currentEpisode already matches and has a valid id, no need to fetch
+    if (
+      currentEp &&
+      currentEp.id > 0 &&
+      currentEp.season_number === data.season &&
+      currentEp.episode_number === data.episode
+    ) {
+      return;
+    }
+
+    // Check if URL params need updating (episode changed but URL is stale)
+    const currentParams = untracked(() => this.params());
+    const urlNeedsUpdate =
+      currentParams?.season !== data.season ||
+      currentParams?.episode !== data.episode;
+
+    // If currentEpisode is null, a placeholder (id === 0), or doesn't match
+    // the player's reported episode, fetch and update it
+    if (
+      !currentEp ||
+      currentEp.id === 0 ||
+      currentEp.season_number !== data.season ||
+      currentEp.episode_number !== data.episode
+    ) {
+      this.movieService
+        .getSeasonDetails(media.id, data.season)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((seasonDetails) => {
+          const matchingEpisode = seasonDetails.episodes.find(
+            (e) => e.episode_number === data.episode
+          );
+          if (matchingEpisode) {
+            this.currentEpisode.set(matchingEpisode);
+
+            // Update URL to reflect the new episode without triggering navigation/reload
+            if (urlNeedsUpdate) {
+              const newUrl = this.navigationService.getPath("watch", {
+                mediaType: "tv",
+                id: media.id,
+                season: data.season,
+                episode: data.episode,
+                playlistId: this.playlist()?.id,
+              });
+
+              // Use replaceState to update URL without adding to history
+              if (typeof window !== "undefined" && window.history) {
+                try {
+                  window.history.replaceState({}, "", newUrl);
+                } catch (e) {
+                  console.error("Failed to update URL:", e);
+                }
+              }
+            }
           }
         });
     }

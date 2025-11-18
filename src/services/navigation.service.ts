@@ -114,6 +114,11 @@ export class NavigationService {
     return path;
   }
 
+  // Public helper for getting relative URL path
+  getPath(view: View, params: any = null): string {
+    return this.buildUrl(view, params);
+  }
+
   // Parse current browser URL and update navigation state (used on startup and popstate)
   private parseUrlAndUpdateState(skipHistoryUpdate: boolean = true) {
     if (typeof window === "undefined") return;
@@ -229,17 +234,16 @@ export class NavigationService {
 
   // --------- Helpers to encode/decode 'v' param (short opaque id) ----------
   private encodeWatchId(params: any): string {
-    const toBase36 = (n: number) => Math.abs(Math.floor(n)).toString(36);
     if (!params?.id) return "";
     if (params.mediaType === "tv") {
-      // format: t<showId>-s<season>-e<episode> (values base36-encoded)
-      let out = `t${toBase36(params.id)}`;
-      if (params.season) out += `-s${toBase36(params.season)}`;
-      if (params.episode) out += `-e${toBase36(params.episode)}`;
+      // format: t<showId>-s<season>-e<episode> (using regular numbers for readability)
+      let out = `t${params.id}`;
+      if (params.season) out += `-s${params.season}`;
+      if (params.episode) out += `-e${params.episode}`;
       return out;
     }
     // default to movie
-    return `m${toBase36(params.id)}`;
+    return `m${params.id}`;
   }
 
   private decodeWatchId(code: string): {
@@ -250,10 +254,9 @@ export class NavigationService {
   } | null {
     if (!code) return null;
     try {
-      const decodeBase36 = (s: string) => parseInt(s, 36);
       if (code.startsWith("m")) {
         const idPart = code.slice(1);
-        const id = decodeBase36(idPart);
+        const id = parseInt(idPart, 10);
         if (!isNaN(id)) return { mediaType: "movie", id };
         return null;
       }
@@ -261,16 +264,16 @@ export class NavigationService {
       if (code.startsWith("t")) {
         // t<id>-s<season>-e<episode>
         const parts = code.slice(1).split("-");
-        const id = decodeBase36(parts[0]);
+        const id = parseInt(parts[0], 10);
         let season: number | undefined;
         let episode: number | undefined;
 
         for (let i = 1; i < parts.length; i++) {
           const p = parts[i];
           if (p.startsWith("s")) {
-            season = decodeBase36(p.slice(1));
+            season = parseInt(p.slice(1), 10);
           } else if (p.startsWith("e")) {
-            episode = decodeBase36(p.slice(1));
+            episode = parseInt(p.slice(1), 10);
           }
         }
         if (!isNaN(id)) return { mediaType: "tv", id, season, episode };

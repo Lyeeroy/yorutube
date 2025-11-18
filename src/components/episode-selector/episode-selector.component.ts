@@ -1,24 +1,42 @@
-import { Component, ChangeDetectionStrategy, input, computed, signal, inject, effect, output, untracked, viewChild, ElementRef, DestroyRef } from '@angular/core';
-import { TvShowDetails, Season, Episode, SeasonDetails } from '../../models/movie.model';
-import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { MovieService } from '../../services/movie.service';
-import { PlaybackProgressService } from '../../services/playback-progress.service';
-import { fromEvent } from 'rxjs';
-import { debounceTime } from 'rxjs/operators';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  computed,
+  signal,
+  inject,
+  effect,
+  output,
+  untracked,
+  viewChild,
+  ElementRef,
+  DestroyRef,
+} from "@angular/core";
+import {
+  TvShowDetails,
+  Season,
+  Episode,
+  SeasonDetails,
+} from "../../models/movie.model";
+import { CommonModule, NgOptimizedImage } from "@angular/common";
+import { MovieService } from "../../services/movie.service";
+import { PlaybackProgressService } from "../../services/playback-progress.service";
+import { fromEvent } from "rxjs";
+import { debounceTime } from "rxjs/operators";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 
 @Component({
-  selector: 'app-episode-selector',
+  selector: "app-episode-selector",
   standalone: true,
   imports: [CommonModule, NgOptimizedImage],
-  templateUrl: './episode-selector.component.html',
+  templateUrl: "./episode-selector.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EpisodeSelectorComponent {
   // Inputs & Outputs
   tvShowDetails = input.required<TvShowDetails>();
   currentEpisode = input<Episode | null>(null);
-  episodeSelected = output<{ episode: Episode, seasonNumber: number }>();
+  episodeSelected = output<{ episode: Episode; seasonNumber: number }>();
 
   // Injected Services
   private movieService = inject(MovieService);
@@ -29,26 +47,32 @@ export class EpisodeSelectorComponent {
   expandedEpisodeId = signal<number | null>(null);
 
   // Reactive season details loading
-  private selectedSeasonTrigger = signal<{ tvId: number; seasonNumber: number } | null>(null);
-  seasonDetailsResource = signal<{ loading: boolean; data: (SeasonDetails & { tvId: number; }) | null; error: any }>({ loading: false, data: null, error: null });
-  
+  private selectedSeasonTrigger = signal<{
+    tvId: number;
+    seasonNumber: number;
+  } | null>(null);
+  seasonDetailsResource = signal<{
+    loading: boolean;
+    data: (SeasonDetails & { tvId: number }) | null;
+    error: any;
+  }>({ loading: false, data: null, error: null });
+
   // Signals for template compatibility
   loadingSeason = computed(() => this.seasonDetailsResource().loading);
   selectedSeasonDetails = computed(() => this.seasonDetailsResource().data);
 
   // Horizontal Scrolling for Seasons
-  scrollContainer = viewChild<ElementRef<HTMLElement>>('scrollContainer');
+  scrollContainer = viewChild<ElementRef<HTMLElement>>("scrollContainer");
   canScrollLeft = signal(false);
   canScrollRight = signal(false);
   private checkScrollTimeout: number | null = null;
-  
+
   // Drag-to-scroll properties
   private isMouseDown = false;
   private startX = 0;
   private scrollLeft = 0;
   private hasDragged = false;
   isGrabbing = signal(false);
-
 
   constructor() {
     // This effect fetches season details whenever the trigger changes.
@@ -57,53 +81,86 @@ export class EpisodeSelectorComponent {
       const trigger = this.selectedSeasonTrigger();
 
       if (!trigger) {
-        this.seasonDetailsResource.set({ loading: false, data: null, error: null });
+        this.seasonDetailsResource.set({
+          loading: false,
+          data: null,
+          error: null,
+        });
         return;
       }
 
       // Avoid re-fetching if we already have the correct data for this show
       const currentData = untracked(() => this.seasonDetailsResource().data);
-      if (currentData && currentData.season_number === trigger.seasonNumber && currentData.tvId === trigger.tvId) {
-          return;
+      if (
+        currentData &&
+        currentData.season_number === trigger.seasonNumber &&
+        currentData.tvId === trigger.tvId
+      ) {
+        return;
       }
 
-      this.seasonDetailsResource.set({ loading: true, data: null, error: null });
-      const sub = this.movieService.getSeasonDetails(trigger.tvId, trigger.seasonNumber)
+      this.seasonDetailsResource.set({
+        loading: true,
+        data: null,
+        error: null,
+      });
+      const sub = this.movieService
+        .getSeasonDetails(trigger.tvId, trigger.seasonNumber)
         .subscribe({
-          next: data => {
+          next: (data) => {
             const augmentedData = data ? { ...data, tvId: trigger.tvId } : null;
-            this.seasonDetailsResource.set({ loading: false, data: augmentedData, error: null });
+            this.seasonDetailsResource.set({
+              loading: false,
+              data: augmentedData,
+              error: null,
+            });
           },
-          error: err => this.seasonDetailsResource.set({ loading: false, data: null, error: err })
+          error: (err) =>
+            this.seasonDetailsResource.set({
+              loading: false,
+              data: null,
+              error: err,
+            }),
         });
 
       onCleanup(() => sub.unsubscribe());
     });
 
     // This effect syncs the selected season with the component inputs (`tvShowDetails` and `currentEpisode`).
-    effect(() => {
-      const tvDetails = this.tvShowDetails();
-      const currentEp = this.currentEpisode();
-      
-      if (!tvDetails) {
-        return;
-      }
+    // It runs whenever currentEpisode changes, ensuring the UI always reflects the currently playing episode.
+    effect(
+      () => {
+        const tvDetails = this.tvShowDetails();
+        const currentEp = this.currentEpisode();
 
-      let seasonToSelect: Season | undefined;
-      if (currentEp) {
-        seasonToSelect = tvDetails.seasons.find(s => s.season_number === currentEp.season_number);
-      } else if (tvDetails.seasons.length > 0) {
-        seasonToSelect = tvDetails.seasons.find(s => s.season_number > 0) || tvDetails.seasons[0];
-      }
+        if (!tvDetails) {
+          return;
+        }
 
-      if (seasonToSelect) {
-        this.selectSeason(seasonToSelect);
-      }
-    }, { allowSignalWrites: true });
+        let seasonToSelect: Season | undefined;
+        if (currentEp && currentEp.season_number) {
+          // When currentEpisode changes (provider navigation, auto-next, etc.),
+          // automatically switch to the correct season
+          seasonToSelect = tvDetails.seasons.find(
+            (s) => s.season_number === currentEp.season_number
+          );
+        } else if (tvDetails.seasons.length > 0) {
+          // No episode selected, default to first regular season
+          seasonToSelect =
+            tvDetails.seasons.find((s) => s.season_number > 0) ||
+            tvDetails.seasons[0];
+        }
+
+        if (seasonToSelect) {
+          this.selectSeason(seasonToSelect);
+        }
+      },
+      { allowSignalWrites: true }
+    );
 
     // This effect checks for scrollbar visibility when the view updates
     effect(() => {
-      this.tvShowDetails(); 
+      this.tvShowDetails();
       this.scrollContainer();
       if (this.checkScrollTimeout !== null) {
         clearTimeout(this.checkScrollTimeout);
@@ -114,10 +171,9 @@ export class EpisodeSelectorComponent {
       }, 100);
     });
 
-    fromEvent(window, 'resize').pipe(
-      debounceTime(200),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(() => this.checkScroll());
+    fromEvent(window, "resize")
+      .pipe(debounceTime(200), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.checkScroll());
   }
 
   getProgress(mediaId: number): number {
@@ -131,7 +187,10 @@ export class EpisodeSelectorComponent {
   selectSeason(season: Season): void {
     const tvId = this.tvShowDetails()?.id;
     if (tvId) {
-      this.selectedSeasonTrigger.set({ tvId, seasonNumber: season.season_number });
+      this.selectedSeasonTrigger.set({
+        tvId,
+        seasonNumber: season.season_number,
+      });
     }
   }
 
@@ -140,42 +199,46 @@ export class EpisodeSelectorComponent {
   }
 
   toggleEpisodeDescription(episodeId: number): void {
-    this.expandedEpisodeId.update(current => current === episodeId ? null : episodeId);
+    this.expandedEpisodeId.update((current) =>
+      current === episodeId ? null : episodeId
+    );
   }
 
   getRelativeTime(dateString?: string | null): string {
-    if (!dateString) { return ''; }
+    if (!dateString) {
+      return "";
+    }
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
+      if (isNaN(date.getTime())) return "";
       const now = new Date();
       const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
       if (seconds < 0) {
-        return 'Upcoming';
+        return "Upcoming";
       }
-      
+
       const years = Math.floor(seconds / 31536000);
       if (years > 0) {
-        return `${years} year${years > 1 ? 's' : ''} ago`;
+        return `${years} year${years > 1 ? "s" : ""} ago`;
       }
-      
+
       const months = Math.floor(seconds / 2592000);
       if (months > 0) {
-          return `${months} month${months > 1 ? 's' : ''} ago`;
+        return `${months} month${months > 1 ? "s" : ""} ago`;
       }
 
       const days = Math.floor(seconds / 86400);
       if (days > 1) {
-          return `${days} days ago`;
+        return `${days} days ago`;
       }
       if (days === 1) {
-          return 'Yesterday';
+        return "Yesterday";
       }
-      
-      return 'Today';
+
+      return "Today";
     } catch (e) {
-      return '';
+      return "";
     }
   }
 
@@ -190,34 +253,35 @@ export class EpisodeSelectorComponent {
   checkScroll(): void {
     const element = this.scrollContainer()?.nativeElement;
     if (!element) return;
-    
+
     const hasOverflow = element.scrollWidth > element.clientWidth;
     const atStart = element.scrollLeft < 5;
-    const atEnd = element.scrollWidth - element.clientWidth - element.scrollLeft < 5;
-    
+    const atEnd =
+      element.scrollWidth - element.clientWidth - element.scrollLeft < 5;
+
     this.canScrollLeft.set(hasOverflow && !atStart);
     this.canScrollRight.set(hasOverflow && !atEnd);
   }
 
-  scroll(direction: 'left' | 'right'): void {
+  scroll(direction: "left" | "right"): void {
     const element = this.scrollContainer()?.nativeElement;
     if (!element) return;
 
     const scrollAmount = element.clientWidth * 0.75;
-    const scrollValue = direction === 'left' ? -scrollAmount : scrollAmount;
-    
+    const scrollValue = direction === "left" ? -scrollAmount : scrollAmount;
+
     element.scrollBy({
       left: scrollValue,
-      behavior: 'smooth'
+      behavior: "smooth",
     });
   }
 
   onMouseDown(e: MouseEvent): void {
     const element = this.scrollContainer()?.nativeElement;
     if (!element) return;
-    
+
     e.preventDefault();
-    
+
     this.isMouseDown = true;
     this.hasDragged = false;
     this.isGrabbing.set(true);
@@ -243,9 +307,9 @@ export class EpisodeSelectorComponent {
 
     const x = e.pageX - element.offsetLeft;
     const walk = x - this.startX;
-    
+
     if (Math.abs(walk) > 5) {
-        this.hasDragged = true;
+      this.hasDragged = true;
     }
 
     element.scrollLeft = this.scrollLeft - walk;
