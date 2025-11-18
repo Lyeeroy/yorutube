@@ -99,15 +99,31 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
     }
 
     // Handle episode changes - Vidlink sends strings, so parse them
+    // Allow changes when episode differs (catches both manual navigation and auto-next)
     if (data.season !== undefined && data.episode !== undefined) {
       const season = parseInt(String(data.season), 10);
       const episode = this.normalizeEpisode(data.episode);
 
       if (!isNaN(season) && !isNaN(episode)) {
-        result.episodeChange = {
-          season,
-          episode,
-        };
+        const episodeDiffers =
+          !currentEpisode ||
+          currentEpisode.season_number !== season ||
+          currentEpisode.episode_number !== episode;
+
+        if (episodeDiffers) {
+          const hasPlaybackTime = typeof data.currentTime === "number";
+          const isNonRoutineEvent =
+            data.event &&
+            !["timeupdate", "time", "seeking", "seeked"].includes(data.event);
+
+          // Report episode change if we have playback data or non-routine event
+          if (hasPlaybackTime || isNonRoutineEvent) {
+            result.episodeChange = {
+              season,
+              episode,
+            };
+          }
+        }
       }
     }
 
@@ -120,10 +136,17 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
       const episode = this.normalizeEpisode((data as any).last_episode_watched);
 
       if (!isNaN(season) && !isNaN(episode)) {
-        result.episodeChange = {
-          season,
-          episode,
-        };
+        // Only report if it differs from current episode
+        if (
+          !currentEpisode ||
+          currentEpisode.season_number !== season ||
+          currentEpisode.episode_number !== episode
+        ) {
+          result.episodeChange = {
+            season,
+            episode,
+          };
+        }
       }
     }
 

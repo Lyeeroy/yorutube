@@ -21,7 +21,9 @@ export class VidfastPlayerProvider implements IPlayerProvider {
   // here - if you embed VidFast from other domains listed in the docs, you can
   // add additional checks in the video player message handler.
   readonly origin = "https://vidfast.pro";
-  readonly supportsAutoNext = false;
+  readonly supportsAutoNext = true;
+  // VidFast supports an internal next button — the provider emits episode
+  // metadata often, so host-level thresholds should be used to avoid loops.
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, autoNext, resumeTime } = config;
@@ -122,40 +124,44 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       if (data.currentTime > 0) result.playerStarted = true;
     }
 
-    // VidFast includes season/episode info in many message types, but we should
-    // ONLY report episode changes for actual navigation events, not routine
-    // timeupdate/progress events. This prevents spurious reloads and navigation
-    // conflicts when VidFast sends episode metadata during normal playback.
+    // VidFast includes season/episode info in many message types.
+    // We need to detect when the player navigates internally (e.g., user clicked
+    // the next episode button or auto-next triggered), but avoid false positives
+    // from initial load when the episode hasn't changed.
     //
-    // Episode changes should only be reported for events like:
-    // - 'ended' followed by auto-next
-    // - explicit user navigation within the player
-    // - NOT on 'timeupdate', 'time', 'play', 'pause', etc.
+    // Strategy: Report episode changes when:
+    // 1. Episode differs AND has meaningful playback (>5s) - user navigation during playback
+    // 2. Episode differs AND has low playback (<5s) - auto-next reset to new episode start
+    // 3. Episode differs AND non-routine event - explicit navigation event
+    //
+    // What we DON'T want: reporting changes at 0s for the SAME episode during initial load
     if (
       typeof data.season === "number" &&
       typeof data.episode === "number" &&
-      // Only process episode changes for specific events, not routine updates
-      data.event &&
-      ![
-        "timeupdate",
-        "time",
-        "play",
-        "pause",
-        "playing",
-        "seeking",
-        "seeked",
-      ].includes(data.event)
+      !isNaN(data.season) &&
+      !isNaN(data.episode)
     ) {
-      // Only report an episode change if it differs from the current episode
-      if (
+      const episodeDiffers =
         !currentEpisode ||
         currentEpisode.season_number !== data.season ||
-        currentEpisode.episode_number !== data.episode
-      ) {
-        result.episodeChange = {
-          season: data.season,
-          episode: data.episode,
-        };
+        currentEpisode.episode_number !== data.episode;
+
+      if (episodeDiffers) {
+        const currentTime = data.currentTime;
+        const hasPlaybackTime = typeof currentTime === "number";
+        const isNonRoutineEvent =
+          data.event &&
+          !["timeupdate", "time", "seeking", "seeked"].includes(data.event);
+
+        // Allow episode change if:
+        // - We have playback time data (either high for navigation, or low for auto-next reset)
+        // - OR it's a non-routine event
+        if (hasPlaybackTime || isNonRoutineEvent) {
+          result.episodeChange = {
+            season: data.season,
+            episode: data.episode,
+          };
+        }
       }
     }
 

@@ -15,6 +15,7 @@ export class VideasyPlayerProvider implements IPlayerProvider {
   readonly id = "VIDEASY";
   readonly name = "Videasy";
   readonly origin = "https://player.videasy.net";
+  readonly supportsAutoNext = true;
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, autoNext, resumeTime } = config;
@@ -91,32 +92,32 @@ export class VideasyPlayerProvider implements IPlayerProvider {
       result.playerStarted = true;
     }
 
-    // Handle episode changes - only for actual navigation events, not routine updates
-    // This prevents spurious reloads if the player sends episode info during timeupdate
+    // Handle episode changes - detect when player navigates internally
+    // Allow changes when episode differs (catches both manual navigation and auto-next)
     if (
       typeof data.season === "number" &&
       typeof data.episode === "number" &&
-      data.event &&
-      ![
-        "timeupdate",
-        "time",
-        "play",
-        "pause",
-        "playing",
-        "seeking",
-        "seeked",
-      ].includes(data.event)
+      !isNaN(data.season) &&
+      !isNaN(data.episode)
     ) {
-      // Only report if it differs from current episode
-      if (
+      const episodeDiffers =
         !currentEpisode ||
         currentEpisode.season_number !== data.season ||
-        currentEpisode.episode_number !== data.episode
-      ) {
-        result.episodeChange = {
-          season: data.season,
-          episode: data.episode,
-        };
+        currentEpisode.episode_number !== data.episode;
+
+      if (episodeDiffers) {
+        const hasPlaybackTime = typeof data.currentTime === "number";
+        const isNonRoutineEvent =
+          data.event &&
+          !["timeupdate", "time", "seeking", "seeked"].includes(data.event);
+
+        // Report episode change if we have playback data or non-routine event
+        if (hasPlaybackTime || isNonRoutineEvent) {
+          result.episodeChange = {
+            season: data.season,
+            episode: data.episode,
+          };
+        }
       }
     }
 

@@ -52,7 +52,6 @@ interface PlayerEpisodeState {
   season: number;
   episode: number;
 }
-
 @Component({
   selector: "app-video-player",
   standalone: true,
@@ -332,6 +331,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             )
           : undefined;
 
+        // Some providers embed the `event` inside a `data` wrapper. Normalize
+        // here so we can decide whether this was a non-routine event (e.g.
+        // explicit player navigation) and therefore bypass playback guards.
+        const routedEventName =
+          routed.raw?.event ?? (routed.raw?.data && routed.raw?.data.event);
+
         if (result?.playerStarted && !this.playerHasStarted()) {
           this.playerHasStarted.set(true);
         }
@@ -343,8 +348,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         if (
           media.media_type === "tv" &&
           result?.episodeChange &&
-          this.playerHasStarted() &&
-          !this.isNavigating()
+          // Allow certain non-routine events (e.g. explicit navigation) to bypass
+          // the playback-time guard so that internal player "next" buttons
+          // immediately update the URL. Use routed.raw.event as the event
+          // discriminator.
+          this.canProcessEpisodeChange(routedEventName)
         ) {
           this.handleEpisodeChangeDetection(
             result.episodeChange,
@@ -373,10 +381,27 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             !isNaN(season) &&
             !isNaN(episode)
           ) {
+            // Update UI-only state
             this.syncCurrentEpisodeFromPlayerData(
               { season, episode },
               media as TvShowDetails
             );
+
+            // If the metadata indicates a different episode than our current params
+            // and we've had meaningful playback, trigger proper navigation.
+            // This catches internal player 'next' button clicks that previously
+            // emitted metadata only on initial load/timeupdate and were ignored.
+            const currentParams = untracked(() => this.params());
+            const urlNeedsUpdate =
+              currentParams?.season !== season || currentParams?.episode !== episode;
+
+            if (urlNeedsUpdate && this.canProcessEpisodeChange(routedEventName)) {
+              // Use the provider-normalized metadata to update the app state
+              this.handleEpisodeChangeDetection(
+                { season, episode },
+                media as TvShowDetails
+              );
+            }
           }
         }
       });
@@ -554,7 +579,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     // If we've reached here, it means the player has navigated to a DIFFERENT episode
-    // than what our app's URL params say. We need to sync our app.
+    // than what our app's URL params say. We need to check if we should sync our app.
     const lastPlayerState = this.lastPlayerEpisodeState();
     const hasPlayerChangedEpisode =
       !lastPlayerState ||
@@ -562,6 +587,32 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       lastPlayerState.episode !== playerEpisode.episode;
 
     if (hasPlayerChangedEpisode) {
+      // Check if this is likely a player-initiated auto-next (sequential episode progression)
+      // If the user has set a custom threshold < 95%, we should ignore player auto-next
+      // and let our app handle it at the user's preferred threshold
+      const isSequentialNext =
+        appEpisodeState &&
+        playerEpisode.season === appEpisodeState.season &&
+        playerEpisode.episode === appEpisodeState.episode + 1;
+
+      const userThreshold = this.playerService.autoNextThreshold();
+      const provider = this.playerProviderService.getProvider(
+        this.selectedPlayer()
+      );
+
+      // If this looks like player auto-next AND user wants early triggering (< 95%),
+      // ignore the player's navigation and let our app handle it at the user's threshold
+      if (
+        isSequentialNext &&
+        provider?.supportsAutoNext &&
+        this.playerService.autoNextEnabled() &&
+        userThreshold < 95
+      ) {
+        // Ignore player-initiated auto-next, let app handle it at user's threshold
+        this.lastPlayerEpisodeState.set(playerEpisode);
+        return;
+      }
+
       // Try to acquire lock to prevent duplicate navigation from both player and progress events
       if (!this.playerService.tryLockAutoNext()) {
         // Lock already held, just update our tracking and exit
@@ -649,31 +700,33 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           const matchingEpisode = seasonDetails.episodes.find(
             (e) => e.episode_number === data.episode
           );
-          if (matchingEpisode) {
-            this.currentEpisode.set(matchingEpisode);
-
-            // Update URL to reflect the new episode without triggering navigation/reload
-            if (urlNeedsUpdate) {
-              const newUrl = this.navigationService.getPath("watch", {
-                mediaType: "tv",
-                id: media.id,
-                season: data.season,
-                episode: data.episode,
-                playlistId: this.playlist()?.id,
-              });
-
-              // Use replaceState to update URL without adding to history
-              if (typeof window !== "undefined" && window.history) {
-                try {
-                  window.history.replaceState({}, "", newUrl);
-                } catch (e) {
-                  console.error("Failed to update URL:", e);
-                }
-              }
+            if (matchingEpisode) {
+              // Only update the UI selection; DO NOT update the URL from metadata.
+              // URL updates should only happen via explicit navigation.
+              this.currentEpisode.set(matchingEpisode);
             }
-          }
         });
     }
+  }
+
+  /**
+   * Check if we can safely process episode change navigation.
+   * Requires the player to have started and a small playback threshold to avoid
+   * false positives from timeupdate events that include metadata.
+   */
+  private canProcessEpisodeChange(eventName?: string): boolean {
+    // Consider events other than routine time updates as 'non-routine'.
+    // Non-routine events (for example explicit player navigation events)
+    // should be allowed to drive URL updates immediately, even when
+    // playback hasn't reached the 5 second guard threshold.
+    const nonRoutineEvent =
+      typeof eventName === "string" &&
+      !["timeupdate", "time", "seeking", "seeked"].includes(eventName);
+
+    return (
+      this.playerHasStarted() && !this.isNavigating() &&
+      (this.lastKnownPlaybackTime() >= 5 || nonRoutineEvent)
+    );
   }
 
   private playNextEpisode(tvShow: TvShowDetails): void {
