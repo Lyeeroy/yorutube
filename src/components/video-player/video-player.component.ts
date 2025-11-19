@@ -160,12 +160,31 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const provider = this.playerProviderService.getProvider(selectedPlayerId);
     if (!provider) return null;
 
+    // Use params to determine the episode we're navigating to, not currentEpisode()
+    // This prevents a race condition where currentEpisode() still references the old
+    // episode during autonext navigation, causing the old episode's progress to be
+    // applied to the new episode URL.
+    const params = untracked(() => this.params());
     const episode = this.currentEpisode();
-    const progressId = episode ? episode.id : media.id;
+    
+    // Determine progressId based on params (source of truth) rather than currentEpisode
+    let progressId: number;
+    if (media.media_type === "tv" && params?.season && params?.episode && episode) {
+      // For TV shows, only use episode.id if the episode matches what params say we're navigating to
+      // This prevents using the old episode's ID during navigation
+      if (episode.season_number === +params.season && episode.episode_number === +params.episode) {
+        progressId = episode.id;
+      } else {
+        // Episode signal hasn't updated yet, use media.id as fallback
+        // This means we won't resume progress, but that's better than resuming the wrong episode
+        progressId = media.id;
+      }
+    } else {
+      progressId = episode ? episode.id : media.id;
+    }
 
     // Get resume time for supported players
     // Priority: 1) startAt from URL params, 2) saved progress
-    const params = untracked(() => this.params());
     const urlStartAt = params?.startAt;
 
     const progress = untracked(() =>
