@@ -1,23 +1,29 @@
-import { Component, ChangeDetectionStrategy, inject, signal, effect, input, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, HostListener, inject, signal, effect, input, computed } from '@angular/core';
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlaylistService } from '../../services/playlist.service';
 import { Playlist } from '../../models/playlist.model';
 import { MediaType } from '../../models/movie.model';
 import { NavigationService } from '../../services/navigation.service';
+import { WatchlistService } from '../../services/watchlist.service';
+import { ContinueWatchingService } from '../../services/continue-watching.service';
+import { AddToPlaylistModalComponent } from '../add-to-playlist-modal/add-to-playlist-modal.component';
+import { MediaDetailModalComponent } from '../media-detail-modal/media-detail-modal.component';
 
 const isMovie = (media: MediaType) => media.media_type === 'movie';
 
 @Component({
   selector: 'app-playlist-detail',
   standalone: true,
-  imports: [CommonModule, NgOptimizedImage, FormsModule],
+  imports: [CommonModule, NgOptimizedImage, FormsModule, AddToPlaylistModalComponent, MediaDetailModalComponent],
   templateUrl: './playlist-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PlaylistDetailComponent {
   private playlistService = inject(PlaylistService);
   private navigationService = inject(NavigationService);
+  watchlistService = inject(WatchlistService);
+  private continueWatchingService = inject(ContinueWatchingService);
 
   params = input.required<any>();
   playlist = signal<Playlist | null>(null);
@@ -27,6 +33,13 @@ export class PlaylistDetailComponent {
   editedDescription = signal('');
 
   playlistItems = signal<MediaType[]>([]);
+
+  // menu state for items
+  menuStyle = signal<{ top: string; right: string } | null>(null);
+  menuMediaId = signal<number | null>(null);
+  menuMedia = signal<MediaType | null>(null);
+  showPlaylistModal = signal(false);
+  showDetailsModal = signal(false);
 
   constructor() {
     effect(() => {
@@ -88,8 +101,16 @@ export class PlaylistDetailComponent {
       this.playlistService.removeFromPlaylist(p.id, mediaId);
       // update local signal to reflect change immediately
       this.playlistItems.update(items => items.filter(i => i.id !== mediaId));
+      // close menu if it was opened for this media
+      if (this.menuMediaId() === mediaId) {
+        this.menuStyle.set(null);
+        this.menuMediaId.set(null);
+        this.menuMedia.set(null);
+      }
     }
   }
+
+  // deletePlaylist already implemented above
   
   deletePlaylist(): void {
     const p = this.playlist();
@@ -105,5 +126,70 @@ export class PlaylistDetailComponent {
       this.playlistService.updatePlaylistDetails(p.id, this.editedName(), this.editedDescription());
       this.isEditing.set(false);
     }
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.menuStyle()) {
+      this.menuStyle.set(null);
+      this.menuMediaId.set(null);
+      this.menuMedia.set(null);
+    }
+  }
+
+  toggleOptionsMenu(event: MouseEvent, media: MediaType): void {
+    event.stopPropagation();
+    if (this.menuStyle() && this.menuMediaId() === media.id) {
+      this.menuStyle.set(null);
+      this.menuMediaId.set(null);
+      this.menuMedia.set(null);
+      return;
+    }
+
+    const button = event.currentTarget as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+
+    const style = {
+      top: `${rect.bottom + 4}px`,
+      right: `${viewportWidth - (rect.left + rect.width / 2)}px`,
+    };
+
+    this.menuMedia.set(media);
+    this.menuMediaId.set(media.id);
+    this.menuStyle.set(style);
+  }
+
+  openPlaylistModal(event: Event): void {
+    event.stopPropagation();
+    this.showPlaylistModal.set(true);
+    this.menuStyle.set(null);
+    this.menuMediaId.set(null);
+  }
+
+  openDetailsModal(event: Event): void {
+    event.stopPropagation();
+    this.showDetailsModal.set(true);
+    this.menuStyle.set(null);
+    this.menuMediaId.set(null);
+  }
+
+  onRemoveFromContinueWatching(event: Event, mediaId: number): void {
+    event.stopPropagation();
+    this.continueWatchingService.removeItem(mediaId);
+    this.menuStyle.set(null);
+    this.menuMediaId.set(null);
+  }
+
+  toggleWatchlist(event: Event, media: MediaType) {
+    event.stopPropagation();
+    const mediaId = media.id;
+    if (this.watchlistService.isOnWatchlist(mediaId)) {
+      this.watchlistService.removeFromWatchlist(mediaId);
+    } else {
+      this.watchlistService.addToWatchlist(media);
+    }
+    this.menuStyle.set(null);
+    this.menuMediaId.set(null);
   }
 }

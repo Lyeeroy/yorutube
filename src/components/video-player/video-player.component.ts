@@ -537,7 +537,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       );
     }
 
-    // Auto-play next episode for VIDLINK or VIDSRC when video completes
+    // Auto-play next when playback completes.
+    // For TV shows, prefer sequential episode progression; for movies,
+    // jump to the next playlist item (if present). We only trigger for
+    // providers that support auto-next to avoid duplicates for providers
+    // that perform their own in-player navigation.
     const provider = this.playerProviderService.getProvider(
       this.selectedPlayer()
     );
@@ -545,7 +549,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (
       provider?.supportsAutoNext &&
       this.playerService.autoNextEnabled() &&
-      media.media_type === "tv" &&
       this.playerHasStarted() &&
       !this.autoPlayNextTriggered() &&
       this.playerService.tryLockAutoNext() &&
@@ -559,8 +562,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         return progressPercent >= effective;
       })()
     ) {
+      // If media is TV show — advance to next episode if any, else try playlist
+      // If media is a movie — try playlist next item.
       this.autoPlayNextTriggered.set(true);
-      this.playNextEpisode(media as TvShowDetails);
+      if (media.media_type === "tv") {
+        this.playNextEpisode(media as TvShowDetails);
+      } else if (media.media_type === "movie") {
+        const didNavigate = this.tryPlayNextPlaylistItem(media as MovieDetails);
+        if (!didNavigate) {
+          // No playlist next item — nothing to do. Unlock the auto-next lock to
+          // allow other events to proceed.
+          this.playerService.unlockAutoNext();
+        }
+      }
     }
   }
 
@@ -781,25 +795,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const currentEp = this.currentEpisode();
     if (!currentEp) return;
 
-    // If playing from a playlist, prefer the explicit playlist order first
-    const playlistId = this.playlist()?.id;
-    if (playlistId) {
-      const nextItem = this.playlistService.getNextItemFromPlaylist(
-        playlistId,
-        tvShow.id
-      );
-      if (nextItem) {
-        // Navigate to the playlist's next item
-        this.navigationService.navigateTo("watch", {
-          mediaType: nextItem.media_type,
-          id: nextItem.id,
-          playlistId: playlistId,
-          autoplay: true,
-        });
-        // ensure lock is kept until navigation resets state
-        return;
-      }
-    }
+    // First try to advance to the next episode in the series. Only if no
+    // next episode or season is found should we fall back to the playlist
+    // order (so playlists don't interrupt sequential show playback).
 
     // Get current season details to find next episode
     this.movieService
@@ -857,9 +855,52 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
               }
             }
           }
-          // If no next season/episode is found, do nothing (end of series).
+          // If no next season/episode is found, try to move to next item in
+          // the playlist (if playing from a playlist). Otherwise end of
+          // series — do nothing.
+          const playlistId = this.playlist()?.id;
+          if (playlistId) {
+            const nextItem = this.playlistService.getNextItemFromPlaylist(
+              playlistId,
+              tvShow.id
+            );
+            if (nextItem) {
+              this.navigationService.navigateTo("watch", {
+                mediaType: nextItem.media_type,
+                id: nextItem.id,
+                playlistId: playlistId,
+                autoplay: true,
+              });
+            }
+          }
         }
       });
+  }
+
+  /**
+   * If currently playing from a playlist, navigate to the next media item
+   * (movie or tv) in that playlist. Returns true if navigation started.
+   */
+  private tryPlayNextPlaylistItem(
+    media: MovieDetails | TvShowDetails
+  ): boolean {
+    const playlistId = this.playlist()?.id;
+    if (!playlistId) return false;
+    const nextItem = this.playlistService.getNextItemFromPlaylist(
+      playlistId,
+      media.id
+    );
+    if (!nextItem) return false;
+
+    // Navigate to the next playlist item
+    this.navigationService.navigateTo("watch", {
+      mediaType: nextItem.media_type,
+      id: nextItem.id,
+      playlistId: playlistId,
+      autoplay: true,
+    });
+
+    return true;
   }
 
   private navigateToEpisode(

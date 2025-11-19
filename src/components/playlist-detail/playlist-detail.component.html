@@ -55,16 +55,49 @@
             <span class="text-zinc-400 w-8 text-center shrink-0">{{ i + 1 }}</span>
             <img [ngSrc]="item.poster_path ? 'https://image.tmdb.org/t/p/w300' + item.poster_path : 'https://picsum.photos/seed/' + item.id + '/90/135'" alt="Thumbnail" class="w-16 h-auto rounded-md mx-4 shrink-0" width="90" height="135">
             <div class="flex-grow min-w-0">
-              <p class="font-semibold text-sm text-white truncate group-hover:text-red-500">{{ getMediaTitle(item) }}</p>
+              <div class="flex items-start justify-between">
+                <p class="font-semibold text-sm text-white truncate">{{ getMediaTitle(item) }}</p>
+                <!-- always visible larger three dots next to title like video-card -->
+                <button (click)="toggleOptionsMenu($event, item)" class="text-zinc-400 hover:text-white p-1 text-xl ml-2" title="More options">
+                  <span class="material-symbols-outlined">more_vert</span>
+                </button>
+              </div>
               <p class="text-xs text-zinc-400 mt-1">{{ getMediaInfo(item) }}</p>
             </div>
-            <button (click)="removeFromPlaylist($event, item.id)" class="text-zinc-500 hover:text-white p-2 opacity-0 group-hover:opacity-100">
-              <span class="material-symbols-outlined text-lg">close</span>
-            </button>
+            <div class="flex items-center space-x-2">
+              <!-- Removed direct remove X - item removal is now in the three dots menu -->
+            </div>
           </div>
         } @empty {
           <p class="text-zinc-400 text-center py-8">This playlist is empty.</p>
         }
+            @if (menuStyle(); as style) {
+              @if (menuMedia() && menuMediaId() !== null) {
+                <div
+                  (click)="$event.stopPropagation()"
+                  class="fixed w-56 bg-zinc-800 rounded-md shadow-lg z-[100] border border-zinc-700 py-1"
+                  [style.top]="style.top"
+                  [style.right]="style.right">
+                  <button (click)="toggleWatchlist($event, menuMedia())" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
+                    <span class="material-symbols-outlined text-xl">watch_later</span>
+                    <span>{{ watchlistService.isOnWatchlist(menuMedia().id) ? 'Remove from Watchlist' : 'Save to Watchlist' }}</span>
+                  </button>
+                  <button (click)="openPlaylistModal($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
+                    <span class="material-symbols-outlined text-xl">playlist_add</span>
+                    <span>Add to playlist</span>
+                  </button>
+                  <button (click)="removeFromPlaylist($event, menuMedia().id)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
+                    <span class="material-symbols-outlined text-xl">close</span>
+                    <span>Remove from Playlist</span>
+                  </button>
+                  <div class="border-t border-zinc-700/50 my-1 mx-2"></div>
+                  <button (click)="openDetailsModal($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
+                    <span class="material-symbols-outlined text-xl">info</span>
+                    <span>Details</span>
+                  </button>
+                </div>
+              }
+            }
       </div>
     </div>
   </div>
@@ -73,4 +106,12 @@
     <h2 class="text-2xl font-semibold text-zinc-400">Playlist not found</h2>
     <p class="text-zinc-500 mt-2">We couldn't find the playlist you were looking for.</p>
   </div>
-}
+  }
+
+  @if (showPlaylistModal()) {
+    <app-add-to-playlist-modal [media]="menuMedia()" (close)="showPlaylistModal.set(false)"></app-add-to-playlist-modal>
+  }
+
+  @if (showDetailsModal()) {
+    <app-media-detail-modal [media]="menuMedia()" (close)="showDetailsModal.set(false)"></app-media-detail-modal>
+  }

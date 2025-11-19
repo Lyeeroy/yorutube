@@ -17,6 +17,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
   let component: VideoPlayerComponent;
 
   const mockNavigationService = {} as any;
+  mockNavigationService.navigateTo = jasmine.createSpy("navigateTo");
   const mockPlayerService = {
     autoplayEnabled: () => false,
     autoNextEnabled: () => false,
@@ -232,5 +233,84 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
     expect(cw.addItem.calls.count()).toBeGreaterThan(0);
     // Should only be recommended once by our signal guard
     expect(cw.addItem.calls.count()).toBe(1);
+  });
+
+  it("auto next plays next movie in playlist when enabled and provider supports it", () => {
+    const movie = { id: 1000, media_type: "movie" } as MovieDetails;
+    const nextMovie = { id: 1001, media_type: "movie" } as any;
+    const mockPlaylist = TestBed.inject(PlaylistService) as any;
+    mockPlaylist.getNextItemFromPlaylist.and.returnValue(nextMovie);
+
+    const playerSvc = TestBed.inject(PlayerService) as any;
+    playerSvc.autoNextEnabled = () => true;
+    playerSvc.tryLockAutoNext = () => true;
+
+    const providerSvc = TestBed.inject(PlayerProviderService) as any;
+    providerSvc.getProvider = () => ({ supportsAutoNext: true } as any);
+
+    component["playlist"].set({ id: "pl", items: [movie, nextMovie] } as any);
+    // mark player started so threshold can be checked
+    component["playerHasStarted"].set(true);
+
+    component["handlePlaybackProgress"](
+      { currentTime: 60, duration: 120, progressPercent: 100 },
+      movie
+    );
+
+    const nav = TestBed.inject(NavigationService) as any;
+    expect(nav.navigateTo).toHaveBeenCalledWith("watch", {
+      mediaType: "movie",
+      id: 1001,
+      playlistId: "pl",
+      autoplay: true,
+    });
+  });
+
+  it("auto next goes to next playlist item after last episode of a TV show", () => {
+    const tv: TvShowDetails = {
+      id: 2000,
+      media_type: "tv",
+      seasons: [{ season_number: 1, episode_count: 1 }],
+    } as any;
+
+    const nextPlaylistItem = { id: 2001, media_type: "movie" } as any;
+    const mockPlaylist = TestBed.inject(PlaylistService) as any;
+    mockPlaylist.getNextItemFromPlaylist.and.returnValue(nextPlaylistItem);
+
+    const mockMovieService = TestBed.inject(MovieService) as any;
+    mockMovieService.getSeasonDetails.and.returnValue(
+      of({ episodes: [{ episode_number: 1 }] } as any)
+    );
+
+    const playerSvc = TestBed.inject(PlayerService) as any;
+    playerSvc.autoNextEnabled = () => true;
+    playerSvc.tryLockAutoNext = () => true;
+
+    const providerSvc = TestBed.inject(PlayerProviderService) as any;
+    providerSvc.getProvider = () => ({ supportsAutoNext: true } as any);
+
+    component["playlist"].set({
+      id: "pl2",
+      items: [tv, nextPlaylistItem],
+    } as any);
+    component["currentEpisode"].set({
+      id: 1,
+      season_number: 1,
+      episode_number: 1,
+    } as any);
+    component["playerHasStarted"].set(true);
+
+    component["handlePlaybackProgress"](
+      { currentTime: 1200, duration: 1200, progressPercent: 100 },
+      tv
+    );
+
+    const nav = TestBed.inject(NavigationService) as any;
+    expect(nav.navigateTo).toHaveBeenCalledWith("watch", {
+      mediaType: "movie",
+      id: 2001,
+      playlistId: "pl2",
+      autoplay: true,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, HostListener, inject, signal, computed } from '@angular/core';
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlaylistService } from '../../services/playlist.service';
@@ -17,6 +17,11 @@ export class PlaylistsComponent {
   private navigationService = inject(NavigationService);
   
   playlists = this.playlistService.playlists;
+
+  // Menu state for three dots on playlist tile
+  playlistMenuStyle = signal<{ top: string; right: string } | null>(null);
+  playlistMenuTarget = signal<string | null>(null);
+  selectedPlaylist = computed(() => this.playlists().find((p) => p.id === this.playlistMenuTarget()));
   
   showCreateForm = signal(false);
   newPlaylistName = signal('');
@@ -38,5 +43,41 @@ export class PlaylistsComponent {
       this.playlistService.createPlaylist(name, this.newPlaylistDescription().trim());
       this.cancelCreate();
     }
+  }
+
+  togglePlaylistMenu(event: MouseEvent, playlistId: string): void {
+    event.stopPropagation();
+    if (this.playlistMenuTarget() === playlistId && this.playlistMenuStyle()) {
+      this.playlistMenuStyle.set(null);
+      this.playlistMenuTarget.set(null);
+      return;
+    }
+
+    const button = event.currentTarget as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+
+    const style = {
+      top: `${rect.bottom + 4}px`,
+      right: `${viewportWidth - (rect.left + rect.width / 2)}px`,
+    };
+    this.playlistMenuTarget.set(playlistId);
+    this.playlistMenuStyle.set(style);
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.playlistMenuStyle()) {
+      this.playlistMenuStyle.set(null);
+      this.playlistMenuTarget.set(null);
+    }
+  }
+
+  deletePlaylistFromMenu(event: Event, playlistId: string): void {
+    event.stopPropagation();
+    this.playlistService.deletePlaylist(playlistId);
+    // close menu
+    this.playlistMenuStyle.set(null);
+    this.playlistMenuTarget.set(null);
   }
 }
