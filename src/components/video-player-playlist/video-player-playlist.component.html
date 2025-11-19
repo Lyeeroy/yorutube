@@ -1,11 +1,16 @@
-<div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden flex flex-col h-full max-h-[600px]">
+<div
+  class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden flex flex-col h-full max-h-[600px]"
+>
   <!-- Header -->
-  <div 
+  <div
     (click)="toggleExpand()"
     class="p-4 border-zinc-800 flex items-start justify-between bg-zinc-900 shrink-0 z-10 cursor-pointer hover:bg-zinc-800/50 transition-colors select-none"
-    [class.border-b]="isExpanded()">
+    [class.border-b]="isExpanded()"
+  >
     <div class="flex-grow min-w-0 mr-4">
-      <h2 class="text-xl font-bold text-white truncate leading-tight mb-1">{{ playlist().name }}</h2>
+      <h2 class="text-xl font-bold text-white truncate leading-tight mb-1">
+        {{ playlist().name }}
+      </h2>
       <div class="flex items-center text-xs text-zinc-400 space-x-1">
         <span class="font-medium text-zinc-300">Playlist</span>
         <span>•</span>
@@ -16,145 +21,193 @@
       <button
         (click)="$event.stopPropagation(); shufflePlaylist()"
         class="p-2 hover:bg-zinc-800 rounded-full transition-colors"
-        [ngClass]="{ 'text-red-500': isShuffled(), 'text-zinc-400 hover:text-white': !isShuffled() }"
+        [ngClass]="{
+          'text-red-500': isShuffled(),
+          'text-zinc-400 hover:text-white': !isShuffled()
+        }"
         title="Shuffle playlist"
       >
         <span class="material-symbols-outlined text-[20px]">shuffle</span>
       </button>
-      <button (click)="$event.stopPropagation(); closePlaylist()" class="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors" title="Close playlist">
+      <button
+        (click)="$event.stopPropagation(); closePlaylist()"
+        class="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"
+        title="Close playlist"
+      >
         <span class="material-symbols-outlined text-[20px]">close</span>
       </button>
     </div>
   </div>
-  
+
   <!-- Playlist Items -->
   @if (isExpanded()) {
-    <div 
-      cdkDropList 
-      (cdkDropListDropped)="drop($event)"
-      class="overflow-y-auto custom-scrollbar flex-grow bg-zinc-900">
-      @for(item of playlist().items; track item.id; let i = $index) {
-        <div 
-          cdkDrag
-          (click)="selectMedia.emit(item)"
-          class="group relative flex items-center p-2 pl-3 hover:bg-zinc-800 cursor-pointer transition-colors"
-          [class.bg-zinc-800]="item.id === currentMediaId()">
-          
-          <!-- Drag Handle (Visible on Hover, replaces Index) -->
-          <div class="absolute left-3 w-6 flex justify-center items-center text-zinc-500 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10" cdkDragHandle>
-            <span class="material-symbols-outlined text-lg transform rotate-90">drag_handle</span>
-          </div>
+  <div
+    cdkDropList
+    (cdkDropListDropped)="drop($event)"
+    class="overflow-y-auto custom-scrollbar flex-grow bg-zinc-900"
+  >
+    @for(item of playlist().items; track item.id; let i = $index) {
+    <div
+      cdkDrag
+      (click)="selectMedia.emit(item)"
+      class="group relative flex items-center p-2 pl-3 hover:bg-zinc-800 cursor-pointer transition-colors"
+      [class.bg-zinc-800]="item.id === currentMediaId()"
+    >
+      <!-- Drag Handle (Visible on Hover, replaces Index) -->
+      <div
+        class="absolute left-3 w-6 flex justify-center items-center text-zinc-500 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        cdkDragHandle
+      >
+        <span class="material-symbols-outlined text-lg transform rotate-90"
+          >drag_handle</span
+        >
+      </div>
 
-          <!-- Index -->
-          <div class="w-6 text-center shrink-0 mr-3 flex justify-center items-center group-hover:opacity-0 transition-opacity">
-             <span class="text-zinc-500 text-xs font-medium" [class.text-white]="item.id === currentMediaId()">{{ i + 1 }}</span>
-          </div>
+      <!-- Index -->
+      <div
+        class="w-6 text-center shrink-0 mr-3 flex justify-center items-center group-hover:opacity-0 transition-opacity"
+      >
+        <span
+          class="text-zinc-500 text-xs font-medium"
+          [class.text-white]="item.id === currentMediaId()"
+          >{{ i + 1 }}</span
+        >
+      </div>
 
-          <!-- Thumbnail -->
-          <div class="relative shrink-0 mr-3">
-            <img [ngSrc]="item.poster_path ? 'https://image.tmdb.org/t/p/w300' + item.poster_path : 'https://picsum.photos/seed/' + item.id + '/90/135'" 
-                 alt="Thumbnail" 
-                 class="w-24 h-14 object-cover rounded-lg bg-zinc-800" 
-                 width="96" 
-                 height="56">
-          </div>
-          
-          <!-- Info -->
-          <div class="flex-grow min-w-0 flex flex-col justify-center h-full py-1">
-            <h3 class="text-sm font-medium text-white line-clamp-2 leading-snug mb-0.5" [class.text-white]="item.id !== currentMediaId()">{{ getMediaTitle(item) }}</h3>
-            <p class="text-xs text-zinc-400 truncate">{{ getMediaSubtitle(item) }}</p>
-          </div>
+      <!-- Thumbnail -->
+      <div class="relative shrink-0 mr-3">
+        <img
+          [ngSrc]="
+            item.poster_path
+              ? 'https://image.tmdb.org/t/p/w300' + item.poster_path
+              : 'https://picsum.photos/seed/' + item.id + '/90/135'
+          "
+          alt="Thumbnail"
+          class="w-24 h-14 object-cover rounded-lg bg-zinc-800"
+          width="96"
+          height="56"
+        />
+      </div>
 
-          <!-- More Options Button (Visible on Hover or when menu open) -->
-          <button 
-            (click)="toggleOptionsMenu($event, item)"
-            class="p-2 hover:bg-zinc-700 rounded-full text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all ml-1 shrink-0"
-            [class.opacity-100]="activeMenuMedia()?.id === item.id"
-            title="More options">
-            <span class="material-symbols-outlined text-lg">more_vert</span>
-          </button>
+      <!-- Info -->
+      <div class="flex-grow min-w-0 flex flex-col justify-center h-full py-1">
+        <h3
+          class="text-sm font-medium text-white line-clamp-2 leading-snug mb-0.5"
+          [class.text-white]="item.id !== currentMediaId()"
+        >
+          {{ getMediaTitle(item) }}
+        </h3>
+        <p class="text-xs text-zinc-400 truncate">
+          {{ getMediaSubtitle(item) }}
+        </p>
+      </div>
 
-          <!-- Drag Preview -->
-          <div *cdkDragPreview class="bg-zinc-800 p-2 rounded-lg shadow-2xl flex items-center border border-zinc-700 w-full max-w-sm opacity-95">
-             <img [src]="item.poster_path ? 'https://image.tmdb.org/t/p/w300' + item.poster_path : 'https://picsum.photos/seed/' + item.id + '/90/135'" alt="Thumbnail" class="w-16 h-auto rounded-md mr-3">
-             <div class="flex flex-col">
-               <span class="text-white text-sm font-medium truncate">{{ getMediaTitle(item) }}</span>
-               <span class="text-zinc-400 text-xs">{{ getMediaSubtitle(item) }}</span>
-             </div>
-          </div>
-          
-          <!-- Placeholder -->
-          <div *cdkDragPlaceholder class="bg-zinc-800/50 border-2 border-dashed border-zinc-700 rounded-lg mx-2 my-1"></div>
+      <!-- More Options Button (Visible on Hover or when menu open) -->
+      <button
+        (click)="toggleOptionsMenu($event, item)"
+        class="p-2 hover:bg-zinc-700 rounded-full text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all ml-1 shrink-0"
+        [class.opacity-100]="activeMenuMedia()?.id === item.id"
+        title="More options"
+      >
+        <span class="material-symbols-outlined text-lg">more_vert</span>
+      </button>
+
+      <!-- Drag Preview -->
+      <div
+        *cdkDragPreview
+        class="bg-zinc-800 p-2 rounded-lg shadow-2xl flex items-center border border-zinc-700 w-full max-w-sm opacity-95"
+      >
+        <img
+          [src]="
+            item.poster_path
+              ? 'https://image.tmdb.org/t/p/w300' + item.poster_path
+              : 'https://picsum.photos/seed/' + item.id + '/90/135'
+          "
+          alt="Thumbnail"
+          class="w-16 h-auto rounded-md mr-3"
+        />
+        <div class="flex flex-col">
+          <span class="text-white text-sm font-medium truncate">{{
+            getMediaTitle(item)
+          }}</span>
+          <span class="text-zinc-400 text-xs">{{
+            getMediaSubtitle(item)
+          }}</span>
         </div>
-      }
+      </div>
+
+      <!-- Placeholder -->
+      <div
+        *cdkDragPlaceholder
+        class="bg-zinc-800/50 border-2 border-dashed border-zinc-700 rounded-lg mx-2 my-1"
+      ></div>
     </div>
+    }
+  </div>
   }
 </div>
 
 <!-- Context Menu -->
 @if (menuStyle(); as style) {
-  <div
-    (click)="$event.stopPropagation()"
-    class="fixed z-[100] w-56 rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
-    [style.top]="style.top"
-    [style.right]="style.right"
+<div
+  (click)="$event.stopPropagation()"
+  class="fixed z-[100] w-56 rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
+  [style.top]="style.top"
+  [style.right]="style.right"
+>
+  @if (activeMenuMedia(); as media) {
+  <button
+    (click)="toggleWatchlist($event)"
+    class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
   >
-    @if (activeMenuMedia(); as media) {
-      <button
-        (click)="toggleWatchlist($event)"
-        class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
-      >
-        <span
-          class="material-symbols-outlined text-xl"
-          [class.material-symbols-filled]="isOnWatchlist(media)"
-          >watch_later</span
-        >
-        <span>{{
-          isOnWatchlist(media) ? "Remove from Watchlist" : "Save to Watchlist"
-        }}</span>
-      </button>
-    
-      <button
-        (click)="openPlaylistModal($event)"
-        class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
-      >
-        <span class="material-symbols-outlined text-xl">playlist_add</span>
-        <span>Save to playlist</span>
-      </button>
+    <span
+      class="material-symbols-outlined text-xl"
+      [class.material-symbols-filled]="isOnWatchlist(media)"
+      >watch_later</span
+    >
+    <span>{{
+      isOnWatchlist(media) ? "Remove from Watchlist" : "Save to Watchlist"
+    }}</span>
+  </button>
 
-      <button
-        (click)="removeItem($event, media)"
-        class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
-      >
-        <span class="material-symbols-outlined text-xl">delete</span>
-        <span>Remove</span>
-      </button>
-    
-      <div class="mx-2 my-1 border-t border-zinc-700/50"></div>
-    
-      <button
-        (click)="openDetailsModal($event)"
-        class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
-      >
-        <span class="material-symbols-outlined text-xl">info</span>
-        <span>Details</span>
-      </button>
-    }
-  </div>
+  <button
+    (click)="openPlaylistModal($event)"
+    class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
+  >
+    <span class="material-symbols-outlined text-xl">playlist_add</span>
+    <span>Save to playlist</span>
+  </button>
+
+  <button
+    (click)="removeItem($event, media)"
+    class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
+  >
+    <span class="material-symbols-outlined text-xl">delete</span>
+    <span>Remove</span>
+  </button>
+
+  <div class="mx-2 my-1 border-t border-zinc-700/50"></div>
+
+  <button
+    (click)="openDetailsModal($event)"
+    class="flex w-full items-center space-x-3 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-700"
+  >
+    <span class="material-symbols-outlined text-xl">info</span>
+    <span>Details</span>
+  </button>
+  }
+</div>
 }
 
 <!-- Modals -->
 @if (showPlaylistModal() && selectedModalMedia()) {
-  <app-add-to-playlist-modal
-    [media]="selectedModalMedia()!"
-    (close)="showPlaylistModal.set(false)"
-  />
-} 
-
-@if (showDetailsModal() && selectedModalMedia()) {
-  <app-media-detail-modal
-    [media]="selectedModalMedia()!"
-    (close)="showDetailsModal.set(false)"
-  />
+<app-add-to-playlist-modal
+  [media]="selectedModalMedia()!"
+  (close)="showPlaylistModal.set(false)"
+/>
+} @if (showDetailsModal() && selectedModalMedia()) {
+<app-media-detail-modal
+  [media]="selectedModalMedia()!"
+  (close)="showDetailsModal.set(false)"
+/>
 }
-

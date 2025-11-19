@@ -88,7 +88,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   videoDetails = signal<Video | null>(null);
   loadingTrailer = signal(true);
   currentEpisode = signal<Episode | null>(null);
-  
+
   playlist = computed(() => {
     const p = this.params();
     const id = p?.playlistId;
@@ -372,11 +372,16 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         const routedEventName =
           routed.raw?.event ?? (routed.raw?.data && routed.raw?.data.event);
 
+        // Check if the message corresponds to a different episode than what we expect.
+        // This prevents processing stale messages from the previous episode during navigation.
+        const isMessageForDifferentEpisode =
+          media.media_type === "tv" && !!result?.episodeChange;
+
         if (result?.playerStarted && !this.playerHasStarted()) {
           this.playerHasStarted.set(true);
         }
 
-        if (result?.playbackProgress) {
+        if (result?.playbackProgress && !isMessageForDifferentEpisode) {
           this.handlePlaybackProgress(result.playbackProgress, media);
         }
 
@@ -1022,7 +1027,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (!media) return;
 
     const currentParams = this.params();
-    
+
     this.navigationService.navigateTo("watch", {
       mediaType: media.media_type,
       id: media.id,
