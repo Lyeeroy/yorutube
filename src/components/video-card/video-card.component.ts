@@ -66,6 +66,9 @@ export class VideoCardComponent {
   menuStyle = signal<{ top: string; right: string } | null>(null);
   showPlaylistModal = signal(false);
   showDetailsModal = signal(false);
+  // Shows controls on touch devices after a first tap. The first tap reveals overlay
+  // actions; a second tap opens the player. This mimics `:hover` behaviour on touch.
+  tapRevealed = signal(false);
 
   progress = computed(() => {
     const mediaId = this.progressMediaId() ?? this.media().id;
@@ -104,10 +107,70 @@ export class VideoCardComponent {
     if (this.menuStyle()) {
       this.menuStyle.set(null);
     }
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+    }
+  }
+
+  // Close the options menu when the user scrolls (mouse wheel, touch move, or normal scroll)
+  // so the floating menu doesn't stay open while the content moves.
+  @HostListener("window:scroll") // handles touch/trackpad scrolls
+  @HostListener("window:wheel") // handles mouse wheel
+  @HostListener("window:touchmove") // handles mobile dragging
+  onWindowScroll(): void {
+    if (this.menuStyle()) {
+      this.menuStyle.set(null);
+    }
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+    }
+  }
+
+  // On touch devices: first tap reveals action buttons; second tap opens the player.
+  onCardClick(event: Event): void {
+    // If user tapped an actionable child (button / link), don't open the player
+    // — let the child handler (which calls stopPropagation) manage it.
+    const target = event.target as HTMLElement | null;
+    if (target && target.closest("button, a")) {
+      return;
+    }
+
+    // Desktop: click goes straight to player
+    if (!this.isTouchDevice()) {
+      this.mediaClicked.emit();
+      return;
+    }
+
+    // Touch: show overlay first
+    if (this.tapRevealed()) {
+      this.mediaClicked.emit();
+      return;
+    }
+
+    this.tapRevealed.set(true);
+    // Hide after a short timeout in case user doesn't interact
+    setTimeout(() => {
+      this.tapRevealed.set(false);
+    }, 3000);
+  }
+
+  private isTouchDevice(): boolean {
+    try {
+      return (
+        typeof window !== "undefined" &&
+        (navigator.maxTouchPoints ?? 0) > 0 ||
+        "ontouchstart" in window
+      );
+    } catch (e) {
+      return false;
+    }
   }
 
   toggleOptionsMenu(event: MouseEvent): void {
     event.stopPropagation();
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+    }
     if (this.menuStyle()) {
       this.menuStyle.set(null);
       return;
@@ -129,18 +192,27 @@ export class VideoCardComponent {
     event.stopPropagation();
     this.showPlaylistModal.set(true);
     this.menuStyle.set(null);
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+    }
   }
 
   openDetailsModal(event: Event): void {
     event.stopPropagation();
     this.showDetailsModal.set(true);
     this.menuStyle.set(null);
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+    }
   }
 
   onRemoveFromContinueWatching(event: Event): void {
     event.stopPropagation();
     this.removeFromContinueWatching.emit();
     this.menuStyle.set(null);
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+    }
   }
 
   isOnWatchlist = computed(() =>
@@ -157,6 +229,9 @@ export class VideoCardComponent {
       this.watchlistService.removeFromWatchlist(currentMedia.id);
     } else {
       this.watchlistService.addToWatchlist(currentMedia);
+    }
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
     }
   }
 

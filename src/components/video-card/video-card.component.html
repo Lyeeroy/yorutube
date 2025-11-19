@@ -1,5 +1,5 @@
 @if (media()) { @if (layout() === 'grid') {
-<div (click)="mediaClicked.emit()" class="cursor-pointer group">
+<div (click)="onCardClick($event)" class="cursor-pointer group">
   <div class="relative rounded-xl overflow-hidden">
     @if (isPriority()) {
     <img
@@ -40,6 +40,7 @@
         (click)="toggleWatchlist($event)"
         class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
         [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'"
+        [class.opacity-100]="tapRevealed()"
       >
         <span
           class="material-symbols-outlined text-lg"
@@ -51,6 +52,7 @@
         (click)="openPlaylistModal($event)"
         class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
         [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
+        [class.opacity-100]="tapRevealed()"
       >
         <span class="material-symbols-outlined text-lg">{{
           isInPlaylist() ? "playlist_add_check" : "playlist_add"
@@ -85,7 +87,6 @@
           class="text-white font-medium text-base leading-snug group-hover:text-red-500 transition-colors line-clamp-2 pr-8"
           [title]="mediaTitle()"
         >
-          
           {{ mediaTitle() }}
         </h3>
         <!-- Position the options button absolute so it doesn't affect vertical spacing between title and channel -->
@@ -93,6 +94,7 @@
           (click)="toggleOptionsMenu($event)"
           class="absolute top-0 right-0 text-zinc-400 hover:text-white px-1 py-0 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           title="More options"
+          [class.opacity-100]="tapRevealed()"
         >
           <span class="material-symbols-outlined">more_vert</span>
         </button>
@@ -113,7 +115,7 @@
 </div>
 } @else {
 <!-- List Layout for sidebars -->
-<div (click)="mediaClicked.emit()" class="flex space-x-3 cursor-pointer group">
+  <div (click)="onCardClick($event)" class="flex space-x-3 cursor-pointer group">
   <div class="w-2/5 flex-shrink-0">
     <div class="relative rounded-lg overflow-hidden aspect-video">
       @if (isPriority()) {
@@ -157,6 +159,7 @@
           [title]="
             isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'
           "
+          [class.opacity-100]="tapRevealed()"
         >
           <span
             class="material-symbols-outlined text-base"
@@ -168,6 +171,7 @@
           (click)="openPlaylistModal($event)"
           class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
           [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
+          [class.opacity-100]="tapRevealed()"
         >
           <span class="material-symbols-outlined text-base">{{
             isInPlaylist() ? "playlist_add_check" : "playlist_add"
@@ -177,17 +181,18 @@
     </div>
   </div>
   <div class="w-3/5 relative">
-  <div class="flex items-start">
+    <div class="flex items-start">
       <h3
         class="text-white font-medium text-sm leading-snug group-hover:text-red-500 transition-colors line-clamp-2 pr-8"
         [title]="mediaTitle()"
       >
         {{ mediaTitle() }}
       </h3>
-      <button
+        <button
         (click)="toggleOptionsMenu($event)"
         class="absolute top-0 right-0 text-zinc-400 hover:text-white px-1 py-0 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
         title="More options"
+          [class.opacity-100]="tapRevealed()"
       >
         <span class="material-symbols-outlined">more_vert</span>
       </button>
