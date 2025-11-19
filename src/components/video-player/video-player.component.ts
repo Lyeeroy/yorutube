@@ -88,7 +88,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   videoDetails = signal<Video | null>(null);
   loadingTrailer = signal(true);
   currentEpisode = signal<Episode | null>(null);
-  playlist = signal<Playlist | null>(null);
+  
+  playlist = computed(() => {
+    const p = this.params();
+    const id = p?.playlistId;
+    if (!id) return null;
+    return this.playlistService.getPlaylistById(id) || null;
+  });
+
   historyAdded = signal(false);
   // provider messages are routed through PlayerMessageRouterService
 
@@ -273,13 +280,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.videoDetails.set(null);
       this.historyAdded.set(false);
 
-      if (playlistId) {
-        this.playlist.set(
-          this.playlistService.getPlaylistById(playlistId) || null
-        );
-      } else {
-        this.playlist.set(null);
-      }
+      // Playlist is now computed, no need to set it manually
 
       if (!id || !mediaType) {
         this.selectedMediaItem.set(null);
@@ -1014,5 +1015,20 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.constructedPlayerUrl.set(currentUrl);
       }, 50);
     }
+  }
+
+  onClosePlaylist(): void {
+    const media = this.selectedMediaItem();
+    if (!media) return;
+
+    const currentParams = this.params();
+    
+    this.navigationService.navigateTo("watch", {
+      mediaType: media.media_type,
+      id: media.id,
+      season: currentParams?.season,
+      episode: currentParams?.episode,
+      // playlistId is omitted
+    });
   }
 }

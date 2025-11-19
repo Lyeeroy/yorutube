@@ -144,4 +144,12 @@ export class PlaylistService {
       p.items.some((item) => item.id === mediaId)
     );
   }
+
+  updatePlaylistItems(playlistId: string, items: MediaType[]): void {
+    this.playlists.update((playlists) =>
+      playlists.map((p) =>
+        p.id === playlistId ? { ...p, items, updatedAt: Date.now() } : p
+      )
+    );
+  }
 }
