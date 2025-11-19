@@ -1,195 +1,265 @@
-@if (media()) {
-  @if (layout() === 'grid') {
-    <div (click)="mediaClicked.emit()" class="cursor-pointer group">
-      <div class="relative rounded-xl overflow-hidden">
-        @if (isPriority()) {
-          <img 
-            [ngSrc]="thumbnailUrl()"
-            [alt]="mediaTitle()"
-            width="480"
-            height="270"
-            priority
-            class="w-full object-cover aspect-video transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
-          />
-        } @else {
-          <img 
-            [ngSrc]="thumbnailUrl()"
-            [alt]="mediaTitle()"
-            width="480"
-            height="270"
-            class="w-full object-cover aspect-video transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
-          />
-        }
-        <div class="absolute inset-0 bg-black bg-opacity-10"></div>
-        @if (progress() > 0) {
-          <div class="absolute bottom-0 left-0 w-full h-1 bg-zinc-700/80">
-            <div class="h-full bg-red-600" [style.width.%]="progress()"></div>
-          </div>
-        }
-        @if (media().media_type === 'movie') {
-          <span class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md">MOVIE</span>
-        } @else {
-          <span class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md">TV SHOW</span>
-        }
-        <div class="absolute top-2 right-2 flex flex-col space-y-2 z-10">
-          <button 
-            (click)="toggleWatchlist($event)"
-            class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
-            [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'">
-            <span class="material-symbols-outlined text-lg" [class.material-symbols-filled]="isOnWatchlist()">watch_later</span>
-          </button>
-          <button 
-            (click)="openPlaylistModal($event)"
-            class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
-            [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'">
-            <span class="material-symbols-outlined text-lg">{{ isInPlaylist() ? 'playlist_add_check' : 'playlist_add' }}</span>
-          </button>
-        </div>
-      </div>
-      <div class="flex items-start space-x-3 mt-3">
-          <div 
-            (click)="onChannelClick($event)"
-            class="h-9 w-9 rounded-full flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity relative"
-            [class.bg-white]="channelLogoUrl()" 
-            [class.bg-zinc-700]="!channelLogoUrl()"
-            [class.cursor-pointer]="subscribableChannel()"
-          >
-            @if (channelLogoUrl(); as logoUrl) {
-              <img [ngSrc]="logoUrl" [alt]="channelName()" fill class="p-1 object-contain">
-            } @else {
-              <span class="text-sm font-bold text-white">{{ channelName().charAt(0) }}</span>
-            }
-          </div>
-          <div class="min-w-0 flex-1">
-              <div class="flex items-start justify-between">
-                  <h3 class="text-white font-medium text-base leading-snug group-hover:text-red-500 transition-colors line-clamp-2 pr-2" [title]="mediaTitle()">
-                    {{ mediaTitle() }}
-                  </h3>
-                  <button (click)="toggleOptionsMenu($event)" class="text-zinc-400 hover:text-white p-1 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="More options">
-                      <span class="material-symbols-outlined">more_vert</span>
-                  </button>
-              </div>
-              <div class="text-gray-400 text-sm mt-1">
-                  <p 
-                    (click)="onChannelClick($event)"
-                    class="truncate hover:text-white transition-colors" 
-                    [class.cursor-pointer]="subscribableChannel()"
-                    [title]="channelName()">{{ channelName() }}</p>
-                  <p class="truncate">{{ videoInfoLine() }}</p>
-              </div>
-          </div>
-      </div>
+@if (media()) { @if (layout() === 'grid') {
+<div (click)="mediaClicked.emit()" class="cursor-pointer group">
+  <div class="relative rounded-xl overflow-hidden">
+    @if (isPriority()) {
+    <img
+      [ngSrc]="thumbnailUrl()"
+      [alt]="mediaTitle()"
+      width="480"
+      height="270"
+      priority
+      class="w-full object-cover aspect-video transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
+    />
+    } @else {
+    <img
+      [ngSrc]="thumbnailUrl()"
+      [alt]="mediaTitle()"
+      width="480"
+      height="270"
+      class="w-full object-cover aspect-video transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
+    />
+    }
+    <div class="absolute inset-0 bg-black bg-opacity-10"></div>
+    @if (progress() > 0) {
+    <div class="absolute bottom-0 left-0 w-full h-1 bg-zinc-700/80">
+      <div class="h-full bg-red-600" [style.width.%]="progress()"></div>
     </div>
-  } @else {
-    <!-- List Layout for sidebars -->
-    <div (click)="mediaClicked.emit()" class="flex space-x-3 cursor-pointer group">
-      <div class="w-2/5 flex-shrink-0">
-        <div class="relative rounded-lg overflow-hidden aspect-video">
-          @if (isPriority()) {
-            <img 
-              [ngSrc]="thumbnailUrl()"
-              [alt]="mediaTitle()"
-              width="480"
-              height="270"
-              priority
-              class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
-            />
-          } @else {
-            <img 
-              [ngSrc]="thumbnailUrl()"
-              [alt]="mediaTitle()"
-              width="480"
-              height="270"
-              class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
-            />
-          }
-          <div class="absolute inset-0 bg-black bg-opacity-10"></div>
-           @if (progress() > 0) {
-            <div class="absolute bottom-0 left-0 w-full h-1 bg-zinc-700/80">
-              <div class="h-full bg-red-600" [style.width.%]="progress()"></div>
-            </div>
-          }
-          @if (media().media_type === 'movie') {
-            <span class="absolute bottom-1 right-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">MOVIE</span>
-          } @else {
-            <span class="absolute bottom-1 right-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">TV SHOW</span>
-          }
-          <div class="absolute top-1 right-1 flex flex-col space-y-1 z-10">
-            <button 
-              (click)="toggleWatchlist($event)"
-              class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
-              [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'">
-              <span class="material-symbols-outlined text-base" [class.material-symbols-filled]="isOnWatchlist()">watch_later</span>
-            </button>
-            <button 
-              (click)="openPlaylistModal($event)"
-              class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
-              [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'">
-              <span class="material-symbols-outlined text-base">{{ isInPlaylist() ? 'playlist_add_check' : 'playlist_add' }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="w-3/5">
-        <div class="flex items-start justify-between">
-            <h3 class="text-white font-medium text-sm leading-snug group-hover:text-red-500 transition-colors line-clamp-2 pr-2" [title]="mediaTitle()">
-              {{ mediaTitle() }}
-            </h3>
-            <button (click)="toggleOptionsMenu($event)" class="text-zinc-400 hover:text-white p-1 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="More options">
-                <span class="material-symbols-outlined">more_vert</span>
-            </button>
-        </div>
-        <div class="text-gray-400 text-xs mt-1">
-            <p 
-              (click)="onChannelClick($event)"
-              class="truncate hover:text-white transition-colors" 
-              [class.cursor-pointer]="subscribableChannel()"
-              [title]="channelName()">{{ channelName() ?? ' ' }}</p>
-            <p class="truncate">{{ videoInfoLine() }}</p>
-        </div>
-      </div>
+    } @if (media().media_type === 'movie') {
+    <span
+      class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md"
+      >MOVIE</span
+    >
+    } @else {
+    <span
+      class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md"
+      >TV SHOW</span
+    >
+    }
+    <div class="absolute top-2 right-2 flex flex-col space-y-2 z-10">
+      <button
+        (click)="toggleWatchlist($event)"
+        class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
+        [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'"
+      >
+        <span
+          class="material-symbols-outlined text-lg"
+          [class.material-symbols-filled]="isOnWatchlist()"
+          >watch_later</span
+        >
+      </button>
+      <button
+        (click)="openPlaylistModal($event)"
+        class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
+        [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
+      >
+        <span class="material-symbols-outlined text-lg">{{
+          isInPlaylist() ? "playlist_add_check" : "playlist_add"
+        }}</span>
+      </button>
     </div>
-  }
-
-  @if (menuStyle(); as style) {
-    <div 
-      (click)="$event.stopPropagation()"
-      class="fixed w-56 bg-zinc-800 rounded-md shadow-lg z-[100] border border-zinc-700 py-1"
-      [style.top]="style.top"
-      [style.right]="style.right">
-      <button (click)="toggleWatchlist($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-        <span class="material-symbols-outlined text-xl" [class.material-symbols-filled]="isOnWatchlist()">watch_later</span>
-        <span>{{ isOnWatchlist() ? 'Remove from Watchlist' : 'Save to Watchlist' }}</span>
-      </button>
-      <button (click)="openPlaylistModal($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-          <span class="material-symbols-outlined text-xl">{{ isInPlaylist() ? 'playlist_add_check' : 'playlist_add' }}</span>
-          <span>{{ isInPlaylist() ? 'Saved to playlist' : 'Save to playlist' }}</span>
-      </button>
-      @if (showRemoveFromContinueWatching()) {
-        <button (click)="onRemoveFromContinueWatching($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-          <span class="material-symbols-outlined text-xl">clear</span>
-          <span>Not interested</span>
-        </button>
+  </div>
+  <div class="flex items-start space-x-3 mt-3">
+    <div
+      (click)="onChannelClick($event)"
+      class="h-9 w-9 rounded-full flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity relative"
+      [class.bg-white]="channelLogoUrl()"
+      [class.bg-zinc-700]="!channelLogoUrl()"
+      [class.cursor-pointer]="subscribableChannel()"
+    >
+      @if (channelLogoUrl(); as logoUrl) {
+      <img
+        [ngSrc]="logoUrl"
+        [alt]="channelName()"
+        fill
+        class="p-1 object-contain"
+      />
+      } @else {
+      <span class="text-sm font-bold text-white">{{
+        channelName().charAt(0)
+      }}</span>
       }
-      <div class="border-t border-zinc-700/50 my-1 mx-2"></div>
-      <button (click)="openDetailsModal($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-        <span class="material-symbols-outlined text-xl">info</span>
-        <span>Details</span>
+    </div>
+    <div class="min-w-0 flex-1 relative">
+      <div class="flex items-start">
+        <h3
+          class="text-white font-medium text-base leading-snug group-hover:text-red-500 transition-colors line-clamp-2 pr-8"
+          [title]="mediaTitle()"
+        >
+          
+          {{ mediaTitle() }}
+        </h3>
+        <!-- Position the options button absolute so it doesn't affect vertical spacing between title and channel -->
+        <button
+          (click)="toggleOptionsMenu($event)"
+          class="absolute top-0 right-0 text-zinc-400 hover:text-white px-1 py-0 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          title="More options"
+        >
+          <span class="material-symbols-outlined">more_vert</span>
+        </button>
+      </div>
+      <div class="text-gray-400 text-sm mt-1">
+        <p
+          (click)="onChannelClick($event)"
+          class="truncate hover:text-white transition-colors"
+          [class.cursor-pointer]="subscribableChannel()"
+          [title]="channelName()"
+        >
+          {{ channelName() }}
+        </p>
+        <p class="truncate">{{ videoInfoLine() }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+} @else {
+<!-- List Layout for sidebars -->
+<div (click)="mediaClicked.emit()" class="flex space-x-3 cursor-pointer group">
+  <div class="w-2/5 flex-shrink-0">
+    <div class="relative rounded-lg overflow-hidden aspect-video">
+      @if (isPriority()) {
+      <img
+        [ngSrc]="thumbnailUrl()"
+        [alt]="mediaTitle()"
+        width="480"
+        height="270"
+        priority
+        class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
+      />
+      } @else {
+      <img
+        [ngSrc]="thumbnailUrl()"
+        [alt]="mediaTitle()"
+        width="480"
+        height="270"
+        class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300 ease-in-out"
+      />
+      }
+      <div class="absolute inset-0 bg-black bg-opacity-10"></div>
+      @if (progress() > 0) {
+      <div class="absolute bottom-0 left-0 w-full h-1 bg-zinc-700/80">
+        <div class="h-full bg-red-600" [style.width.%]="progress()"></div>
+      </div>
+      } @if (media().media_type === 'movie') {
+      <span
+        class="absolute bottom-1 right-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-1.5 py-0.5 rounded"
+        >MOVIE</span
+      >
+      } @else {
+      <span
+        class="absolute bottom-1 right-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-1.5 py-0.5 rounded"
+        >TV SHOW</span
+      >
+      }
+      <div class="absolute top-1 right-1 flex flex-col space-y-1 z-10">
+        <button
+          (click)="toggleWatchlist($event)"
+          class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
+          [title]="
+            isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'
+          "
+        >
+          <span
+            class="material-symbols-outlined text-base"
+            [class.material-symbols-filled]="isOnWatchlist()"
+            >watch_later</span
+          >
+        </button>
+        <button
+          (click)="openPlaylistModal($event)"
+          class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
+          [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
+        >
+          <span class="material-symbols-outlined text-base">{{
+            isInPlaylist() ? "playlist_add_check" : "playlist_add"
+          }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="w-3/5 relative">
+  <div class="flex items-start">
+      <h3
+        class="text-white font-medium text-sm leading-snug group-hover:text-red-500 transition-colors line-clamp-2 pr-8"
+        [title]="mediaTitle()"
+      >
+        {{ mediaTitle() }}
+      </h3>
+      <button
+        (click)="toggleOptionsMenu($event)"
+        class="absolute top-0 right-0 text-zinc-400 hover:text-white px-1 py-0 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+        title="More options"
+      >
+        <span class="material-symbols-outlined">more_vert</span>
       </button>
     </div>
+    <div class="text-gray-400 text-xs mt-1">
+      <p
+        (click)="onChannelClick($event)"
+        class="truncate hover:text-white transition-colors"
+        [class.cursor-pointer]="subscribableChannel()"
+        [title]="channelName()"
+      >
+        {{ channelName() ?? " " }}
+      </p>
+      <p class="truncate">{{ videoInfoLine() }}</p>
+    </div>
+  </div>
+</div>
+} @if (menuStyle(); as style) {
+<div
+  (click)="$event.stopPropagation()"
+  class="fixed w-56 bg-zinc-800 rounded-md shadow-lg z-[100] border border-zinc-700 py-1"
+  [style.top]="style.top"
+  [style.right]="style.right"
+>
+  <button
+    (click)="toggleWatchlist($event)"
+    class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+  >
+    <span
+      class="material-symbols-outlined text-xl"
+      [class.material-symbols-filled]="isOnWatchlist()"
+      >watch_later</span
+    >
+    <span>{{
+      isOnWatchlist() ? "Remove from Watchlist" : "Save to Watchlist"
+    }}</span>
+  </button>
+  <button
+    (click)="openPlaylistModal($event)"
+    class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+  >
+    <span class="material-symbols-outlined text-xl">{{
+      isInPlaylist() ? "playlist_add_check" : "playlist_add"
+    }}</span>
+    <span>{{ isInPlaylist() ? "Saved to playlist" : "Save to playlist" }}</span>
+  </button>
+  @if (showRemoveFromContinueWatching()) {
+  <button
+    (click)="onRemoveFromContinueWatching($event)"
+    class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+  >
+    <span class="material-symbols-outlined text-xl">clear</span>
+    <span>Not interested</span>
+  </button>
   }
-
-  @if (showPlaylistModal()) {
-    <app-add-to-playlist-modal 
-      [media]="media()"
-      (close)="showPlaylistModal.set(false)"
-    />
-  }
-
-  @if (showDetailsModal()) {
-    <app-media-detail-modal 
-      [media]="media()"
-      (close)="showDetailsModal.set(false)"
-    />
-  }
-}
+  <div class="border-t border-zinc-700/50 my-1 mx-2"></div>
+  <button
+    (click)="openDetailsModal($event)"
+    class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+  >
+    <span class="material-symbols-outlined text-xl">info</span>
+    <span>Details</span>
+  </button>
+</div>
+} @if (showPlaylistModal()) {
+<app-add-to-playlist-modal
+  [media]="media()"
+  (close)="showPlaylistModal.set(false)"
+/>
+} @if (showDetailsModal()) {
+<app-media-detail-modal
+  [media]="media()"
+  (close)="showDetailsModal.set(false)"
+/>
+} }

@@ -1,46 +1,58 @@
-import { Component, ChangeDetectionStrategy, HostListener, inject, signal, computed } from '@angular/core';
-import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { PlaylistService } from '../../services/playlist.service';
-import { Playlist } from '../../models/playlist.model';
-import { NavigationService } from '../../services/navigation.service';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  HostListener,
+  inject,
+  signal,
+  computed,
+} from "@angular/core";
+import { CommonModule, NgOptimizedImage } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import { PlaylistService } from "../../services/playlist.service";
+import { Playlist } from "../../models/playlist.model";
+import { NavigationService } from "../../services/navigation.service";
 
 @Component({
-  selector: 'app-playlists',
+  selector: "app-playlists",
   standalone: true,
   imports: [CommonModule, NgOptimizedImage, FormsModule],
-  templateUrl: './playlists.component.html',
+  templateUrl: "./playlists.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PlaylistsComponent {
   private playlistService = inject(PlaylistService);
   private navigationService = inject(NavigationService);
-  
+
   playlists = this.playlistService.playlists;
 
   // Menu state for three dots on playlist tile
   playlistMenuStyle = signal<{ top: string; right: string } | null>(null);
   playlistMenuTarget = signal<string | null>(null);
-  selectedPlaylist = computed(() => this.playlists().find((p) => p.id === this.playlistMenuTarget()));
-  
+  selectedPlaylist = computed(() =>
+    this.playlists().find((p) => p.id === this.playlistMenuTarget())
+  );
+
   showCreateForm = signal(false);
-  newPlaylistName = signal('');
-  newPlaylistDescription = signal('');
+  newPlaylistName = signal("");
+  newPlaylistDescription = signal("");
 
   onPlaylistClicked(playlist: Playlist): void {
-    this.navigationService.navigateTo('playlist-detail', { id: playlist.id });
+    this.navigationService.navigateTo("playlist-detail", { id: playlist.id });
   }
 
   cancelCreate(): void {
     this.showCreateForm.set(false);
-    this.newPlaylistName.set('');
-    this.newPlaylistDescription.set('');
+    this.newPlaylistName.set("");
+    this.newPlaylistDescription.set("");
   }
 
   createNewPlaylist(): void {
     const name = this.newPlaylistName().trim();
     if (name) {
-      this.playlistService.createPlaylist(name, this.newPlaylistDescription().trim());
+      this.playlistService.createPlaylist(
+        name,
+        this.newPlaylistDescription().trim()
+      );
       this.cancelCreate();
     }
   }
@@ -65,7 +77,7 @@ export class PlaylistsComponent {
     this.playlistMenuStyle.set(style);
   }
 
-  @HostListener('document:click')
+  @HostListener("document:click")
   onDocumentClick(): void {
     if (this.playlistMenuStyle()) {
       this.playlistMenuStyle.set(null);

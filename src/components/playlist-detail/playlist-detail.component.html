@@ -1,117 +1,193 @@
 @if (playlist(); as p) {
-  <div class="flex flex-col md:flex-row gap-8 p-4 sm:p-6">
-    <!-- Left Panel: Playlist Info -->
-    <div class="w-full md:w-1/3 lg:w-1/4 md:sticky md:top-6 self-start">
-      <div class="relative rounded-xl overflow-hidden aspect-video">
-        <img [ngSrc]="getThumbnail(0)" [alt]="p.name" width="480" height="270" class="w-full h-full object-cover" priority>
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-        <div class="absolute bottom-4 left-4 text-white">
-          <h1 class="text-2xl font-bold">{{ p.name }}</h1>
-          <p class="text-sm">Playlist</p>
-        </div>
+<div class="flex flex-col md:flex-row gap-8 p-4 sm:p-6">
+  <!-- Left Panel: Playlist Info -->
+  <div class="w-full md:w-1/3 lg:w-1/4 md:sticky md:top-6 self-start">
+    <div class="relative rounded-xl overflow-hidden aspect-video">
+      <img
+        [ngSrc]="getThumbnail(0)"
+        [alt]="p.name"
+        width="480"
+        height="270"
+        class="w-full h-full object-cover"
+        priority
+      />
+      <div
+        class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"
+      ></div>
+      <div class="absolute bottom-4 left-4 text-white">
+        <h1 class="text-2xl font-bold">{{ p.name }}</h1>
+        <p class="text-sm">Playlist</p>
       </div>
-      <div class="mt-4 flex flex-col space-y-2">
-        <button (click)="playAll()" class="w-full bg-white text-black font-semibold py-2 px-4 rounded-full flex items-center justify-center space-x-2 hover:bg-zinc-200">
-          <span class="material-symbols-outlined text-3xl -ml-1">play_arrow</span>
-          <span>Play All</span>
-        </button>
-        @if (!isEditing()) {
-          <div class="pt-2">
-            <div class="flex items-center justify-between">
-              <p class="text-zinc-400 text-sm">{{ p.items.length }} videos</p>
-              <button (click)="isEditing.set(true)" class="text-zinc-400 hover:text-white p-1">
-                <span class="material-symbols-outlined text-xl">edit</span>
-              </button>
-            </div>
-            @if (p.description) {
-              <p class="text-zinc-300 mt-2 text-sm">{{ p.description }}</p>
-            }
-          </div>
-        } @else {
-          <div class="flex flex-col space-y-2 pt-2">
-            <input type="text" [(ngModel)]="editedName" class="w-full bg-zinc-700 text-white rounded-md px-3 py-2 text-lg font-semibold">
-            <textarea [(ngModel)]="editedDescription" rows="3" class="w-full bg-zinc-700 text-white rounded-md px-3 py-2 text-sm"></textarea>
-            <div class="flex justify-end space-x-2">
-              <button (click)="isEditing.set(false)" class="text-zinc-300 hover:text-white px-3 py-1">Cancel</button>
-              <button (click)="saveDetails()" class="bg-red-600 text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-red-500">Save</button>
-            </div>
-          </div>
+    </div>
+    <div class="mt-4 flex flex-col space-y-2">
+      <button
+        (click)="playAll()"
+        class="w-full bg-white text-black font-semibold py-2 px-4 rounded-full flex items-center justify-center space-x-2 hover:bg-zinc-200"
+      >
+        <span class="material-symbols-outlined text-3xl -ml-1">play_arrow</span>
+        <span>Play All</span>
+      </button>
+      @if (!isEditing()) {
+      <div class="pt-2">
+        <div class="flex items-center justify-between">
+          <p class="text-zinc-400 text-sm">{{ p.items.length }} videos</p>
+          <button
+            (click)="isEditing.set(true)"
+            class="text-zinc-400 hover:text-white p-1"
+          >
+            <span class="material-symbols-outlined text-xl">edit</span>
+          </button>
+        </div>
+        @if (p.description) {
+        <p class="text-zinc-300 mt-2 text-sm">{{ p.description }}</p>
         }
-
-        <div class="pt-4 border-t border-zinc-700">
-          <button (click)="deletePlaylist()" class="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-500/10 p-2 rounded-md">
-            <span class="material-symbols-outlined">delete</span>
-            <span>Delete Playlist</span>
+      </div>
+      } @else {
+      <div class="flex flex-col space-y-2 pt-2">
+        <input
+          type="text"
+          [(ngModel)]="editedName"
+          class="w-full bg-zinc-700 text-white rounded-md px-3 py-2 text-lg font-semibold"
+        />
+        <textarea
+          [(ngModel)]="editedDescription"
+          rows="3"
+          class="w-full bg-zinc-700 text-white rounded-md px-3 py-2 text-sm"
+        ></textarea>
+        <div class="flex justify-end space-x-2">
+          <button
+            (click)="isEditing.set(false)"
+            class="text-zinc-300 hover:text-white px-3 py-1"
+          >
+            Cancel
+          </button>
+          <button
+            (click)="saveDetails()"
+            class="bg-red-600 text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-red-500"
+          >
+            Save
           </button>
         </div>
       </div>
-    </div>
+      }
 
-    <!-- Right Panel: Video List -->
-    <div class="w-full md:w-2/3 lg:w-3/4">
-      <div class="flex flex-col space-y-2">
-        @for(item of playlistItems(); track item.id; let i = $index) {
-          <div (click)="onMediaClicked(item)" class="flex items-center p-2 rounded-lg hover:bg-zinc-800 cursor-pointer group">
-            <span class="text-zinc-400 w-8 text-center shrink-0">{{ i + 1 }}</span>
-            <img [ngSrc]="item.poster_path ? 'https://image.tmdb.org/t/p/w300' + item.poster_path : 'https://picsum.photos/seed/' + item.id + '/90/135'" alt="Thumbnail" class="w-16 h-auto rounded-md mx-4 shrink-0" width="90" height="135">
-            <div class="flex-grow min-w-0">
-              <div class="flex items-start justify-between">
-                <p class="font-semibold text-sm text-white truncate">{{ getMediaTitle(item) }}</p>
-                <!-- always visible larger three dots next to title like video-card -->
-                <button (click)="toggleOptionsMenu($event, item)" class="text-zinc-400 hover:text-white p-1 text-xl ml-2" title="More options">
-                  <span class="material-symbols-outlined">more_vert</span>
-                </button>
-              </div>
-              <p class="text-xs text-zinc-400 mt-1">{{ getMediaInfo(item) }}</p>
-            </div>
-            <div class="flex items-center space-x-2">
-              <!-- Removed direct remove X - item removal is now in the three dots menu -->
-            </div>
-          </div>
-        } @empty {
-          <p class="text-zinc-400 text-center py-8">This playlist is empty.</p>
-        }
-            @if (menuStyle(); as style) {
-              @if (menuMedia() && menuMediaId() !== null) {
-                <div
-                  (click)="$event.stopPropagation()"
-                  class="fixed w-56 bg-zinc-800 rounded-md shadow-lg z-[100] border border-zinc-700 py-1"
-                  [style.top]="style.top"
-                  [style.right]="style.right">
-                  <button (click)="toggleWatchlist($event, menuMedia())" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-                    <span class="material-symbols-outlined text-xl">watch_later</span>
-                    <span>{{ watchlistService.isOnWatchlist(menuMedia().id) ? 'Remove from Watchlist' : 'Save to Watchlist' }}</span>
-                  </button>
-                  <button (click)="openPlaylistModal($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-                    <span class="material-symbols-outlined text-xl">playlist_add</span>
-                    <span>Add to playlist</span>
-                  </button>
-                  <button (click)="removeFromPlaylist($event, menuMedia().id)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-                    <span class="material-symbols-outlined text-xl">close</span>
-                    <span>Remove from Playlist</span>
-                  </button>
-                  <div class="border-t border-zinc-700/50 my-1 mx-2"></div>
-                  <button (click)="openDetailsModal($event)" class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700">
-                    <span class="material-symbols-outlined text-xl">info</span>
-                    <span>Details</span>
-                  </button>
-                </div>
-              }
-            }
+      <div class="pt-4 border-t border-zinc-700">
+        <button
+          (click)="deletePlaylist()"
+          class="w-full flex items-center justify-center space-x-2 text-red-500 hover:bg-red-500/10 p-2 rounded-md"
+        >
+          <span class="material-symbols-outlined">delete</span>
+          <span>Delete Playlist</span>
+        </button>
       </div>
     </div>
   </div>
-} @else {
-  <div class="text-center py-16">
-    <h2 class="text-2xl font-semibold text-zinc-400">Playlist not found</h2>
-    <p class="text-zinc-500 mt-2">We couldn't find the playlist you were looking for.</p>
+
+  <!-- Right Panel: Video List -->
+  <div class="w-full md:w-2/3 lg:w-3/4">
+    <div class="flex flex-col space-y-2">
+      @for(item of playlistItems(); track item.id; let i = $index) {
+      <div
+        (click)="onMediaClicked(item)"
+        class="flex items-center p-2 rounded-lg hover:bg-zinc-800 cursor-pointer group"
+      >
+        <span class="text-zinc-400 w-8 text-center shrink-0">{{ i + 1 }}</span>
+        <img
+          [ngSrc]="
+            item.poster_path
+              ? 'https://image.tmdb.org/t/p/w300' + item.poster_path
+              : 'https://picsum.photos/seed/' + item.id + '/90/135'
+          "
+          alt="Thumbnail"
+          class="w-16 h-auto rounded-md mx-4 shrink-0"
+          width="90"
+          height="135"
+        />
+        <div class="flex-grow min-w-0">
+          <div class="relative">
+            <div class="flex items-start">
+              <p class="font-semibold text-sm text-white truncate pr-8">
+                {{ getMediaTitle(item) }}
+              </p>
+              <!-- always visible larger three dots next to title like video-card -->
+              <button
+                (click)="toggleOptionsMenu($event, item)"
+                class="absolute top-0 right-0 text-zinc-400 hover:text-white p-1 text-xl"
+                title="More options"
+              >
+                <span class="material-symbols-outlined">more_vert</span>
+              </button>
+            </div>
+          </div>
+          <p class="text-xs text-zinc-400 mt-1">{{ getMediaInfo(item) }}</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <!-- Removed direct remove X - item removal is now in the three dots menu -->
+        </div>
+      </div>
+      } @empty {
+      <p class="text-zinc-400 text-center py-8">This playlist is empty.</p>
+      } @if (menuStyle(); as style) { @if (menuMedia() && menuMediaId() !==
+      null) {
+      <div
+        (click)="$event.stopPropagation()"
+        class="fixed w-56 bg-zinc-800 rounded-md shadow-lg z-[100] border border-zinc-700 py-1"
+        [style.top]="style.top"
+        [style.right]="style.right"
+      >
+        <button
+          (click)="toggleWatchlist($event, menuMedia())"
+          class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+        >
+          <span class="material-symbols-outlined text-xl">watch_later</span>
+          <span>{{
+            watchlistService.isOnWatchlist(menuMedia().id)
+              ? "Remove from Watchlist"
+              : "Save to Watchlist"
+          }}</span>
+        </button>
+        <button
+          (click)="openPlaylistModal($event)"
+          class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+        >
+          <span class="material-symbols-outlined text-xl">playlist_add</span>
+          <span>Add to playlist</span>
+        </button>
+        <button
+          (click)="removeFromPlaylist($event, menuMedia().id)"
+          class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+        >
+          <span class="material-symbols-outlined text-xl">close</span>
+          <span>Remove from Playlist</span>
+        </button>
+        <div class="border-t border-zinc-700/50 my-1 mx-2"></div>
+        <button
+          (click)="openDetailsModal($event)"
+          class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+        >
+          <span class="material-symbols-outlined text-xl">info</span>
+          <span>Details</span>
+        </button>
+      </div>
+      } }
+    </div>
   </div>
-  }
-
-  @if (showPlaylistModal()) {
-    <app-add-to-playlist-modal [media]="menuMedia()" (close)="showPlaylistModal.set(false)"></app-add-to-playlist-modal>
-  }
-
-  @if (showDetailsModal()) {
-    <app-media-detail-modal [media]="menuMedia()" (close)="showDetailsModal.set(false)"></app-media-detail-modal>
-  }
+</div>
+} @else {
+<div class="text-center py-16">
+  <h2 class="text-2xl font-semibold text-zinc-400">Playlist not found</h2>
+  <p class="text-zinc-500 mt-2">
+    We couldn't find the playlist you were looking for.
+  </p>
+</div>
+} @if (showPlaylistModal()) {
+<app-add-to-playlist-modal
+  [media]="menuMedia()"
+  (close)="showPlaylistModal.set(false)"
+></app-add-to-playlist-modal>
+} @if (showDetailsModal()) {
+<app-media-detail-modal
+  [media]="menuMedia()"
+  (close)="showDetailsModal.set(false)"
+></app-media-detail-modal>
+}
