@@ -393,9 +393,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             // emitted metadata only on initial load/timeupdate and were ignored.
             const currentParams = untracked(() => this.params());
             const urlNeedsUpdate =
-              currentParams?.season !== season || currentParams?.episode !== episode;
+              currentParams?.season !== season ||
+              currentParams?.episode !== episode;
 
-            if (urlNeedsUpdate && this.canProcessEpisodeChange(routedEventName)) {
+            if (
+              urlNeedsUpdate &&
+              this.canProcessEpisodeChange(routedEventName)
+            ) {
               // Use the provider-normalized metadata to update the app state
               this.handleEpisodeChangeDetection(
                 { season, episode },
@@ -700,11 +704,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           const matchingEpisode = seasonDetails.episodes.find(
             (e) => e.episode_number === data.episode
           );
-            if (matchingEpisode) {
-              // Only update the UI selection; DO NOT update the URL from metadata.
-              // URL updates should only happen via explicit navigation.
-              this.currentEpisode.set(matchingEpisode);
-            }
+          if (matchingEpisode) {
+            // Only update the UI selection; DO NOT update the URL from metadata.
+            // URL updates should only happen via explicit navigation.
+            this.currentEpisode.set(matchingEpisode);
+          }
         });
     }
   }
@@ -724,7 +728,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       !["timeupdate", "time", "seeking", "seeked"].includes(eventName);
 
     return (
-      this.playerHasStarted() && !this.isNavigating() &&
+      this.playerHasStarted() &&
+      !this.isNavigating() &&
       (this.lastKnownPlaybackTime() >= 5 || nonRoutineEvent)
     );
   }
