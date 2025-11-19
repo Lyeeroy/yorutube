@@ -157,12 +157,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const progressId = episode ? episode.id : media.id;
 
     // Get resume time for supported players
+    // Priority: 1) startAt from URL params, 2) saved progress
+    const params = untracked(() => this.params());
+    const urlStartAt = params?.startAt;
+
     const progress = untracked(() =>
       this.playbackProgressService.getProgress(progressId)
     );
 
-    const resumeTime =
-      progress && progress.progress > 5 && progress.progress < 100
+    // Use URL startAt if provided, otherwise use saved progress
+    const resumeTime = urlStartAt
+      ? urlStartAt
+      : progress && progress.progress > 5 && progress.progress < 100
         ? progress.timestamp
         : 0;
 
@@ -417,6 +423,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   // Track last known currentTime to prevent premature episode-change navigation
   private lastKnownPlaybackTime = signal(0);
+
+  // Public signal for components that need current playback time (e.g., share modal)
+  currentPlaybackTime = computed(() => this.lastKnownPlaybackTime());
 
   private handlePlaybackProgress(
     progressData: {

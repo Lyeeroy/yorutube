@@ -27,6 +27,7 @@ import { SubscriptionService } from "../../services/subscription.service";
 import { WatchlistService } from "../../services/watchlist.service";
 import { NavigationService } from "../../services/navigation.service";
 import { AddToPlaylistModalComponent } from "../add-to-playlist-modal/add-to-playlist-modal.component";
+import { ShareModalComponent } from "../share-modal/share-modal.component";
 import { PlaylistService } from "../../services/playlist.service";
 import { PlayerService, PlayerType } from "../../services/player.service";
 import { EpisodeSelectorComponent } from "../episode-selector/episode-selector.component";
@@ -45,6 +46,7 @@ const isTvShowDetails = (
     CommonModule,
     NgOptimizedImage,
     AddToPlaylistModalComponent,
+    ShareModalComponent,
     EpisodeSelectorComponent,
   ],
   templateUrl: "./video-info.component.html",
@@ -56,6 +58,7 @@ export class VideoInfoComponent {
   genreMap = input.required<Map<number, string>>();
   currentEpisode = input<Episode | null>(null);
   videoDetails = input<Video | null>(null);
+  currentTime = input<number>(0);
   episodeSelected = output<{ episode: Episode; seasonNumber: number }>();
   refreshPlayer = output<void>();
 
@@ -71,6 +74,7 @@ export class VideoInfoComponent {
   // UI State Signals
   descriptionExpanded = signal(false);
   showPlaylistModal = signal(false);
+  showShareModal = signal(false);
   showMoreOptionsMenu = signal(false);
   showSourcesDropdown = signal(false);
   showAutoNextThreshold = signal(false);
@@ -284,36 +288,7 @@ export class VideoInfoComponent {
   }
 
   shareMedia(): void {
-    const media = this.media();
-    if (!media) return;
-
-    const params: any = {
-      mediaType: media.media_type,
-      id: media.id,
-    };
-
-    if (this.currentEpisode()) {
-      params.season = this.currentEpisode().season_number;
-      params.episode = this.currentEpisode().episode_number;
-    }
-
-    const url = this.navigationService.getUrl("watch", params);
-
-    if (typeof navigator !== "undefined" && (navigator as any).share) {
-      // Use Web Share API when available
-      (navigator as any).share({ title: this.mediaTitle(), url }).catch(() => {
-        // Ignore errors from share
-      });
-    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard
-        .writeText(url)
-        .then(() => alert("Link copied to clipboard"))
-        .catch(() => alert("Copy failed: " + url));
-    } else {
-      // Fallback to prompt for older browsers
-      window.prompt("Copy this link", url);
-    }
-
+    this.showShareModal.set(true);
     this.showMoreOptionsMenu.set(false);
   }
 

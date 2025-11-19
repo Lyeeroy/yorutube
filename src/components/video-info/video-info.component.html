@@ -331,5 +331,12 @@
     [media]="media()"
     (close)="showPlaylistModal.set(false)"
   />
+  } @if (showShareModal()) {
+  <app-share-modal
+    [media]="media()"
+    [currentEpisode]="currentEpisode()"
+    [currentTime]="currentTime()"
+    (close)="showShareModal.set(false)"
+  />
   }
 </div>

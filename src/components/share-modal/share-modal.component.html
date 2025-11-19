@@ -1,0 +1,92 @@
+<div
+  class="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4"
+  (click)="close.emit()"
+>
+  <div
+    class="bg-zinc-800 rounded-lg shadow-xl w-full max-w-md"
+    (click)="$event.stopPropagation()"
+  >
+    <!-- Header -->
+    <div class="flex items-center justify-between p-4 border-b border-zinc-700">
+      <h3 class="text-lg font-semibold text-white">Share</h3>
+      <button
+        (click)="close.emit()"
+        class="text-zinc-400 hover:text-white transition-colors"
+      >
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="p-4 space-y-4">
+      <!-- URL Input with Copy Button -->
+      <div class="flex items-center space-x-2">
+        <input
+          type="text"
+          [value]="shareUrl()"
+          readonly
+          class="flex-1 bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+        <button
+          (click)="copyToClipboard()"
+          class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2"
+        >
+          @if (copySuccess()) {
+          <span class="material-symbols-outlined text-lg">check</span>
+          <span>Copied</span>
+          } @else {
+          <span class="material-symbols-outlined text-lg">content_copy</span>
+          <span>Copy</span>
+          }
+        </button>
+      </div>
+
+       <!-- Divider under the URL input — extend to full modal width by removing
+         horizontal padding from the content wrapper. -->
+       <div class="border-t border-zinc-700 my-3 -mx-4"></div>
+
+      <!-- Start At Section (placed under the URL input divider) -->
+      <div class="space-y-2">
+        <div class="flex flex-col sm:flex-row items-center sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <!-- Checkbox and Label -->
+          <label class="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              [checked]="startAtEnabled()"
+              (change)="toggleStartAt()"
+              class="w-5 h-5 bg-zinc-900 border-zinc-600 focus:ring-red-500 rounded"
+              style="accent-color: #dc2626"
+            />
+            <span class="text-white text-sm">Start at</span>
+            @if (startAtEnabled()) {
+            <span class="material-symbols-outlined text-red-500 text-base">check</span>
+            }
+          </label>
+
+          <!-- Time Input (next to the checkbox). Responsive: full width on small
+               screens, smaller fixed width on larger screens to avoid excess width
+               on desktop. -->
+          <input
+            type="text"
+            [value]="formattedTime()"
+            (input)="onTimeInputChange($event)"
+            placeholder="0:00"
+            [disabled]="!startAtEnabled()"
+            class="bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-28 md:w-20 lg:w-24"
+          />
+        </div>
+      </div>
+
+      <!-- Share via Web API button (if available) -->
+      @if (canUseWebShare()) {
+      <button
+        (click)="shareViaWebApi()"
+        class="w-full flex items-center justify-center space-x-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-lg px-4 py-2.5 transition-colors"
+      >
+        <span class="material-symbols-outlined text-lg">share</span>
+        <span>Share via...</span>
+      </button>
+      }
+    </div>
+  </div>
+</div>

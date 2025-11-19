@@ -67,6 +67,7 @@ export class NavigationService {
         else if (params?.id) qp.set("v", String(params.id)); // backward compat
         if (params?.playlistId) qp.set("list", String(params.playlistId));
         if (params?.autoplay) qp.set("autoplay", "1");
+        if (params?.startAt && params.startAt > 0) qp.set("startAt", String(params.startAt));
         const q = qp.toString();
         return q ? `/watch?${q}` : "/watch";
       }
@@ -136,6 +137,7 @@ export class NavigationService {
       let season = params.get("season");
       let episode = params.get("episode");
       const autoplay = params.get("autoplay");
+      const startAt = params.get("startAt");
 
       // Backwards compat: /watch/:mediaType/:id
       const legacyMatch = pathname.match(/^\/watch\/([^\/]+)\/(\d+)/);
@@ -173,6 +175,7 @@ export class NavigationService {
             season: season ? Number(season) : undefined,
             episode: episode ? Number(episode) : undefined,
             autoplay: !!autoplay,
+            startAt: startAt ? Number(startAt) : undefined,
           },
         });
         return;
