@@ -157,8 +157,8 @@ export class VideoCardComponent {
   private isTouchDevice(): boolean {
     try {
       return (
-        typeof window !== "undefined" &&
-        (navigator.maxTouchPoints ?? 0) > 0 ||
+        (typeof window !== "undefined" &&
+          (navigator.maxTouchPoints ?? 0) > 0) ||
         "ontouchstart" in window
       );
     } catch (e) {
