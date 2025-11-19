@@ -165,12 +165,23 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.playbackProgressService.getProgress(progressId)
     );
 
-    // Use URL startAt if provided, otherwise use saved progress
-    const resumeTime = urlStartAt
-      ? urlStartAt
-      : progress && progress.progress > 5 && progress.progress < 100
-        ? progress.timestamp
-        : 0;
+    // Use URL startAt only if provided for this navigation and player hasn't
+    // started yet; otherwise prefer saved progress. This prevents a shared
+    // start time from being re-applied when the user switches providers while
+    // watching.
+    const initialStart = untracked(() => this.initialStartAt());
+
+    let resumeTime = 0;
+    if (
+      typeof initialStart === "number" &&
+      initialStart > 0 &&
+      !this.playerHasStarted() &&
+      this.lastKnownPlaybackTime() <= 5
+    ) {
+      resumeTime = initialStart;
+    } else if (progress && progress.progress > 5 && progress.progress < 100) {
+      resumeTime = progress.timestamp;
+    }
 
     const config: PlayerUrlConfig = {
       media,
@@ -200,6 +211,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.constructedPlayerUrl.set(url);
       } else if (this.skipNextPlayerUpdate()) {
         this.skipNextPlayerUpdate.set(false);
+      }
+    });
+
+    // Clear initialStartAt once the player has a meaningful playback time so
+    // that switching providers will respect the true user progress instead of
+    // the shared 'startAt'. We also clear when the player starts.
+    effect(() => {
+      // When the player starts or we have last known playback time > 5s, clear
+      // the initialStartAt so it's not re-applied when the user changes players.
+      if (this.playerHasStarted() || this.lastKnownPlaybackTime() > 5) {
+        this.initialStartAt.set(undefined);
       }
     });
 
@@ -233,6 +255,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
         // Mark that we're navigating to prevent stale player messages from interfering
         this.isNavigating.set(true);
+
+        // Capture any `startAt` param from navigation so we can apply it as a one-time
+        // resume time for the newly-opened media. We'll clear it once the player
+        // has started or we have meaningful playback progress to avoid reusing
+        // the shared startAt if the user switches player sources.
+        this.initialStartAt.set(p?.startAt ? Number(p.startAt) : undefined);
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -426,6 +454,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   // Public signal for components that need current playback time (e.g., share modal)
   currentPlaybackTime = computed(() => this.lastKnownPlaybackTime());
+
+  // Hold any startAt param from the URL for the first load. This should only
+  // be applied once when the user navigates to a new media. After meaningful
+  // playback or the player starts, this value will be cleared so it isn't
+  // reapplied when the user switches providers.
+  private initialStartAt = signal<number | undefined>(undefined);
 
   private handlePlaybackProgress(
     progressData: {
