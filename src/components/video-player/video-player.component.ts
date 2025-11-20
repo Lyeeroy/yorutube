@@ -129,6 +129,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   currentMediaId = computed(() => this.selectedMediaItem()?.id);
 
+  // Cache for season details to avoid repeated API calls during auto-next
+  private seasonDetailsCache = new Map<string, any>();
+  
+  // Debounce counter for progress updates
+  private lastProgressUpdateTime = 0;
+
   thumbnailUrl = computed<string | null>(() => {
     const media = this.selectedMediaItem();
     return media?.backdrop_path
@@ -275,6 +281,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.autoPlayNextTriggered.set(false);
         this.recommendedNextEpisodeSent.set(false);
         this.lastKnownPlaybackTime.set(0);
+        this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
         // Unlock any auto-next if we just navigated to a different media
         this.playerService.unlockAutoNext();
@@ -507,15 +514,25 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }
     }
 
-    const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
-      progress: progressPercent,
-      timestamp: currentTime,
-      duration: duration,
-    };
-
+    // Get episode once for use in multiple places below
     const episode = this.currentEpisode();
-    const progressId = episode ? episode.id : media.id;
-    this.playbackProgressService.updateProgress(progressId, playbackData);
+
+    // Debounce progress updates to reduce excessive writes (max once per second)
+    const now = Date.now();
+    const shouldUpdateProgress = now - this.lastProgressUpdateTime >= 1000;
+
+    if (shouldUpdateProgress) {
+      this.lastProgressUpdateTime = now;
+      
+      const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
+        progress: progressPercent,
+        timestamp: currentTime,
+        duration: duration,
+      };
+
+      const progressId = episode ? episode.id : media.id;
+      this.playbackProgressService.updateProgress(progressId, playbackData);
+    }
 
     // Add to history after significant playback (30 seconds or 5% progress)
     if (!this.historyAdded() && (currentTime > 30 || progressPercent > 5)) {
@@ -674,20 +691,32 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     if (hasPlayerChangedEpisode) {
       // Check if this is likely a player-initiated auto-next (sequential episode progression)
-      // If the user has set a custom threshold < 95%, we should ignore player auto-next
-      // and let our app handle it at the user's preferred threshold
+      // Handle both forwards and backwards navigation to properly detect manual vs auto
       const isSequentialNext =
         appEpisodeState &&
         playerEpisode.season === appEpisodeState.season &&
         playerEpisode.episode === appEpisodeState.episode + 1;
+      
+      const isSequentialPrevious =
+        appEpisodeState &&
+        playerEpisode.season === appEpisodeState.season &&
+        playerEpisode.episode === appEpisodeState.episode - 1;
 
       const userThreshold = this.playerService.autoNextThreshold();
       const provider = this.playerProviderService.getProvider(
         this.selectedPlayer()
       );
 
+      // If auto-next is disabled, ignore sequential forward episode changes (auto-next behavior)
+      // but allow backwards navigation and non-sequential changes (manual episode selection)
+      if (isSequentialNext && !this.playerService.autoNextEnabled()) {
+        // Auto-next is disabled, ignore this sequential episode change
+        this.lastPlayerEpisodeState.set(playerEpisode);
+        return;
+      }
+
       // If this looks like player auto-next AND user wants early triggering (< 95%),
-      // ignore the player's navigation and let our app handle it at the user's threshold
+      // ignore the player's navigation and let our app handle it at the user's preferred threshold
       if (
         isSequentialNext &&
         provider?.supportsAutoNext &&
@@ -818,7 +847,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   private playNextEpisode(tvShow: TvShowDetails): void {
     const currentEp = this.currentEpisode();
-    if (!currentEp) return;
+    if (!currentEp) {
+      // No current episode, unlock and exit
+      this.playerService.unlockAutoNext();
+      return;
+    }
 
     // First try to advance to the next episode in the series. Only if no
     // next episode or season is found should we fall back to the playlist
@@ -828,78 +861,105 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     this.movieService
       .getSeasonDetails(tvShow.id, currentEp.season_number)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((seasonDetails) => {
-        const episodes = seasonDetails.episodes || [];
-        const currentIndex = episodes.findIndex(
-          (e) => e.episode_number === currentEp.episode_number
-        );
-
-        if (currentIndex === -1) {
-          // Failsafe: if current episode not found, maybe it was removed.
-          // Don't auto-play to avoid unexpected behavior.
-          console.warn(
-            "Could not find current episode in season details. Auto-play cancelled."
-          );
-          return;
-        }
-
-        if (currentIndex < episodes.length - 1) {
-          // Next episode exists in the current season.
-          const nextEpisode = episodes[currentIndex + 1];
-          this.navigateToEpisode(
-            tvShow.id,
-            currentEp.season_number,
-            nextEpisode.episode_number
-          );
-        } else {
-          // This is the last episode of the current season. Try to find the next season.
-          const currentSeasonIndex = tvShow.seasons.findIndex(
-            (s) => s.season_number === currentEp.season_number
+      .subscribe({
+        next: (seasonDetails) => {
+          const episodes = seasonDetails.episodes || [];
+          const currentIndex = episodes.findIndex(
+            (e) => e.episode_number === currentEp.episode_number
           );
 
-          if (currentSeasonIndex > -1) {
-            // Search for the next season with episodes, skipping empty seasons.
-            for (
-              let i = currentSeasonIndex + 1;
-              i < tvShow.seasons.length;
-              i++
-            ) {
-              const nextSeasonObj = tvShow.seasons[i];
-              // Also check for season_number > 0 to skip "specials" seasons
-              if (
-                nextSeasonObj &&
-                nextSeasonObj.episode_count > 0 &&
-                nextSeasonObj.season_number > 0
-              ) {
-                this.navigateToEpisode(
-                  tvShow.id,
-                  nextSeasonObj.season_number,
-                  1
-                );
-                return; // Found and navigated, so exit.
-              }
-            }
-          }
-          // If no next season/episode is found, try to move to next item in
-          // the playlist (if playing from a playlist). Otherwise end of
-          // series — do nothing.
-          const playlistId = this.playlist()?.id;
-          if (playlistId) {
-            const nextItem = this.playlistService.getNextItemFromPlaylist(
-              playlistId,
-              tvShow.id
+          if (currentIndex === -1) {
+            // Failsafe: if current episode not found, maybe it was removed.
+            // Don't auto-play to avoid unexpected behavior.
+            console.warn(
+              "Could not find current episode in season details. Auto-play cancelled."
             );
-            if (nextItem) {
-              this.navigationService.navigateTo("watch", {
-                mediaType: nextItem.media_type,
-                id: nextItem.id,
-                playlistId: playlistId,
-                autoplay: true,
-              });
+            this.playerService.unlockAutoNext();
+            return;
+          }
+
+          if (currentIndex < episodes.length - 1) {
+            // Next episode exists in the current season.
+            const nextEpisode = episodes[currentIndex + 1];
+            this.navigateToEpisode(
+              tvShow.id,
+              currentEp.season_number,
+              nextEpisode.episode_number
+            );
+            // Navigation will trigger cleanup that unlocks auto-next
+          } else {
+            // This is the last episode of the current season. Try to find the next season.
+            const currentSeasonIndex = tvShow.seasons.findIndex(
+              (s) => s.season_number === currentEp.season_number
+            );
+
+            if (currentSeasonIndex > -1) {
+              // Search for the next season with episodes, skipping empty seasons.
+              let foundNextSeason = false;
+              for (
+                let i = currentSeasonIndex + 1;
+                i < tvShow.seasons.length;
+                i++
+              ) {
+                const nextSeasonObj = tvShow.seasons[i];
+                // Also check for season_number > 0 to skip "specials" seasons
+                if (
+                  nextSeasonObj &&
+                  nextSeasonObj.episode_count > 0 &&
+                  nextSeasonObj.season_number > 0
+                ) {
+                  this.navigateToEpisode(
+                    tvShow.id,
+                    nextSeasonObj.season_number,
+                    1
+                  );
+                  foundNextSeason = true;
+                  // Navigation will trigger cleanup that unlocks auto-next
+                  return; // Found and navigated, so exit.
+                }
+              }
+              
+              if (!foundNextSeason) {
+                // No next season found, try playlist
+                this.tryPlayNextAfterSeriesEnd(tvShow);
+              }
+            } else {
+              // Could not find current season, try playlist
+              this.tryPlayNextAfterSeriesEnd(tvShow);
             }
           }
+        },
+        error: (err) => {
+          console.error('Failed to fetch season details for auto-next:', err);
+          this.playerService.unlockAutoNext();
         }
       });
+  }
+
+  /**
+   * Helper to try playing next playlist item after series ends
+   * Unlocks auto-next if no playlist item found
+   */
+  private tryPlayNextAfterSeriesEnd(tvShow: TvShowDetails): void {
+    const playlistId = this.playlist()?.id;
+    if (playlistId) {
+      const nextItem = this.playlistService.getNextItemFromPlaylist(
+        playlistId,
+        tvShow.id
+      );
+      if (nextItem) {
+        this.navigationService.navigateTo("watch", {
+          mediaType: nextItem.media_type,
+          id: nextItem.id,
+          playlistId: playlistId,
+          autoplay: true,
+        });
+        // Navigation will trigger cleanup that unlocks auto-next
+        return;
+      }
+    }
+    // No playlist item found, end of series - unlock auto-next
+    this.playerService.unlockAutoNext();
   }
 
   /**

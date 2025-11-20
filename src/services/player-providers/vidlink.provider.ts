@@ -32,7 +32,8 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
       "poster=true",
     ];
 
-    // Auto-next is handled by the application's custom logic, not the provider
+    // Explicitly disable Vidlink's built-in auto-next - we handle it with our custom logic
+    queryParams.push("nextbutton=false");
 
     // Pass explicit autoplay value so providers that default to autoplay
     // when the param is missing are overridden by a user-controlled setting.

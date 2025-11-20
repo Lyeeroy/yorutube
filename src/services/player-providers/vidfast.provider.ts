@@ -45,7 +45,9 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       params.push("autoPlay=false");
       params.push("autoplay=false");
     }
-    // Auto-next is handled by the application's custom logic, not the provider
+    
+    // Explicitly disable VidFast's built-in auto-next - we handle it with our custom logic
+    params.push("autoNext=false");
 
     if (resumeTime && resumeTime > 5) {
       params.push(`startAt=${Math.floor(resumeTime)}`);

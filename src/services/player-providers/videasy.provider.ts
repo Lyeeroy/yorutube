@@ -26,7 +26,8 @@ export class VideasyPlayerProvider implements IPlayerProvider {
       "episodeSelector=true",
     ];
 
-    // Auto-next is handled by the application's custom logic, not the provider
+    // Explicitly disable Videasy's built-in auto-next - we handle it with our custom logic
+    queryParams.push("autoplayNextEpisode=false");
 
     if (resumeTime && resumeTime > 5) {
       queryParams.push(`progress=${Math.floor(resumeTime)}`);
