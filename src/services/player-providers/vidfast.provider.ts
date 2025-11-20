@@ -26,7 +26,7 @@ export class VidfastPlayerProvider implements IPlayerProvider {
   // metadata often, so host-level thresholds should be used to avoid loops.
 
   generateUrl(config: PlayerUrlConfig): string | null {
-    const { media, episode, autoplay, autoNext, resumeTime } = config;
+    const { media, episode, autoplay, resumeTime } = config;
 
     // Default to showing title/poster but don't force autoplay unless
     // explicitly enabled via the config. VidFast treats duplicate query
@@ -45,7 +45,7 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       params.push("autoPlay=false");
       params.push("autoplay=false");
     }
-    if (autoNext) params.push("autoNext=true", "nextButton=true");
+    // Auto-next is handled by the application's custom logic, not the provider
 
     if (resumeTime && resumeTime > 5) {
       params.push(`startAt=${Math.floor(resumeTime)}`);

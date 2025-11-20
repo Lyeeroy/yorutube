@@ -20,7 +20,7 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
   readonly supportsAutoNext = true;
 
   generateUrl(config: PlayerUrlConfig): string | null {
-    const { media, episode, autoplay, autoNext, resumeTime } = config;
+    const { media, episode, autoplay, resumeTime } = config;
 
     const queryParams: string[] = [
       "primaryColor=ff0000",
@@ -32,9 +32,7 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
       "poster=true",
     ];
 
-    if (autoNext) {
-      queryParams.push("nextbutton=true");
-    }
+    // Auto-next is handled by the application's custom logic, not the provider
 
     // Pass explicit autoplay value so providers that default to autoplay
     // when the param is missing are overridden by a user-controlled setting.

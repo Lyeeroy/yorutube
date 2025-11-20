@@ -18,7 +18,7 @@ export class VideasyPlayerProvider implements IPlayerProvider {
   readonly supportsAutoNext = true;
 
   generateUrl(config: PlayerUrlConfig): string | null {
-    const { media, episode, autoplay, autoNext, resumeTime } = config;
+    const { media, episode, autoplay, resumeTime } = config;
 
     const queryParams: string[] = [
       "color=FF0000",
@@ -26,9 +26,7 @@ export class VideasyPlayerProvider implements IPlayerProvider {
       "episodeSelector=true",
     ];
 
-    if (autoNext) {
-      queryParams.push("autoplayNextEpisode=true");
-    }
+    // Auto-next is handled by the application's custom logic, not the provider
 
     if (resumeTime && resumeTime > 5) {
       queryParams.push(`progress=${Math.floor(resumeTime)}`);
