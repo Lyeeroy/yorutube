@@ -47,7 +47,7 @@ export class VidfastPlayerProvider implements IPlayerProvider {
     }
     
     // Explicitly disable VidFast's built-in auto-next - we handle it with our custom logic
-    params.push("autoNext=false");
+    params.push("autoNext=false", "nextButton=false");
 
     if (resumeTime && resumeTime > 5) {
       params.push(`startAt=${Math.floor(resumeTime)}`);
@@ -117,13 +117,26 @@ export class VidfastPlayerProvider implements IPlayerProvider {
       typeof data.duration === "number" &&
       data.duration > 0
     ) {
+      const timeRemaining = data.duration - data.currentTime;
+      // If within 0.5s of end, report 100% to ensure auto-next triggers
+      const progressPercent = timeRemaining < 0.5 ? 100 : (data.currentTime / data.duration) * 100;
+
       result.playbackProgress = {
         currentTime: data.currentTime,
         duration: data.duration,
-        progressPercent: (data.currentTime / data.duration) * 100,
+        progressPercent,
       };
 
       if (data.currentTime > 0) result.playerStarted = true;
+    }
+
+    // Handle ended event explicitly
+    if (data.event === "ended") {
+      result.playbackProgress = {
+        currentTime: data.duration || 0,
+        duration: data.duration || 0,
+        progressPercent: 100,
+      };
     }
 
     // VidFast includes season/episode info in many message types.

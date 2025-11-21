@@ -90,10 +90,23 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
       typeof data.duration === "number" &&
       data.duration > 0
     ) {
+      const timeRemaining = data.duration - data.currentTime;
+      // If within 0.5s of end, report 100% to ensure auto-next triggers
+      const progressPercent = timeRemaining < 0.5 ? 100 : (data.currentTime / data.duration) * 100;
+
       result.playbackProgress = {
         currentTime: data.currentTime,
         duration: data.duration,
-        progressPercent: (data.currentTime / data.duration) * 100,
+        progressPercent,
+      };
+    }
+
+    // Handle ended event explicitly to ensure we hit 100%
+    if (data.event === "ended") {
+      result.playbackProgress = {
+        currentTime: data.duration || 0,
+        duration: data.duration || 0,
+        progressPercent: 100,
       };
     }
 

@@ -64,6 +64,17 @@ interface PlayerEpisodeState {
   ],
   templateUrl: "./video-player.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [
+    `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+    `
+  ]
 })
 export class VideoPlayerComponent implements OnInit, OnDestroy {
   private movieService = inject(MovieService);
@@ -134,6 +145,62 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   
   // Debounce counter for progress updates
   private lastProgressUpdateTime = 0;
+
+  // Auto-next visualization signals
+  autoNextState = signal<"idle" | "counting_down">("idle");
+  autoNextCountdown = signal(3); // 3 seconds countdown
+  private autoNextTimer: any = null;
+
+  // Computed signal to check if there is a next item available
+  hasNextItem = computed(() => {
+    const media = this.selectedMediaItem();
+    if (!media) return false;
+
+    if (media.media_type === "tv") {
+      // For TV shows, check if there is a next episode
+      // We can infer this from the current episode and season details
+      // Ideally we'd have the full season details here, but for now we can rely on
+      // the fact that if we're not at the last episode of the season (or show), there's likely a next one.
+      // A robust check would require fetching season details if not available.
+      // For now, let's assume true for TV shows unless we know it's the finale (which is hard to know without full details).
+      // Optimization: The `continueWatchingManager` handles the logic of finding the next episode.
+      // If we want to be precise, we might need to expose that logic or just assume true for now.
+      // Given the user request "movies do not have episode therefore there is no need for auto next",
+      // sticking to "TV shows always have auto-next candidate" (unless it's the very last one, which we handle gracefully by failing to play) is a safe start.
+      return true; 
+    } else if (media.media_type === "movie") {
+      // For movies, only if in a playlist and not the last item
+      const playlist = this.playlist();
+      const video = this.videoDetails(); // Note: videoDetails might be trailer info, not playlist item info
+      
+      if (!playlist || !playlist.items || playlist.items.length === 0) return false;
+      
+      // We need to find the current index. 
+      // The playlist service/component usually handles this, but we can try to find by ID.
+      const currentIndex = playlist.items.findIndex(item => item.id === media.id);
+      return currentIndex !== -1 && currentIndex < playlist.items.length - 1;
+    }
+    
+    return false;
+  });
+
+  showNextEpisodeButton = computed(() => {
+    // Show button if:
+    // 1. We have a next item
+    // 2. AND (
+    //    a. Auto-next is actively counting down
+    //    b. OR Progress is >= 90% (standard "near end" prompt)
+    //    c. OR Progress met the custom threshold (e.g. user set to 80%)
+    // )
+    const hasNext = this.hasNextItem();
+    const isCountingDown = this.autoNextState() === "counting_down";
+    const progress = this.currentProgressPercent();
+    const threshold = this.playerService.autoNextThreshold();
+
+    return hasNext && (isCountingDown || progress >= 90 || progress >= threshold);
+  });
+
+  private currentProgressPercent = signal(0);
 
   thumbnailUrl = computed<string | null>(() => {
     const media = this.selectedMediaItem();
@@ -235,7 +302,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   });
 
+  // Timestamp when navigation started, used to filter stale events
+  private navigationStartTime = 0;
+
   constructor() {
+    // Update navigation start time when isNavigating becomes true
+    effect(() => {
+      if (this.isNavigating()) {
+        this.navigationStartTime = Date.now();
+      }
+    });
+
     // Update the player URL, but only if we're not skipping the update
     effect(() => {
       const url = this.playerUrl();
@@ -283,6 +360,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.lastKnownPlaybackTime.set(0);
         this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
+        
+        // Reset auto-next state
+        this.currentProgressPercent.set(0);
+        this.clearAutoNextTimer();
+        this.autoNextState.set("idle");
+        
         // Unlock any auto-next if we just navigated to a different media
         this.playerService.unlockAutoNext();
 
@@ -479,6 +562,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.playerMessageRouter.stop();
+    this.clearAutoNextTimer();
   }
 
   // Track last known currentTime to prevent premature episode-change navigation
@@ -493,6 +577,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // reapplied when the user switches providers.
   private initialStartAt = signal<number | undefined>(undefined);
 
+  // Constants for auto-next logic
+  private readonly PLAYBACK_THRESHOLD_SECONDS = 30;
+  private readonly AUTO_NEXT_PRELOAD_PERCENT = 90;
+  private readonly AUTO_NEXT_COMPLETE_PERCENT = 95;
+  private readonly STALE_EVENT_THRESHOLD_MS = 3000;
+  private readonly STALE_EVENT_TIME_DIFF = 10;
+  private readonly SEEK_RESET_THRESHOLD_PERCENT = 10;
+  private readonly MIN_PLAYBACK_FOR_RESET = 5;
+
   private handlePlaybackProgress(
     progressData: {
       currentTime: number;
@@ -503,13 +596,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   ): void {
     const { currentTime, duration, progressPercent } = progressData;
 
+    if (this.isStalePlaybackEvent(currentTime)) {
+      return;
+    }
+
     // Update last known playback time
     if (typeof currentTime === "number" && currentTime > 0) {
       this.lastKnownPlaybackTime.set(currentTime);
 
       // Once we have meaningful playback (>5s), clear the navigation flag
       // This allows episode change detection to work for auto-next
-      if (currentTime >= 5 && this.isNavigating()) {
+      if (currentTime >= this.MIN_PLAYBACK_FOR_RESET && this.isNavigating()) {
         this.isNavigating.set(false);
       }
     }
@@ -534,8 +631,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.playbackProgressService.updateProgress(progressId, playbackData);
     }
 
-    // Add to history after significant playback (30 seconds or 5% progress)
-    if (!this.historyAdded() && (currentTime > 30 || progressPercent > 5)) {
+    // Add to history after significant playback
+    if (!this.historyAdded() && (currentTime > this.PLAYBACK_THRESHOLD_SECONDS || progressPercent > 5)) {
       this.historyService.addToHistory(
         media,
         this.currentEpisode() || undefined
@@ -544,17 +641,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     // Update continue watching list based on current progress
-    if (progressPercent >= 5 && progressPercent < 95) {
+    if (progressPercent >= 5 && progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT) {
       const continueWatchingItem: Omit<ContinueWatchingItem, "updatedAt"> = {
         id: media.id,
         media: media,
         episode: episode || undefined,
       };
       this.continueWatchingService.addItem(continueWatchingItem);
-    } else if (progressPercent >= 95) {
-      // When playback completes, handle movies and TV shows differently.
-      // Movies: remove from continue watching.
-      // TV: place the next episode (or remove if this was the final episode).
+    } else if (progressPercent >= this.AUTO_NEXT_COMPLETE_PERCENT) {
       this.continueWatchingManager.handleCompletePlayback(
         media,
         this.currentEpisode(),
@@ -562,14 +656,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       );
     }
 
-    // If the user has mostly finished a TV episode, proactively recommend the next
-    // episode in Continue Watching. We mark this once per media playback to avoid
-    // spamming the board with repeated writes.
+    // Update signal for UI
+    this.currentProgressPercent.set(progressPercent);
+
+    // Proactively recommend next episode
     if (
       media.media_type === "tv" &&
       !this.recommendedNextEpisodeSent() &&
-      progressPercent >= 90 &&
-      progressPercent < 95
+      progressPercent >= this.AUTO_NEXT_PRELOAD_PERCENT &&
+      progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT
     ) {
       this.recommendedNextEpisodeSent.set(true);
       this.continueWatchingManager.maybeRecommendNextEpisode(
@@ -579,44 +674,69 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       );
     }
 
-    // Auto-play next when playback completes.
-    // For TV shows, prefer sequential episode progression; for movies,
-    // jump to the next playlist item (if present). We only trigger for
-    // providers that support auto-next to avoid duplicates for providers
-    // that perform their own in-player navigation.
+    this.checkAndTriggerAutoNext(progressPercent, currentTime, media);
+  }
+
+  /**
+   * Checks if a playback event is stale (from previous episode during navigation).
+   */
+  private isStalePlaybackEvent(currentTime: number): boolean {
+    if (this.isNavigating()) {
+      const startAt = this.initialStartAt() || 0;
+      const timeSinceNav = Date.now() - this.navigationStartTime;
+      const isTimeMismatch = Math.abs(currentTime - startAt) > this.STALE_EVENT_TIME_DIFF;
+      
+      // Filter out stale events occurring shortly after navigation start
+      if (timeSinceNav < this.STALE_EVENT_THRESHOLD_MS && isTimeMismatch) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Checks conditions and triggers auto-next if met.
+   */
+  private checkAndTriggerAutoNext(
+    progressPercent: number,
+    currentTime: number,
+    media: MovieDetails | TvShowDetails
+  ): void {
     const provider = this.playerProviderService.getProvider(
       this.selectedPlayer()
     );
 
+    const autoNextEnabled = this.playerService.autoNextEnabled();
+    const playerHasStarted = this.playerHasStarted();
+    const autoPlayNextTriggered = this.autoPlayNextTriggered();
+    const hasNextItem = this.hasNextItem();
+    const threshold = this.playerService.autoNextThreshold();
+    const thresholdMet = progressPercent >= threshold;
+
+    // Reset auto-next trigger if user seeks back significantly
+    // Guard against glitches where progress might briefly drop to 0
+    if (
+      this.autoPlayNextTriggered() && 
+      progressPercent > 0 && 
+      currentTime > this.MIN_PLAYBACK_FOR_RESET && 
+      progressPercent < threshold - this.SEEK_RESET_THRESHOLD_PERCENT
+    ) {
+      this.autoPlayNextTriggered.set(false);
+    }
+
     if (
       provider?.supportsAutoNext &&
-      this.playerService.autoNextEnabled() &&
-      this.playerHasStarted() &&
-      !this.autoPlayNextTriggered() &&
-      this.playerService.tryLockAutoNext() &&
-      // Require meaningful playback time to avoid false triggers from initial duration weirdness
-      currentTime > 30 &&
-      // Use a threshold to catch end of video reliably for players that don't send an 'ended' event
-      // Allow user to change the threshold via PlayerService; default 100% maps to 99.5
-      (() => {
-        const threshold = this.playerService.autoNextThreshold();
-        const effective = threshold === 100 ? 99.5 : threshold;
-        return progressPercent >= effective;
-      })()
+      autoNextEnabled &&
+      playerHasStarted &&
+      !autoPlayNextTriggered &&
+      hasNextItem &&
+      !this.isNavigating() &&
+      currentTime > this.PLAYBACK_THRESHOLD_SECONDS &&
+      thresholdMet &&
+      this.playerService.tryLockAutoNext()
     ) {
-      // If media is TV show — advance to next episode if any, else try playlist
-      // If media is a movie — try playlist next item.
       this.autoPlayNextTriggered.set(true);
-      if (media.media_type === "tv") {
-        this.playNextEpisode(media as TvShowDetails);
-      } else if (media.media_type === "movie") {
-        const didNavigate = this.tryPlayNextPlaylistItem(media as MovieDetails);
-        if (!didNavigate) {
-          // No playlist next item — nothing to do. Unlock the auto-next lock to
-          // allow other events to proceed.
-          this.playerService.unlockAutoNext();
-        }
-      }
+      this.startAutoNextCountdown(media);
     }
   }
 
@@ -770,6 +890,64 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             this.autoPlayNextTriggered.set(false);
           }
         });
+    }
+  }
+
+  private startAutoNextCountdown(media: MovieDetails | TvShowDetails): void {
+    this.autoNextState.set("counting_down");
+    this.autoNextCountdown.set(3);
+
+    this.autoNextTimer = setInterval(() => {
+      const current = this.autoNextCountdown();
+      if (current <= 0) {
+        this.executeAutoNext(media);
+      } else {
+        this.autoNextCountdown.set(current - 1);
+      }
+    }, 1000);
+  }
+
+  private executeAutoNext(media: MovieDetails | TvShowDetails): void {
+    this.clearAutoNextTimer();
+    this.autoNextState.set("idle");
+
+    if (media.media_type === "tv") {
+      this.playNextEpisode(media as TvShowDetails);
+    } else if (media.media_type === "movie") {
+      const didNavigate = this.tryPlayNextPlaylistItem(media as MovieDetails);
+      if (!didNavigate) {
+        this.playerService.unlockAutoNext();
+      }
+    }
+  }
+
+  onNextEpisodeClick(): void {
+    const media = this.selectedMediaItem();
+    if (!media) return;
+
+    // If countdown is active, clear it and execute immediately
+    if (this.autoNextState() === "counting_down") {
+      this.clearAutoNextTimer();
+    }
+    
+    // Lock if not already locked (manual click should also prevent other auto-events)
+    this.playerService.tryLockAutoNext();
+    this.executeAutoNext(media);
+  }
+
+  cancelAutoNext(): void {
+    this.clearAutoNextTimer();
+    this.autoNextState.set("idle");
+    // Do NOT reset autoPlayNextTriggered here, otherwise it will immediately re-trigger
+    // if the video is still playing and past the threshold.
+    // this.autoPlayNextTriggered.set(false); 
+    this.playerService.unlockAutoNext();
+  }
+
+  private clearAutoNextTimer(): void {
+    if (this.autoNextTimer) {
+      clearInterval(this.autoNextTimer);
+      this.autoNextTimer = null;
     }
   }
 
