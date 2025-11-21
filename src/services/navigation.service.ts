@@ -66,7 +66,7 @@ export class NavigationService {
           qp.set("v", this.encodeWatchId(params));
         else if (params?.id) qp.set("v", String(params.id)); // backward compat
         if (params?.playlistId) qp.set("list", String(params.playlistId));
-        if (params?.autoplay) qp.set("autoplay", "1");
+
         if (params?.startAt && params.startAt > 0)
           qp.set("startAt", String(params.startAt));
         const q = qp.toString();
