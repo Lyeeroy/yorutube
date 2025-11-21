@@ -14,7 +14,9 @@
         <h3 class="text-white font-semibold text-xl md:text-2xl leading-snug group-hover:text-red-500 transition-colors" [title]="channel().name">
           {{ channel().name }}
         </h3>
-        <p class="text-sm text-zinc-400 mt-2">Channel • 1.2M subscribers</p>
+        <p class="text-sm text-zinc-400 mt-2">
+          Channel@if (channel().origin_country) { • {{ channel().origin_country }} }
+        </p>
       </div>
       <div class="mt-4 sm:mt-0">
         <button 
