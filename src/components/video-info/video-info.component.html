@@ -140,103 +140,134 @@
         @if (showMoreOptionsMenu()) {
         <div
           (click)="$event.stopPropagation()"
-          class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
+          class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1 overflow-hidden"
         >
-          @if (videoDetails()) {
-          <button
-            (click)="onWatchTrailerClick()"
-            class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-          >
-            <span class="material-symbols-outlined text-xl">play_arrow</span>
-            <span>Watch Trailer</span>
-          </button>
-          }
-          <div class="w-full">
+          <!-- PLAYBACK CONTROLS GROUP -->
+          <div class="py-1">
+            <div class="w-full">
+              <button
+                (click)="toggleAutoNextThreshold($event)"
+                class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+              >
+                <div class="flex items-center space-x-3">
+                  <span class="material-symbols-outlined text-xl">skip_next</span>
+                  <span>Auto Next</span>
+                  @if (autoNextEnabled()) {
+                  <span
+                    class="material-symbols-outlined text-base transition-transform"
+                    [class.rotate-180]="showAutoNextThreshold()"
+                    >expand_more</span
+                  >
+                  }
+                </div>
+                <!-- Toggle Switch UI -->
+                <div
+                  (click)="$event.stopPropagation(); toggleAutoNext()"
+                  class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+                  [class.bg-red-600]="autoNextEnabled()"
+                  [class.bg-zinc-600]="!autoNextEnabled()"
+                >
+                  <span
+                    class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+                    [class.translate-x-6]="autoNextEnabled()"
+                    [class.translate-x-1]="!autoNextEnabled()"
+                  ></span>
+                </div>
+              </button>
+              @if (autoNextEnabled() && showAutoNextThreshold()) {
+              <div class="w-full px-3 py-3 text-sm text-left text-zinc-200 bg-zinc-800/50">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs text-zinc-400">Play next at</span>
+                  <span class="text-xs text-zinc-200"
+                    >{{ autoNextThreshold() }}%</span
+                  >
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  [value]="autoNextThreshold()"
+                  (input)="setAutoNextThreshold($any($event.target).value)"
+                  class="w-full h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer"
+                  style="accent-color: #dc2626"
+                />
+              </div>
+              }
+            </div>
             <button
-              (click)="toggleAutoNextThreshold($event)"
+              (click)="toggleNextButton()"
               class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
             >
               <div class="flex items-center space-x-3">
                 <span class="material-symbols-outlined text-xl">skip_next</span>
-                <span>Auto Next</span>
-                @if (autoNextEnabled()) {
-                <span
-                  class="material-symbols-outlined text-base transition-transform"
-                  [class.rotate-180]="showAutoNextThreshold()"
-                  >expand_more</span
-                >
-                }
+                <span>Next Button</span>
               </div>
               <!-- Toggle Switch UI -->
               <div
-                (click)="$event.stopPropagation(); toggleAutoNext()"
                 class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
-                [class.bg-red-600]="autoNextEnabled()"
-                [class.bg-zinc-600]="!autoNextEnabled()"
+                [class.bg-red-600]="nextButtonEnabled()"
+                [class.bg-zinc-600]="!nextButtonEnabled()"
               >
                 <span
                   class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
-                  [class.translate-x-6]="autoNextEnabled()"
-                  [class.translate-x-1]="!autoNextEnabled()"
+                  [class.translate-x-6]="nextButtonEnabled()"
+                  [class.translate-x-1]="!nextButtonEnabled()"
                 ></span>
               </div>
             </button>
-            @if (autoNextEnabled() && showAutoNextThreshold()) {
-            <div class="w-full px-3 py-3 text-sm text-left text-zinc-200">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs text-zinc-400">Play next at</span>
-                <span class="text-xs text-zinc-200"
-                  >{{ autoNextThreshold() }}%</span
-                >
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                [value]="autoNextThreshold()"
-                (input)="setAutoNextThreshold($any($event.target).value)"
-                class="w-full h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer"
-                style="accent-color: #dc2626"
-              />
-            </div>
-            }
-          </div>
-          <button
-            (click)="toggleAutoplay()"
-            class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-          >
-            <div class="flex items-center space-x-3">
-              <span class="material-symbols-outlined text-xl">play_arrow</span>
-              <span>Autoplay</span>
-            </div>
-            <!-- Toggle Switch UI -->
-            <div
-              class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
-              [class.bg-red-600]="autoplayEnabled()"
-              [class.bg-zinc-600]="!autoplayEnabled()"
+            <button
+              (click)="toggleAutoplay()"
+              class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
             >
-              <span
-                class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
-                [class.translate-x-6]="autoplayEnabled()"
-                [class.translate-x-1]="!autoplayEnabled()"
-              ></span>
-            </div>
-          </button>
-          <button
-            (click)="onRefreshPlayerClick()"
-            class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-          >
-            <span class="material-symbols-outlined text-xl">refresh</span>
-            <span>Refresh Player</span>
-          </button>
-          <button
-            class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-            (click)="shareMedia()"
-          >
-            <span class="material-symbols-outlined text-xl">share</span>
-            <span>Share</span>
-          </button>
+              <div class="flex items-center space-x-3">
+                <span class="material-symbols-outlined text-xl">play_circle</span>
+                <span>Autoplay</span>
+              </div>
+              <!-- Toggle Switch UI -->
+              <div
+                class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+                [class.bg-red-600]="autoplayEnabled()"
+                [class.bg-zinc-600]="!autoplayEnabled()"
+              >
+                <span
+                  class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+                  [class.translate-x-6]="autoplayEnabled()"
+                  [class.translate-x-1]="!autoplayEnabled()"
+                ></span>
+              </div>
+            </button>
+          </div>
+
+          <!-- SEPARATOR -->
+          <div class="border-t border-zinc-700 my-1"></div>
+
+          <!-- ACTIONS GROUP -->
+          <div class="py-1">
+            @if (videoDetails()) {
+            <button
+              (click)="onWatchTrailerClick()"
+              class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+            >
+              <span class="material-symbols-outlined text-xl">movie</span>
+              <span>Watch Trailer</span>
+            </button>
+            }
+            <button
+              class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+              (click)="shareMedia()"
+            >
+              <span class="material-symbols-outlined text-xl">share</span>
+              <span>Share</span>
+            </button>
+            <button
+              (click)="onRefreshPlayerClick()"
+              class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+            >
+              <span class="material-symbols-outlined text-xl">refresh</span>
+              <span>Refresh Player</span>
+            </button>
+          </div>
         </div>
         }
       </div>

@@ -149,6 +149,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Auto-next visualization signals
   autoNextState = signal<"idle" | "counting_down">("idle");
   autoNextCountdown = signal(3); // 3 seconds countdown
+  currentProgressPercent = signal(0);
   private autoNextTimer: any = null;
 
   // Computed signal to check if there is a next item available
@@ -185,24 +186,23 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   });
 
   showNextEpisodeButton = computed(() => {
-    // Show button if:
-    // 1. We have a next item
-    // 2. AND (
-    //    a. Auto-next is actively counting down
-    //    b. OR Progress is >= 90% (standard "near end" prompt)
-    //    c. OR Progress met the custom threshold (e.g. user set to 80%)
-    // )
-    const hasNext = this.hasNextItem();
-    const isCountingDown = this.autoNextState() === "counting_down";
     const progress = this.currentProgressPercent();
-    const threshold = this.playerService.autoNextThreshold();
-
-    return hasNext && (isCountingDown || progress >= 90 || progress >= threshold);
+    const isCountingDown = this.autoNextState() === "counting_down";
+    const hasNext = this.hasNextItem();
+    const isNavigating = this.isNavigating();
+    const nextButtonEnabled = this.playerService.nextButtonEnabled();
+    
+    // Show if:
+    // 1. Next button setting is ENABLED
+    // 2. We have a next item
+    // 3. We are NOT currently navigating
+    // 4. AND either:
+    //    a. Progress is > 90% (pre-show button)
+    //    b. OR we are actively counting down (auto-next triggered)
+    return nextButtonEnabled && hasNext && !isNavigating && (progress >= 90 || isCountingDown);
   });
 
-  private currentProgressPercent = signal(0);
-
-  thumbnailUrl = computed<string | null>(() => {
+  backdropUrl = computed(() => {
     const media = this.selectedMediaItem();
     return media?.backdrop_path
       ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`

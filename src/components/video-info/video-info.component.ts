@@ -84,6 +84,7 @@ export class VideoInfoComponent {
   autoNextEnabled = this.playerService.autoNextEnabled;
   autoNextThreshold = this.playerService.autoNextThreshold;
   autoplayEnabled = this.playerService.autoplayEnabled;
+  nextButtonEnabled = this.playerService.nextButtonEnabled;
   availablePlayers = this.playerService.players;
 
   // Media type-specific details derived from input
@@ -365,6 +366,10 @@ export class VideoInfoComponent {
 
   toggleAutoplay(): void {
     this.playerService.toggleAutoplay();
+  }
+
+  toggleNextButton(): void {
+    this.playerService.toggleNextButton();
   }
 
   onRefreshPlayerClick(): void {

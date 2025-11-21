@@ -11,6 +11,7 @@ const PLAYER_STORAGE_KEY = "yorutube-player";
 const AUTO_NEXT_STORAGE_KEY = "yorutube-auto-next";
 const AUTOPLAY_STORAGE_KEY = "yorutube-autoplay";
 const AUTO_NEXT_THRESHOLD_KEY = "yorutube-auto-next-threshold";
+const NEXT_BUTTON_STORAGE_KEY = "yorutube-next-button";
 
 @Injectable({
   providedIn: "root",
@@ -33,6 +34,9 @@ export class PlayerService {
   // Default to enabled so new users get autoplay as a sane default; stored
   // preference (localStorage) will still override if present.
   autoplayEnabled = signal<boolean>(true);
+  // Toggle for the "Next Episode" button overlay visibility
+  nextButtonEnabled = signal<boolean>(true);
+  
   // Lock to prevent duplicate auto-next navigations (progress vs player events)
   private autoNextLock = signal(false);
   private autoNextLockTimeoutId: any | null = null;
@@ -60,6 +64,10 @@ export class PlayerService {
       if (storedAutoplay !== null) {
         this.autoplayEnabled.set(storedAutoplay === "true");
       }
+      const storedNextButton = localStorage.getItem(NEXT_BUTTON_STORAGE_KEY);
+      if (storedNextButton !== null) {
+        this.nextButtonEnabled.set(storedNextButton === "true");
+      }
       const storedAutoNextThreshold = localStorage.getItem(
         AUTO_NEXT_THRESHOLD_KEY
       );
@@ -84,6 +92,10 @@ export class PlayerService {
         String(this.autoplayEnabled())
       );
       localStorage.setItem(
+        NEXT_BUTTON_STORAGE_KEY,
+        String(this.nextButtonEnabled())
+      );
+      localStorage.setItem(
         AUTO_NEXT_THRESHOLD_KEY,
         String(this.autoNextThreshold())
       );
@@ -100,6 +112,10 @@ export class PlayerService {
 
   toggleAutoplay(): void {
     this.autoplayEnabled.update((v) => !v);
+  }
+
+  toggleNextButton(): void {
+    this.nextButtonEnabled.update((v) => !v);
   }
 
   setAutoNextThreshold(value: number): void {
