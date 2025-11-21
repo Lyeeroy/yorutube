@@ -123,6 +123,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private isNavigating = signal(false);
 
   private constructedPlayerUrl = signal<string>("about:blank");
+  
+  // Track if we are currently reloading the player (forcing a blank state)
+  private reloading = signal(false);
 
   // Track if auto-play next has been triggered for current episode
   private autoPlayNextTriggered = signal(false);
@@ -316,6 +319,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Update the player URL, but only if we're not skipping the update
     effect(() => {
       const url = this.playerUrl();
+      const reloading = this.reloading();
+
+      if (reloading) return;
+
       if (url && !this.skipNextPlayerUpdate()) {
         this.constructedPlayerUrl.set(url);
       } else if (this.skipNextPlayerUpdate()) {
@@ -383,7 +390,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       // Only blank the iframe when we're actually changing media content
       if (shouldReloadPlayer && isActualMediaChange) {
+        this.reloading.set(true);
         this.constructedPlayerUrl.set("about:blank");
+        // Force a small delay to ensure the iframe actually unloads/resets on all devices (especially iPad)
+        setTimeout(() => {
+          this.reloading.set(false);
+        }, 100);
       }
 
       this.videoDetails.set(null);
