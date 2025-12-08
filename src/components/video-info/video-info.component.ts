@@ -28,6 +28,7 @@ import { WatchlistService } from "../../services/watchlist.service";
 import { NavigationService } from "../../services/navigation.service";
 import { AddToPlaylistModalComponent } from "../add-to-playlist-modal/add-to-playlist-modal.component";
 import { ShareModalComponent } from "../share-modal/share-modal.component";
+import { MediaDetailModalComponent } from "../media-detail-modal/media-detail-modal.component";
 import { PlaylistService } from "../../services/playlist.service";
 import { PlayerService, PlayerType } from "../../services/player.service";
 import { EpisodeSelectorComponent } from "../episode-selector/episode-selector.component";
@@ -47,6 +48,7 @@ const isTvShowDetails = (
     NgOptimizedImage,
     AddToPlaylistModalComponent,
     ShareModalComponent,
+    MediaDetailModalComponent,
     EpisodeSelectorComponent,
   ],
   templateUrl: "./video-info.component.html",
@@ -61,6 +63,7 @@ export class VideoInfoComponent {
   currentTime = input<number>(0);
   episodeSelected = output<{ episode: Episode; seasonNumber: number }>();
   refreshPlayer = output<void>();
+  maximizePlayerOutput = output<void>();
 
   // Injected Services
   private movieService = inject(MovieService);
@@ -75,6 +78,7 @@ export class VideoInfoComponent {
   descriptionExpanded = signal(false);
   showPlaylistModal = signal(false);
   showShareModal = signal(false);
+  showDetailsModal = signal(false);
   showMoreOptionsMenu = signal(false);
   showSourcesDropdown = signal(false);
   showAutoNextThreshold = signal(false);
@@ -282,8 +286,17 @@ export class VideoInfoComponent {
 
   @HostListener("document:click", ["$event"])
   onDocumentClick(event: MouseEvent): void {
-    if (!this.elementRef.nativeElement.contains(event.target)) {
+    const target = event.target as HTMLElement;
+    
+    // Check if click is outside the more options menu and its button
+    const clickedInsideMoreOptions = target.closest('.more-options-menu') || target.closest('.more-options-button');
+    if (!clickedInsideMoreOptions && this.showMoreOptionsMenu()) {
       this.showMoreOptionsMenu.set(false);
+    }
+    
+    // Check if click is outside the sources dropdown and its button
+    const clickedInsideSources = target.closest('.sources-dropdown') || target.closest('.sources-button');
+    if (!clickedInsideSources && this.showSourcesDropdown()) {
       this.showSourcesDropdown.set(false);
     }
   }
@@ -381,5 +394,15 @@ export class VideoInfoComponent {
     this.navigationService.navigateTo("collection-detail", {
       id: collection.id,
     });
+  }
+
+  openDetailsModal(): void {
+    this.showDetailsModal.set(true);
+    this.showMoreOptionsMenu.set(false);
+  }
+
+  maximizePlayer(): void {
+    this.maximizePlayerOutput.emit();
+    this.showMoreOptionsMenu.set(false);
   }
 }

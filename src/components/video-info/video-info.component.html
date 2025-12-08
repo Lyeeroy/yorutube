@@ -71,7 +71,7 @@
       <div class="relative">
         <button
           (click)="toggleSourcesDropdown($event)"
-          class="h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+          class="sources-button h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
         >
           <span class="material-symbols-outlined text-xl">play_circle</span>
           <span class="hidden md:inline">Sources</span>
@@ -84,7 +84,7 @@
         @if (showSourcesDropdown()) {
         <div
           (click)="$event.stopPropagation()"
-          class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
+          class="sources-dropdown absolute top-full left-0 md:right-0 md:left-auto mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
         >
           @for (player of availablePlayers(); track player) {
           <button
@@ -132,7 +132,7 @@
       <div class="relative">
         <button
           (click)="toggleMoreOptionsMenu($event)"
-          class="flex items-center justify-center w-10 h-10 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+          class="more-options-button flex items-center justify-center w-10 h-10 bg-zinc-800 hover:bg-zinc-700 rounded-full"
         >
           <span class="material-symbols-outlined text-xl">more_vert</span>
         </button>
@@ -140,7 +140,7 @@
         @if (showMoreOptionsMenu()) {
         <div
           (click)="$event.stopPropagation()"
-          class="absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1 overflow-hidden"
+          class="more-options-menu absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1 overflow-hidden"
         >
           <!-- PLAYBACK CONTROLS GROUP -->
           <div class="py-1">
@@ -246,31 +246,38 @@
           <!-- SEPARATOR -->
           <div class="border-t border-zinc-700 my-1"></div>
 
-          <!-- ACTIONS GROUP -->
-          <div class="py-1">
-            @if (videoDetails()) {
-            <button
-              (click)="onWatchTrailerClick()"
-              class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-            >
-              <span class="material-symbols-outlined text-xl">movie</span>
-              <span>Watch Trailer</span>
-            </button>
-            }
-            <button
-              class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-              (click)="shareMedia()"
-            >
-              <span class="material-symbols-outlined text-xl">share</span>
-              <span>Share</span>
-            </button>
-            <button
-              (click)="onRefreshPlayerClick()"
-              class="w-full flex items-center space-x-3 px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-            >
-              <span class="material-symbols-outlined text-xl">refresh</span>
-              <span>Refresh Player</span>
-            </button>
+          <!-- ACTIONS GROUP - HORIZONTAL ICON BUTTONS -->
+          <div class="py-2 px-3">
+            <div class="flex items-center justify-between space-x-2">
+              <button
+                (click)="shareMedia()"
+                class="flex-1 flex items-center justify-center p-2 rounded-lg hover:bg-zinc-600 transition-colors"
+                title="Share"
+              >
+                <span class="material-symbols-outlined text-xl">share</span>
+              </button>
+              <button
+                (click)="onRefreshPlayerClick()"
+                class="flex-1 flex items-center justify-center p-2 rounded-lg hover:bg-zinc-600 transition-colors"
+                title="Refresh Player"
+              >
+                <span class="material-symbols-outlined text-xl">refresh</span>
+              </button>
+              <button
+                (click)="maximizePlayer()"
+                class="flex-1 flex items-center justify-center p-2 rounded-lg  hover:bg-zinc-600 transition-colors"
+                title="Maximize"
+              >
+                <span class="material-symbols-outlined text-xl">fullscreen</span>
+              </button>
+              <button
+                (click)="openDetailsModal()"
+                class="flex-1 flex items-center justify-center p-2 rounded-lg hover:bg-zinc-600 transition-colors"
+                title="Details"
+              >
+                <span class="material-symbols-outlined text-xl">info</span>
+              </button>
+            </div>
           </div>
         </div>
         }
@@ -372,6 +379,11 @@
     [currentEpisode]="currentEpisode()"
     [currentTime]="currentTime()"
     (close)="showShareModal.set(false)"
+  />
+  } @if (showDetailsModal()) {
+  <app-media-detail-modal
+    [media]="media()"
+    (close)="showDetailsModal.set(false)"
   />
   }
 </div>

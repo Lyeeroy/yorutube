@@ -11,6 +11,7 @@ import {
   OnInit,
   OnDestroy,
   untracked,
+  HostListener,
 } from "@angular/core";
 import {
   MediaType,
@@ -98,6 +99,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   selectedMediaItem = signal<MovieDetails | TvShowDetails | null>(null);
   videoDetails = signal<Video | null>(null);
   loadingTrailer = signal(true);
+  isMaximized = signal(false);
   currentEpisode = signal<Episode | null>(null);
 
   playlist = computed(() => {
@@ -1304,5 +1306,29 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       episode: currentParams?.episode,
       // playlistId is omitted
     });
+  }
+
+  onMaximizePlayer(): void {
+    this.isMaximized.set(true);
+  }
+
+  closeMaximize(): void {
+    this.isMaximized.set(false);
+  }
+
+  onMaximizeBackdropClick(event: MouseEvent): void {
+    // Close if clicking the backdrop (not the iframe)
+    const target = event.target as HTMLElement;
+    if (target.classList.contains('fixed')) {
+      this.closeMaximize();
+    }
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscapeKey(event: KeyboardEvent): void {
+    if (this.isMaximized()) {
+      this.closeMaximize();
+      event.preventDefault();
+    }
   }
 }
