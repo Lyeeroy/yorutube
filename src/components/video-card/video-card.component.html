@@ -38,8 +38,10 @@
     <!-- OPTIMIZATION: Opacity/Hover logic moved to parent container to keep buttons in sync -->
     <!-- LOGIC ADDED: `|| menuStyle()` keeps buttons visible when menu is open -->
     <div
-      class="absolute right-1 top-1 z-10 flex flex-col space-y-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+      class="absolute right-1 top-1 z-10 flex flex-col space-y-1 transition-opacity duration-200"
+      [class.opacity-0]="!tapRevealed() && !menuStyle()"
       [class.opacity-100]="tapRevealed() || menuStyle()"
+      [class.group-hover:opacity-100]="!isTouch"
     >
       <button
         (click)="toggleWatchlist($event)"
@@ -108,9 +110,11 @@
         <!-- LOGIC ADDED: `|| menuStyle()` keeps this button visible when menu is open -->
         <button
           (click)="toggleOptionsMenu($event)"
-          class="absolute -right-1 top-0 -mr-1 shrink-0 px-1 py-0 text-zinc-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+          class="absolute -right-1 top-0 -mr-1 shrink-0 px-1 py-0 text-zinc-400 transition-opacity hover:text-white"
           title="More options"
+          [class.opacity-0]="!tapRevealed() && !menuStyle()"
           [class.opacity-100]="tapRevealed() || menuStyle()"
+          [class.group-hover:opacity-100]="!isTouch"
         >
           <span class="material-symbols-outlined">more_vert</span>
         </button>
