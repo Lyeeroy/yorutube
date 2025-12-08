@@ -2,7 +2,8 @@
 <!-- Main Container -->
 <div
   (click)="onCardClick($event)"
-  class="group relative cursor-pointer rounded-xl transition-colors duration-200"
+  class="relative cursor-pointer rounded-xl transition-colors duration-200"
+  [class.group]="!isTouch"
   [ngClass]="containerClasses()"
 >
   <!-- 1. Thumbnail Section -->
