@@ -19,7 +19,7 @@
           class="w-full h-full"
           [src]="safeConstructedPlayerUrl()"
           (load)="onPlayerIframeLoad()"
-          [class.invisible]="loadingTrailer() || !playerUrl()"
+          [class.invisible]="loadingTrailer() || !playerUrl() || iframeLoading()"
           title="Video player"
           frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -41,48 +41,24 @@
           </div>
         }
   
-        @if (loadingTrailer() || !playerUrl()) {
-        <!-- Loading Facade (Thumbnail and Spinner) -->
-        <div class="w-full h-full absolute inset-0">
-          @if(thumbnailUrl(); as thumb) {
-          <img
-            [ngSrc]="thumb"
-            [alt]="media.media_type === 'movie' ? media.title : media.name"
-            class="w-full h-full object-cover"
-            width="1280"
-            height="720"
-            priority
-          />
-          }
-          <div
-            class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"
-          ></div>
-  
-          @if (loadingTrailer()) {
-          <!-- Loading Spinner -->
-          <div
-            class="absolute inset-0 flex items-center justify-center bg-black/50"
-          >
-            <div
-              class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"
-            ></div>
-          </div>
-          } @else if (selectedPlayer() === 'YouTube' && !playerUrl()) {
-          <!-- No Trailer Available Message -->
-          <div
-            class="absolute inset-0 flex items-center justify-center bg-zinc-900/80"
-          >
-            <div class="text-center p-4">
-              <span
-                class="material-symbols-outlined mx-auto text-5xl text-zinc-600"
-              >
-                videocam_off
-              </span>
-              <p class="text-zinc-400 mt-4">No YouTube trailer available.</p>
-            </div>
-          </div>
-          }
-        </div>
+        @if (loadingTrailer() || !playerUrl() || iframeLoading()) {
+        <!-- Skeleton Loading State -->
+@if (loadingTrailer() || iframeLoading()) {
+  <div class="w-full h-full absolute inset-0 bg-zinc-800 animate-pulse">
+    <!-- Optional: Subtle play button placeholder -->
+    
+  </div>
+} @else if (selectedPlayer() === 'YouTube' && !playerUrl()) {
+  <!-- No Trailer Available Message -->
+  <div class="absolute inset-0 flex items-center justify-center bg-zinc-900">
+    <div class="text-center p-4">
+      <span class="material-symbols-outlined mx-auto text-5xl text-zinc-600">
+        videocam_off
+      </span>
+      <p class="text-zinc-400 mt-4">No YouTube trailer available.</p>
+    </div>
+  </div>
+}
         }
         
         <!-- Next Episode Overlay -->

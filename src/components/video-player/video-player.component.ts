@@ -99,6 +99,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   selectedMediaItem = signal<MovieDetails | TvShowDetails | null>(null);
   videoDetails = signal<Video | null>(null);
   loadingTrailer = signal(true);
+  iframeLoading = signal(false);
   isMaximized = signal(false);
   currentEpisode = signal<Episode | null>(null);
 
@@ -326,6 +327,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       if (reloading) return;
 
       if (url && !this.skipNextPlayerUpdate()) {
+        this.iframeLoading.set(true);
         this.constructedPlayerUrl.set(url);
       } else if (this.skipNextPlayerUpdate()) {
         this.skipNextPlayerUpdate.set(false);
@@ -1306,6 +1308,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       episode: currentParams?.episode,
       // playlistId is omitted
     });
+  }
+
+  onPlayerIframeLoad(): void {
+    this.iframeLoading.set(false);
   }
 
   onMaximizePlayer(): void {
