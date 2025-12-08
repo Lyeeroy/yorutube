@@ -1,11 +1,11 @@
-<header class="flex items-center justify-between px-4 h-14 bg-zinc-900 border-b border-zinc-800 shrink-0">
+<header class="flex items-center justify-between px-2 sm:px-4 h-14 bg-zinc-900 border-b border-zinc-800 shrink-0">
   @if (mobileSearchActive()) {
     <!-- Mobile Search View -->
     <div class="flex items-center w-full relative">
-      <button (click)="closeMobileSearch()" class="p-2 rounded-full hover:bg-zinc-800 focus:outline-none">
-        <span class="material-symbols-outlined text-white">arrow_back</span>
+      <button (click)="closeMobileSearch()" class="w-10 h-10 rounded-full hover:bg-zinc-800 focus:outline-none shrink-0 flex items-center justify-center">
+        <span class="material-symbols-outlined text-white text-2xl">arrow_back</span>
       </button>
-      <div class="flex-1 flex items-center h-10 ml-2 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black">
+      <div class="flex-1 flex items-center h-10 ml-1 sm:ml-2 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black">
         <input 
           #searchInput
           type="text" 
@@ -37,11 +37,11 @@
               (click)="onHistorySearch(item)"
               class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm">
               <div class="flex items-center min-w-0">
-                <span class="material-symbols-outlined text-base mr-3 text-zinc-400 shrink-0">history</span>
+                <span class="material-symbols-outlined text-2xl mr-3 text-zinc-400 shrink-0">history</span>
                 <span class="truncate">{{ item }}</span>
               </div>
-              <button (click)="removeHistoryItem($event, item)" class="p-1 rounded-full hover:bg-zinc-600 text-zinc-400 hover:text-white shrink-0">
-                <span class="material-symbols-outlined text-sm">close</span>
+              <button (click)="removeHistoryItem($event, item)" class="w-7 h-7 rounded-full hover:bg-zinc-600 text-zinc-400 hover:text-white shrink-0 flex items-center justify-center">
+                <span class="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
           }
@@ -51,23 +51,23 @@
   } @else {
     <!-- Default Header View -->
     <!-- Left Section -->
-    <div class="flex items-center space-x-2 sm:space-x-4">
-      <button (click)="hamburgerClick.emit()" class="p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-        <span class="material-symbols-outlined text-white">menu</span>
+    <div class="flex items-center space-x-1 sm:space-x-2 lg:space-x-4">
+      <button (click)="hamburgerClick.emit()" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 flex items-center justify-center">
+        <span class="material-symbols-outlined text-white text-2xl">menu</span>
       </button>
-      <button (click)="onLogoClick()" class="flex items-center space-x-2 focus:outline-none">
-        <svg class="h-7 w-auto" viewBox="0 0 120 80">
+      <button (click)="onLogoClick()" class="flex items-center space-x-1 sm:space-x-2 focus:outline-none min-w-0">
+        <svg class="h-6 sm:h-7 w-auto shrink-0" viewBox="0 0 120 80">
           <path class="text-red-600" fill="currentColor" d="M117.5 13.8s-1.4-9.8-5.7-10.8C107.5 2 103.1 2 101.2 2 88.9 1.5 60 1.5 60 1.5s-28.9 0-41.1.4C16.7 2 12.5 2 8.2 3 3.9 4 2.5 13.8 2.5 13.8S1 24.3 1 34.8v10.4c0 10.5 1.5 21 1.5 21s1.4 9.8 5.7 10.8c4.3 1 9.1 1.1 11.2 1.2 13.8.4 40.6.4 40.6.4s28.9 0 41.1-.4c2.2-.1 6.4-.1 10.7-1.1 4.3-1 5.7-10.8 5.7-10.8s1.5-10.5 1.5-21V34.8c0-10.5-1.5-21-1.5-21z"/>
           <path class="text-white" fill="currentColor" d="M48 55.3V24.7L77.3 40 48 55.3z"/>
         </svg>
-        <span class="text-xl sm:text-2xl text-white font-bold tracking-tighter">YoruTube</span>
+        <span class="text-lg sm:text-xl lg:text-2xl text-white font-bold tracking-tighter hidden sm:inline">YoruTube</span>
       </button>
     </div>
 
     <!-- Center Section: Search (hidden on small screens) -->
-    <div class="flex-1 justify-center px-4 lg:px-8 hidden sm:flex">
-      <div class="w-full max-w-xl flex items-center relative">
-        <div class="flex-1 flex items-center h-10 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black">
+    <div class="flex-1 justify-center px-2 md:px-4 lg:px-8 hidden md:flex">
+      <div class="w-full max-w-2xl flex items-center relative">
+        <div class="flex-1 flex items-center h-9 md:h-10 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black">
           <input 
             #searchInput
             type="text" 
@@ -77,18 +77,18 @@
             (keyup.enter)="onSearch()"
             (focus)="historyVisible.set(true)"
             (blur)="closeHistoryWithDelay()"
-            class="w-full h-full bg-transparent pl-5 text-white focus:outline-none rounded-l-3xl"
+            class="w-full h-full bg-transparent pl-3 md:pl-5 text-sm md:text-base text-white focus:outline-none rounded-l-3xl"
           >
           @if (searchQuery()) {
-            <button (click)="clearSearchQuery()" class="p-2 text-zinc-400 hover:text-white">
-              <span class="material-symbols-outlined text-lg">close</span>
+            <button (click)="clearSearchQuery()" class="p-1.5 md:p-2 text-zinc-400 hover:text-white shrink-0">
+              <span class="material-symbols-outlined text-2xl">close</span>
             </button>
           }
           <button 
             (click)="onSearch()"
-            class="h-full bg-zinc-800 hover:bg-zinc-700 text-white px-6 rounded-r-3xl border-l border-zinc-700 flex items-center justify-center"
+            class="h-full bg-zinc-800 hover:bg-zinc-700 text-white px-4 md:px-6 rounded-r-3xl border-l border-zinc-700 flex items-center justify-center shrink-0"
           >
-            <span class="material-symbols-outlined text-zinc-400">search</span>
+            <span class="material-symbols-outlined text-zinc-400 text-2xl">search</span>
           </button>
         </div>
          <!-- Search History Panel -->
@@ -109,27 +109,27 @@
             }
           </div>
         }
-        <button class="ml-4 h-10 w-10 flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none">
-          <span class="material-symbols-outlined text-white">mic</span>
+        <button class="ml-2 md:ml-4 w-9 h-9 md:w-10 md:h-10 hidden lg:flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none shrink-0">
+          <span class="material-symbols-outlined text-white text-2xl">mic</span>
         </button>
       </div>
     </div>
 
     <!-- Right Section -->
-    <div class="flex items-center space-x-2">
-       <button (click)="openMobileSearch()" class="p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white sm:hidden">
-        <span class="material-symbols-outlined text-white">search</span>
+    <div class="flex items-center space-x-1 sm:space-x-2">
+       <button (click)="openMobileSearch()" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white md:hidden shrink-0 flex items-center justify-center">
+        <span class="material-symbols-outlined text-white text-2xl">search</span>
       </button>
-      <button (click)="onHelpClick()" class="hidden sm:flex p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-        <span class="material-symbols-outlined text-white">help</span>
+      <button (click)="onHelpClick()" class="hidden lg:flex w-10 h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 items-center justify-center">
+        <span class="material-symbols-outlined text-white text-2xl">help</span>
       </button>
 
       <!-- Notification Bell -->
-      <div class="relative hidden sm:inline-flex">
-        <button (click)="toggleNotifications($event)" class="relative p-2 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-          <span class="material-symbols-outlined text-white">notifications</span>
+      <div class="relative hidden md:inline-flex">
+        <button (click)="toggleNotifications($event)" class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 flex items-center justify-center">
+          <span class="material-symbols-outlined text-white text-2xl">notifications</span>
           @if (unreadNotificationCount() > 0) {
-            <span class="absolute top-1.5 right-1.5 flex h-4 w-4">
+            <span class="absolute top-1 sm:top-1.5 right-1 sm:right-1.5 flex h-4 w-4">
               <span class="relative inline-flex rounded-full h-4 w-4 bg-red-600 text-white text-xs items-center justify-center font-bold">
                 {{ unreadNotificationCount() > 9 ? '9+' : unreadNotificationCount() }}
               </span>
@@ -139,7 +139,7 @@
       
         <!-- Notification Panel -->
         @if (notificationsVisible()) {
-          <div class="absolute top-full right-0 mt-2 w-96 bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-700">
+          <div class="absolute top-full right-0 mt-2 w-80 sm:w-96 bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-700">
             <div class="flex items-center justify-between p-3 border-b border-zinc-700">
               <h3 class="font-semibold text-white">Notifications</h3>
               @if (unreadNotificationCount() > 0) {
@@ -155,12 +155,12 @@
                   class="flex items-start p-3 hover:bg-zinc-700 cursor-pointer border-b border-zinc-700/50"
                   [class.bg-zinc-700/50]="!notification.isRead">
                   @if (notification.media.poster_path) {
-                    <div class="w-12 h-18 shrink-0 mr-3">
+                    <div class="w-10 h-15 sm:w-12 sm:h-18 shrink-0 mr-2 sm:mr-3">
                       <img [ngSrc]="'https://image.tmdb.org/t/p/w300' + notification.media.poster_path" [alt]="notification.media.media_type === 'movie' ? notification.media.title : notification.media.name" width="90" height="135" class="w-full h-full object-cover rounded">
                     </div>
                   }
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm text-white line-clamp-3">{{ notification.message }}</p>
+                    <p class="text-xs sm:text-sm text-white line-clamp-3">{{ notification.message }}</p>
                     <p class="text-xs text-zinc-400 mt-1">{{ getRelativeTime(notification.timestamp) }} ago</p>
                   </div>
                   @if (!notification.isRead) {
@@ -177,9 +177,9 @@
         }
       </div>
 
-      <button (click)="signInClicked.emit()" class="flex items-center space-x-2 border border-zinc-700 text-white hover:bg-zinc-700 active:bg-zinc-600 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-red-500">
-        <span class="material-symbols-outlined text-xl">account_circle</span>
-        <span>Sign in</span>
+      <button (click)="signInClicked.emit()" class="flex items-center space-x-1 sm:space-x-2 border border-zinc-700 text-white hover:bg-zinc-700 active:bg-zinc-600 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-red-500 shrink-0">
+        <span class="material-symbols-outlined text-2xl">account_circle</span>
+        <span class="hidden sm:inline">Sign in</span>
       </button>
     </div>
   }
