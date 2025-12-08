@@ -23,7 +23,9 @@
     <button
       (click)="scroll('left')"
       aria-label="Scroll left"
-      class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-12 h-12 hidden md:flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 group-hover/slider:opacity-100 focus:opacity-100 focus:outline-none"
+      class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-12 h-12 hidden md:flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 focus:opacity-100 focus:outline-none"
+      [class.group-hover/slider:opacity-100]="!isTouch"
+      [class.opacity-100]="isTouch"
     >
       <span class="material-symbols-outlined">chevron_left</span>
     </button>
@@ -57,7 +59,9 @@
     <button
       (click)="scroll('right')"
       aria-label="Scroll right"
-      class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-12 h-12 hidden md:flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 group-hover/slider:opacity-100 focus:opacity-100 focus:outline-none"
+      class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full w-12 h-12 hidden md:flex items-center justify-center text-white hover:bg-black/80 transition-opacity opacity-0 focus:opacity-100 focus:outline-none"
+      [class.group-hover/slider:opacity-100]="!isTouch"
+      [class.opacity-100]="isTouch"
     >
       <span class="material-symbols-outlined">chevron_right</span>
     </button>

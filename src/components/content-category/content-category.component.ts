@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, ElementRef, inject, OnInit, OnDestroy, DestroyRef, viewChild, effect, AfterViewInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { PLATFORM_ID } from '@angular/core';
 import { fromEvent, Observable } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { VideoCardComponent } from '../video-card/video-card.component';
@@ -40,6 +41,16 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
   private scrollLeft = 0;
   private hasDragged = false;
   isGrabbing = signal(false);
+
+  private platformId = inject(PLATFORM_ID);
+  
+  protected isTouch =
+    isPlatformBrowser(this.platformId) &&
+    (navigator.maxTouchPoints > 0 ||
+      "ontouchstart" in window ||
+      (typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(pointer: coarse)").matches));
 
   constructor() {
     effect(() => {
@@ -137,7 +148,7 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
     }
 
     const element = this.scrollContainer()?.nativeElement;
-    if (!element) return;
+    if (!element || this.isTouch) return;
     
     e.preventDefault(); // Prevent text selection during drag
     

@@ -18,6 +18,7 @@
       width="480"
       height="270"
       class="h-full w-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+      [class.scale-105]="tapRevealed() || menuStyle()"
     />
 
     <div class="absolute inset-0 bg-black/10"></div>
@@ -30,6 +31,7 @@
 
     <span
       class="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-0"
+      [class.opacity-0]="tapRevealed() || menuStyle()"
     >
       {{ isMovie() ? "MOVIE" : "TV SHOW" }}
     </span>
@@ -101,6 +103,7 @@
       <div class="flex items-start justify-between pr-6">
         <h3
           class="line-clamp-2 text-base font-medium leading-snug text-white transition-colors group-hover:text-red-500"
+          [class.text-red-500]="tapRevealed() || menuStyle()"
           [class.text-sm]="layout() === 'list'"
           [title]="mediaTitle()"
         >
