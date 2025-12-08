@@ -181,18 +181,17 @@ export class VideoCardComponent {
         const listeners = [
           this.renderer.listen("window", "scroll", () => this.closeMenus()),
           this.renderer.listen("window", "wheel", () => this.closeMenus()),
-          // Only close on significant touch movement (swipe), not minor touches
+          // Only close on touch movement (swipe)
           this.renderer.listen("window", "touchmove", (e: TouchEvent) => {
-            // Check if it's a real swipe (movement > 10px)
             if (e.touches.length > 0) {
               this.closeMenus();
             }
           }),
-          // Use capture phase to intercept clicks before they reach the card
+          // Close when clicking outside the card
           this.renderer.listen("document", "click", (e: Event) => {
             const target = e.target as HTMLElement;
-            // Don't close if clicking within this card's buttons or content
-            if (!target.closest('.video-card-buttons, .video-card-content')) {
+            // Don't close if clicking within this card component
+            if (!this.elementRef.nativeElement.contains(target)) {
               this.closeMenus();
             }
           }),
