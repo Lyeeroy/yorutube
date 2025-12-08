@@ -117,6 +117,7 @@
           [class.text-sm]="layout() === 'list'"
           [class.line-clamp-2]="layout() === 'grid'"
           [class.line-clamp-1]="layout() === 'list'"
+          [class.sm:line-clamp-2]="layout() === 'list'"
           [title]="mediaTitle()"
         >
           {{ mediaTitle() }}
