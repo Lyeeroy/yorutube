@@ -2,7 +2,9 @@
 <!-- Main Container -->
 <div
   (click)="onCardClick($event)"
-  class="relative cursor-pointer rounded-xl transition-colors duration-200"
+
+  class="relative rounded-xl transition-colors duration-200"
+  [class.cursor-pointer]="!isTouch"
   [class.group]="!isTouch"
   [ngClass]="containerClasses()"
 >
@@ -38,9 +40,9 @@
     <div
       class="absolute right-1 top-1 z-10 flex flex-col space-y-1 transition-opacity duration-200"
       [ngClass]="{
-        'opacity-0': (isTouch && !tapRevealed() && !menuStyle()) || !isTouch,
-        'opacity-100': isTouch && (tapRevealed() || menuStyle()),
-        'group-hover:opacity-100': !isTouch
+        'opacity-0 pointer-events-none': (isTouch && !tapRevealed() && !menuStyle()) || !isTouch,
+        'opacity-100 pointer-events-auto': isTouch && (tapRevealed() || menuStyle()),
+        'group-hover:opacity-100 group-hover:pointer-events-auto': !isTouch
       }"
     >
       <button
@@ -107,15 +109,15 @@
         </h3>
 
         <!-- More Options Button -->
+
         <button
           (click)="toggleOptionsMenu($event)"
           class="absolute -right-1 top-0 -mr-1 shrink-0 px-1 py-0 text-zinc-400 transition-opacity hover:text-white"
           title="More options"
           [ngClass]="{
-            'opacity-0':
-              (isTouch && !tapRevealed() && !menuStyle()) || !isTouch,
-            'opacity-100': isTouch && (tapRevealed() || menuStyle()),
-            'group-hover:opacity-100': !isTouch
+            'opacity-0 pointer-events-none': (isTouch && !tapRevealed() && !menuStyle()) || !isTouch,
+            'opacity-100 pointer-events-auto': isTouch && (tapRevealed() || menuStyle()),
+            'group-hover:opacity-100 group-hover:pointer-events-auto': !isTouch
           }"
         >
           <span class="material-symbols-outlined">more_vert</span>
