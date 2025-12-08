@@ -84,7 +84,7 @@
         @if (showSourcesDropdown()) {
         <div
           (click)="$event.stopPropagation()"
-          class="sources-dropdown absolute top-full left-0 md:right-0 md:left-auto mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
+          class="sources-dropdown absolute top-full left-0 xl:right-0 mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
         >
           @for (player of availablePlayers(); track player) {
           <button
