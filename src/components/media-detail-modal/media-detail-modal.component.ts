@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, output, input, inject, signal, comp
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MovieService } from '../../services/movie.service';
-import { MediaType, MovieDetails, TvShowDetails } from '../../models/movie.model';
+import { MediaType, MovieDetails, TvShowDetails, BelongsToCollection } from '../../models/movie.model';
 import { WatchlistService } from '../../services/watchlist.service';
 import { AddToPlaylistModalComponent } from '../add-to-playlist-modal/add-to-playlist-modal.component';
 import { NavigationService } from '../../services/navigation.service';
@@ -42,6 +42,11 @@ export class MediaDetailModalComponent implements OnInit, OnDestroy {
   });
   
   isOnWatchlist = computed(() => this.watchlistService.isOnWatchlist(this.media().id));
+
+  movieDetails = computed(() => {
+    const d = this.details();
+    return d && d.media_type === 'movie' ? (d as MovieDetails) : null;
+  });
 
   ngOnInit() {
     this.loading.set(true);
@@ -100,5 +105,12 @@ export class MediaDetailModalComponent implements OnInit, OnDestroy {
   getYear(dateString: string | undefined): string {
     if (!dateString) return '';
     return new Date(dateString).getFullYear().toString();
+  }
+
+  goToCollection(collection: BelongsToCollection): void {
+    this.navigationService.navigateTo('collection-detail', {
+      id: collection.id,
+    });
+    this.close.emit();
   }
 }

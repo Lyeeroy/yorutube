@@ -34,6 +34,14 @@
                 <span>•</span>
                 <span>{{ d.vote_average.toFixed(1) }} Rating</span>
               </div>
+              @if(movieDetails()?.belongs_to_collection; as collection) {
+                <div class="mt-2 text-sm flex items-center justify-center md:justify-start space-x-2">
+                  <span class="text-zinc-400">Part of</span>
+                  <button (click)="goToCollection(collection)" class="text-red-500 hover:underline font-semibold">
+                    {{ collection.name }}
+                  </button>
+                </div>
+              }
               <div class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
                  <button (click)="playMedia()" class="h-10 px-6 flex items-center justify-center space-x-2 bg-white hover:bg-zinc-200 rounded-full text-black text-sm font-bold">
                     <span class="material-symbols-outlined text-3xl -ml-1">play_arrow</span>
