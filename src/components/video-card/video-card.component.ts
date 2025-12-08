@@ -114,7 +114,7 @@ export class VideoCardComponent {
   // Cache device capability once
   isTouch =
     isPlatformBrowser(this.platformId) &&
-    window.matchMedia("(hover: none)").matches;
+    (navigator.maxTouchPoints > 0 || "ontouchstart" in window);
 
   // --- Computed Layout Signals ---
 
