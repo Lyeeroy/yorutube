@@ -123,7 +123,7 @@ export class VideoCardComponent {
   containerClasses = computed(() => {
     return this.layout() === "grid"
       ? "flex flex-col w-full"
-      : "flex flex-row space-x-3 w-full";
+      : "flex flex-row space-x-3 w-full items-start";
   });
 
   imageContainerClasses = computed(() => {

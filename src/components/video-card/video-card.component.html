@@ -28,7 +28,7 @@
     }
 
     <span
-      class="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+      class="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-0"
     >
       {{ isMovie() ? "MOVIE" : "TV SHOW" }}
     </span>
@@ -37,16 +37,16 @@
     <!-- OPTIMIZATION: Opacity/Hover logic moved to parent container to keep buttons in sync -->
     <!-- LOGIC ADDED: `|| menuStyle()` keeps buttons visible when menu is open -->
     <div
-      class="absolute right-2 top-2 z-10 flex flex-col space-y-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+      class="absolute right-1 top-1 z-10 flex flex-col space-y-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
       [class.opacity-100]="tapRevealed() || menuStyle()"
     >
       <button
         (click)="toggleWatchlist($event)"
-        class="rounded-md bg-black/60 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        class="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
         [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'"
       >
         <span
-          class="material-symbols-outlined text-lg"
+          class="material-symbols-outlined text-base"
           [class.material-symbols-filled]="isOnWatchlist()"
         >
           watch_later
@@ -55,10 +55,10 @@
 
       <button
         (click)="openPlaylistModal($event)"
-        class="rounded-md bg-black/60 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        class="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
         [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
       >
-        <span class="material-symbols-outlined text-lg">
+        <span class="material-symbols-outlined text-base">
           {{ isInPlaylist() ? "playlist_add_check" : "playlist_add" }}
         </span>
       </button>
@@ -138,7 +138,7 @@
 @if (menuStyle(); as style) {
 <div
   (click)="$event.stopPropagation()"
-  class="fixed z-[100] w-56 rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
+  class="fixed z-[100] w-56 rounded-full border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
   [style.top]="style.top"
   [style.right]="style.right"
 >
