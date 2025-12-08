@@ -112,7 +112,7 @@ export class VideoCardComponent {
   tapRevealed = signal(false);
 
   // Cache device capability once
-  isTouch =
+  private isTouch =
     isPlatformBrowser(this.platformId) &&
     (navigator.maxTouchPoints > 0 || "ontouchstart" in window);
 
