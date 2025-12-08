@@ -1,32 +1,28 @@
 <div class="flex flex-col space-y-4">
-    <h2 class="text-xl font-bold text-white">Up next</h2>
+  <h2 class="text-xl font-bold text-white">Up next</h2>
 
-    @if(loading()) {
-      @for(_ of [1,2,3,4,5]; track $index) {
-        <div class="flex space-x-3 animate-pulse">
-          <div class="w-2/5 flex-shrink-0">
-            <div class="rounded-lg aspect-video bg-zinc-800 w-full"></div>
-          </div>
-          <div class="w-3/5 space-y-2 pt-1">
-            <div class="h-4 bg-zinc-800 rounded w-full"></div>
-            <div class="h-3 bg-zinc-800 rounded w-5/6"></div>
-            <div class="h-3 bg-zinc-800 rounded w-1/2 mt-1"></div>
-          </div>
-        </div>
-      }
-    } @else {
-      @for (media of mediaItems(); track media.id; let i = $index) {
-        <app-video-card
-          [media]="media"
-          [genreMap]="genreMap()"
-          [isPriority]="i === 0"
-          layout="list"
-          (mediaClicked)="onMediaClicked(media)"
-        ></app-video-card>
-      } @empty {
-          <div class="p-8 text-center bg-zinc-800 rounded-lg">
-              <p class="text-zinc-500">No recommendations found.</p>
-          </div>
-      }
-    }
+  @if(loading()) { @for(_ of [1,2,3,4,5]; track $index) {
+  <div class="flex space-x-3 animate-pulse">
+    <div class="w-2/5 flex-shrink-0">
+      <div class="rounded-lg aspect-video bg-zinc-800 w-full"></div>
+    </div>
+    <div class="w-3/5 space-y-2 pt-1">
+      <div class="h-4 bg-zinc-800 rounded w-full"></div>
+      <div class="h-3 bg-zinc-800 rounded w-5/6"></div>
+      <div class="h-3 bg-zinc-800 rounded w-1/2 mt-1"></div>
+    </div>
+  </div>
+  } } @else { @for (media of mediaItems(); track media.id; let i = $index) {
+  <app-video-card
+    [media]="media"
+    [genreMap]="genreMap()"
+    [isPriority]="i === 0"
+    layout="list"
+    (mediaClicked)="onMediaClicked(media)"
+  ></app-video-card>
+  } @empty {
+  <div class="p-8 text-center bg-zinc-800 rounded-lg">
+    <p class="text-zinc-500">No recommendations found.</p>
+  </div>
+  } }
 </div>

@@ -74,7 +74,11 @@
         [class.w-7]="layout() === 'list'"
         [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
       >
-        <span class="material-symbols-outlined" [class.text-xl]="layout() === 'grid'" [class.text-base]="layout() === 'list'">
+        <span
+          class="material-symbols-outlined"
+          [class.text-xl]="layout() === 'grid'"
+          [class.text-base]="layout() === 'list'"
+        >
           {{ isInPlaylist() ? "playlist_add_check" : "playlist_add" }}
         </span>
       </button>
@@ -117,7 +121,7 @@
           [class.text-sm]="layout() === 'list'"
           [class.line-clamp-2]="layout() === 'grid'"
           [class.line-clamp-1]="layout() === 'list'"
-          [class.sm:line-clamp-2]="layout() === 'list'"
+          [class.xl:line-clamp-2]="layout() === 'list'"
           [title]="mediaTitle()"
         >
           {{ mediaTitle() }}
