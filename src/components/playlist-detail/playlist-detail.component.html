@@ -85,13 +85,28 @@
 
   <!-- Right Panel: Video List -->
   <div class="w-full md:w-2/3 lg:w-3/4">
-    <div class="flex flex-col space-y-2">
+    <div 
+      class="flex flex-col space-y-2" 
+      cdkDropList 
+      (cdkDropListDropped)="drop($event)"
+    >
       @for(item of playlistItems(); track item.id; let i = $index) {
       <div
+        cdkDrag
         (click)="onMediaClicked(item)"
-        class="flex items-center p-2 rounded-lg hover:bg-zinc-800 cursor-pointer group"
+        class="flex items-center p-2 rounded-lg hover:bg-zinc-800 cursor-pointer group bg-zinc-900/0 hover:bg-zinc-800/100"
       >
-        <span class="text-zinc-400 w-8 text-center shrink-0">{{ i + 1 }}</span>
+        <div class="w-8 flex justify-center items-center shrink-0">
+          <span class="text-zinc-400 group-hover:hidden">{{ i + 1 }}</span>
+          <button 
+            cdkDragHandle 
+            (click)="$event.stopPropagation()"
+            class="hidden group-hover:block text-zinc-400 hover:text-white cursor-move"
+          >
+            <span class="material-symbols-outlined">drag_handle</span>
+          </button>
+        </div>
+        
         <img
           [ngSrc]="
             item.poster_path
@@ -99,7 +114,7 @@
               : 'https://picsum.photos/seed/' + item.id + '/90/135'
           "
           alt="Thumbnail"
-          class="w-16 h-auto rounded-md mx-4 shrink-0"
+          class="w-16 h-auto rounded-md mx-4 shrink-0 pointer-events-none"
           width="90"
           height="135"
         />
@@ -124,6 +139,21 @@
         <div class="flex items-center space-x-2">
           <!-- Removed direct remove X - item removal is now in the three dots menu -->
         </div>
+        
+        <!-- Drag preview styling -->
+        <div *cdkDragPreview class="bg-zinc-800 p-2 rounded-lg shadow-2xl flex items-center w-full max-w-2xl opacity-90">
+             <span class="material-symbols-outlined text-zinc-400 mr-4">drag_handle</span>
+             <img
+              [src]="item.poster_path ? 'https://image.tmdb.org/t/p/w300' + item.poster_path : ''"
+              class="w-16 h-auto rounded-md mr-4 shrink-0"
+             />
+             <div class="flex-grow">
+               <p class="font-semibold text-sm text-white">{{ getMediaTitle(item) }}</p>
+               <p class="text-xs text-zinc-400">{{ getMediaInfo(item) }}</p>
+             </div>
+        </div>
+        
+        <div *cdkDragPlaceholder class="opacity-0"></div>
       </div>
       } @empty {
       <p class="text-zinc-400 text-center py-8">This playlist is empty.</p>

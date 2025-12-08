@@ -13,12 +13,18 @@
   @if (playlists().length > 0) {
   <div
     class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-12 sm:gap-x-6"
+    cdkDropList
+    cdkDropListOrientation="mixed"
+    (cdkDropListDropped)="drop($event)"
   >
     @for(playlist of playlists(); track playlist.id; let i = $index) {
     <div
       class="relative cursor-pointer group"
       (click)="onPlaylistClicked(playlist)"
+      cdkDrag
+      [cdkDragData]="playlist"
     >
+      <div *cdkDragPlaceholder class="opacity-0"></div>
       <div class="relative rounded-xl overflow-hidden aspect-video bg-zinc-800">
         @if (playlist.items.length > 0 && playlist.items[0].backdrop_path) { @if
         (i < 5) {

@@ -6,6 +6,12 @@ import {
   signal,
   computed,
 } from "@angular/core";
+import {
+  CdkDragDrop,
+  CdkDrag,
+  CdkDropList,
+  moveItemInArray,
+} from "@angular/cdk/drag-drop";
 import { CommonModule, NgOptimizedImage } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { PlaylistService } from "../../services/playlist.service";
@@ -15,7 +21,7 @@ import { NavigationService } from "../../services/navigation.service";
 @Component({
   selector: "app-playlists",
   standalone: true,
-  imports: [CommonModule, NgOptimizedImage, FormsModule],
+  imports: [CommonModule, NgOptimizedImage, FormsModule, CdkDropList, CdkDrag],
   templateUrl: "./playlists.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -90,6 +96,13 @@ export class PlaylistsComponent {
     this.playlistService.deletePlaylist(playlistId);
     // close menu
     this.playlistMenuStyle.set(null);
+    this.playlistMenuStyle.set(null);
     this.playlistMenuTarget.set(null);
+  }
+
+  drop(event: CdkDragDrop<Playlist[]>) {
+    const currentPlaylists = this.playlists();
+    moveItemInArray(currentPlaylists, event.previousIndex, event.currentIndex);
+    this.playlists.set([...currentPlaylists]);
   }
 }

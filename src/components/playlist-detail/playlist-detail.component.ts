@@ -8,6 +8,13 @@ import {
   input,
   computed,
 } from "@angular/core";
+import {
+  CdkDragDrop,
+  CdkDrag,
+  CdkDropList,
+  CdkDragHandle,
+  moveItemInArray,
+} from "@angular/cdk/drag-drop";
 import { CommonModule, NgOptimizedImage } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { PlaylistService } from "../../services/playlist.service";
@@ -30,6 +37,9 @@ const isMovie = (media: MediaType) => media.media_type === "movie";
     FormsModule,
     AddToPlaylistModalComponent,
     MediaDetailModalComponent,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle,
   ],
   templateUrl: "./playlist-detail.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -214,5 +224,19 @@ export class PlaylistDetailComponent {
     }
     this.menuStyle.set(null);
     this.menuMediaId.set(null);
+  }
+
+  drop(event: CdkDragDrop<MediaType[]>) {
+    const p = this.playlist();
+    if (!p) return;
+
+    const currentItems = this.playlistItems();
+    moveItemInArray(currentItems, event.previousIndex, event.currentIndex);
+    
+    // Update local signal to show change immediately
+    this.playlistItems.set([...currentItems]);
+    
+    // Persist to service
+    this.playlistService.updatePlaylistItems(p.id, currentItems);
   }
 }
