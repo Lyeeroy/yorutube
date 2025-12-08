@@ -2,10 +2,7 @@
 <!-- Main Container -->
 <div
   (click)="onCardClick($event)"
-
-  class="relative rounded-xl transition-colors duration-200"
-  [class.cursor-pointer]="!isTouch"
-  [class.group]="!isTouch"
+  class="group relative cursor-pointer rounded-xl transition-colors duration-200"
   [ngClass]="containerClasses()"
 >
   <!-- 1. Thumbnail Section -->
@@ -31,27 +28,25 @@
     }
 
     <span
-      class="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-0"
+      class="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm"
     >
       {{ isMovie() ? "MOVIE" : "TV SHOW" }}
     </span>
 
     <!-- Action Buttons Overlay -->
+    <!-- OPTIMIZATION: Opacity/Hover logic moved to parent container to keep buttons in sync -->
+    <!-- LOGIC ADDED: `|| menuStyle()` keeps buttons visible when menu is open -->
     <div
-      class="absolute right-1 top-1 z-10 flex flex-col space-y-1 transition-opacity duration-200"
-      [ngClass]="{
-        'opacity-0 pointer-events-none': (isTouch && !tapRevealed() && !menuStyle()) || !isTouch,
-        'opacity-100 pointer-events-auto': isTouch && (tapRevealed() || menuStyle()),
-        'group-hover:opacity-100 group-hover:pointer-events-auto': !isTouch
-      }"
+      class="absolute right-2 top-2 z-10 flex flex-col space-y-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+      [class.opacity-100]="tapRevealed() || menuStyle()"
     >
       <button
         (click)="toggleWatchlist($event)"
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        class="rounded-md bg-black/60 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
         [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'"
       >
         <span
-          class="material-symbols-outlined text-base"
+          class="material-symbols-outlined text-lg"
           [class.material-symbols-filled]="isOnWatchlist()"
         >
           watch_later
@@ -60,10 +55,10 @@
 
       <button
         (click)="openPlaylistModal($event)"
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        class="rounded-md bg-black/60 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
         [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
       >
-        <span class="material-symbols-outlined text-base">
+        <span class="material-symbols-outlined text-lg">
           {{ isInPlaylist() ? "playlist_add_check" : "playlist_add" }}
         </span>
       </button>
@@ -109,16 +104,12 @@
         </h3>
 
         <!-- More Options Button -->
-
+        <!-- LOGIC ADDED: `|| menuStyle()` keeps this button visible when menu is open -->
         <button
           (click)="toggleOptionsMenu($event)"
-          class="absolute -right-1 top-0 -mr-1 shrink-0 px-1 py-0 text-zinc-400 transition-opacity hover:text-white"
+          class="absolute -right-1 top-0 -mr-1 shrink-0 px-1 py-0 text-zinc-400 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
           title="More options"
-          [ngClass]="{
-            'opacity-0 pointer-events-none': (isTouch && !tapRevealed() && !menuStyle()) || !isTouch,
-            'opacity-100 pointer-events-auto': isTouch && (tapRevealed() || menuStyle()),
-            'group-hover:opacity-100 group-hover:pointer-events-auto': !isTouch
-          }"
+          [class.opacity-100]="tapRevealed() || menuStyle()"
         >
           <span class="material-symbols-outlined">more_vert</span>
         </button>
@@ -147,7 +138,7 @@
 @if (menuStyle(); as style) {
 <div
   (click)="$event.stopPropagation()"
-  class="fixed z-[100] w-56 rounded-xl border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
+  class="fixed z-[100] w-56 rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-lg"
   [style.top]="style.top"
   [style.right]="style.right"
 >
