@@ -112,9 +112,13 @@ export class VideoCardComponent {
   tapRevealed = signal(false);
 
   // Cache device capability once
-  private isTouch =
+  protected isTouch =
     isPlatformBrowser(this.platformId) &&
-    (navigator.maxTouchPoints > 0 || "ontouchstart" in window);
+    (navigator.maxTouchPoints > 0 ||
+      "ontouchstart" in window ||
+      (typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(pointer: coarse)").matches));
 
   // --- Computed Layout Signals ---
 
