@@ -222,6 +222,8 @@ export class VideoCardComponent {
     }
 
     console.log('[VideoCard] First tap detected, revealing buttons');
+    // CRITICAL: Stop propagation to prevent document click listener from immediately closing the menu
+    event.stopPropagation();
     this.tapRevealed.set(true);
     setTimeout(() => this.tapRevealed.set(false), 3000);
   }
