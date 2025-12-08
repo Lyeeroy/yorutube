@@ -14,7 +14,8 @@ export type View =
   | "collection-detail"
   | "playlists"
   | "playlist-detail"
-  | "calendar";
+  | "calendar"
+  | "help";
 
 export interface NavigationState {
   view: View;
@@ -102,6 +103,8 @@ export class NavigationService {
         return "/subscriptions";
       case "calendar":
         return "/calendar";
+      case "help":
+        return "/help";
       default:
         return "/";
     }
@@ -229,6 +232,9 @@ export class NavigationService {
         return;
       case "/calendar":
         this.currentView.set({ view: "calendar", params: null });
+        return;
+      case "/help":
+        this.currentView.set({ view: "help", params: null });
         return;
       default:
         this.currentView.set({ view: "home", params: null });

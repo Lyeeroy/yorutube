@@ -157,4 +157,8 @@ export class HeaderComponent {
     }
     return "Just now";
   }
+
+  onHelpClick(): void {
+    this.navigationService.navigateTo("help");
+  }
 }
