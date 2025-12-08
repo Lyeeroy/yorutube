@@ -657,7 +657,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     // Update continue watching list based on current progress
-    if (progressPercent >= 5 && progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT) {
+    if (!this.historyService.isPaused() && progressPercent >= 5 && progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT) {
       const continueWatchingItem: Omit<ContinueWatchingItem, "updatedAt"> = {
         id: media.id,
         media: media,

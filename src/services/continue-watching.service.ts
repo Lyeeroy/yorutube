@@ -1,4 +1,4 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, effect, untracked } from '@angular/core';
 import { ContinueWatchingItem } from '../models/continue-watching.model';
 
 const STORAGE_KEY = 'yorutube-continue-watching';
@@ -12,7 +12,8 @@ export class ContinueWatchingService {
   constructor() {
     this.loadFromStorage();
     effect(() => {
-      this.saveToStorage(this.items());
+      const items = this.items();
+      untracked(() => this.saveToStorage(items));
     });
   }
 
@@ -52,5 +53,9 @@ export class ContinueWatchingService {
 
   removeItem(mediaId: number): void {
     this.items.update(currentItems => currentItems.filter(i => i.id !== mediaId));
+  }
+
+  clearAll(): void {
+    this.items.set([]);
   }
 }

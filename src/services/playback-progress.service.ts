@@ -1,7 +1,8 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, effect, untracked } from '@angular/core';
 import { PlaybackProgress } from '../models/playback-progress.model';
 
 const STORAGE_KEY = 'yorutube-playback-progress';
+const SAVE_THROTTLE_MS = 1000; // Throttle saves to once per second
 
 @Injectable({
   providedIn: 'root'
@@ -9,11 +10,19 @@ const STORAGE_KEY = 'yorutube-playback-progress';
 export class PlaybackProgressService {
   // Store progress as a map of mediaId -> PlaybackProgress
   progressData = signal<Record<number, PlaybackProgress>>({});
+  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.loadFromStorage();
     effect(() => {
-      this.saveToStorage(this.progressData());
+      const data = this.progressData();
+      // Throttle saves to localStorage
+      if (this.saveTimeout) {
+        clearTimeout(this.saveTimeout);
+      }
+      this.saveTimeout = setTimeout(() => {
+        untracked(() => this.saveToStorage(data));
+      }, SAVE_THROTTLE_MS);
     });
   }
 
@@ -57,5 +66,9 @@ export class PlaybackProgressService {
       delete newData[mediaId];
       return newData;
     });
+  }
+
+  clearAll(): void {
+    this.progressData.set({});
   }
 }

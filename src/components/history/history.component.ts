@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, computed, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HistoryService } from '../../services/history.service';
 import { HistoryItem } from '../../models/history.model';
@@ -6,6 +6,8 @@ import { HistoryItemCardComponent } from '../history-item-card/history-item-card
 import { NavigationService } from '../../services/navigation.service';
 import { SubscribableChannel } from '../../models/movie.model';
 import { ContinueWatchingComponent } from '../continue-watching/continue-watching.component';
+import { ContinueWatchingService } from '../../services/continue-watching.service';
+import { PlaybackProgressService } from '../../services/playback-progress.service';
 
 @Component({
   selector: 'app-history',
@@ -14,14 +16,20 @@ import { ContinueWatchingComponent } from '../continue-watching/continue-watchin
   templateUrl: './history.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HistoryComponent {
+export class HistoryComponent implements OnDestroy {
   private historyService = inject(HistoryService);
   private navigationService = inject(NavigationService);
+  private continueWatchingService = inject(ContinueWatchingService);
+  private playbackProgressService = inject(PlaybackProgressService);
+
+  private clearHistoryTimeout: ReturnType<typeof setTimeout> | null = null;
+  private clearContinueWatchingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   history = this.historyService.history;
   confirmingClear = signal(false);
+  confirmingClearContinueWatching = signal(false);
   searchQuery = signal('');
-  isHistoryPaused = signal(false); // UI only for now
+  isHistoryPaused = this.historyService.isPaused;
 
   filteredHistory = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
@@ -84,19 +92,32 @@ export class HistoryComponent {
   });
 
   onRemoveItem(id: string): void {
+    const item = this.history().find(h => h.id === id);
+    if (item) {
+      // Clear progress using the correct ID (episode.id for TV shows, media.id for movies)
+      const progressId = item.episode ? item.episode.id : item.media.id;
+      this.playbackProgressService.clearProgress(progressId);
+      // Don't remove from continue watching - let it stay independently
+    }
     this.historyService.removeFromHistory(id);
   }
 
   onClearHistory(): void {
     if (this.confirmingClear()) {
+      if (this.clearHistoryTimeout) {
+        clearTimeout(this.clearHistoryTimeout);
+        this.clearHistoryTimeout = null;
+      }
       this.historyService.clearHistory();
+      this.playbackProgressService.clearAll();
       this.confirmingClear.set(false);
     } else {
       this.confirmingClear.set(true);
-      setTimeout(() => {
+      this.clearHistoryTimeout = setTimeout(() => {
         if (this.confirmingClear()) {
           this.confirmingClear.set(false);
         }
+        this.clearHistoryTimeout = null;
       }, 3000);
     }
   }
@@ -124,6 +145,34 @@ export class HistoryComponent {
   }
 
   togglePauseHistory(): void {
-    this.isHistoryPaused.update(v => !v);
+    this.historyService.togglePaused();
+  }
+
+  onClearContinueWatching(): void {
+    if (this.confirmingClearContinueWatching()) {
+      if (this.clearContinueWatchingTimeout) {
+        clearTimeout(this.clearContinueWatchingTimeout);
+        this.clearContinueWatchingTimeout = null;
+      }
+      this.continueWatchingService.clearAll();
+      this.confirmingClearContinueWatching.set(false);
+    } else {
+      this.confirmingClearContinueWatching.set(true);
+      this.clearContinueWatchingTimeout = setTimeout(() => {
+        if (this.confirmingClearContinueWatching()) {
+          this.confirmingClearContinueWatching.set(false);
+        }
+        this.clearContinueWatchingTimeout = null;
+      }, 3000);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.clearHistoryTimeout) {
+      clearTimeout(this.clearHistoryTimeout);
+    }
+    if (this.clearContinueWatchingTimeout) {
+      clearTimeout(this.clearContinueWatchingTimeout);
+    }
   }
 }

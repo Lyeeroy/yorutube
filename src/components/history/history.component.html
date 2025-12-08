@@ -27,6 +27,18 @@
       <!-- History Management -->
       <div class="flex flex-col space-y-2">
         <button 
+          (click)="onClearContinueWatching()" 
+          class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium"
+          [class.text-red-500]="confirmingClearContinueWatching()">
+          <span class="material-symbols-outlined">delete_sweep</span>
+          @if(confirmingClearContinueWatching()) {
+             <span>Confirm Clear?</span>
+          } @else {
+             <span>Clear all continue watching</span>
+          }
+        </button>
+
+        <button 
           (click)="onClearHistory()" 
           class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium"
           [class.text-red-500]="confirmingClear()">

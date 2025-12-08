@@ -1,19 +1,27 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, effect, untracked } from '@angular/core';
 import { HistoryItem } from '../models/history.model';
 import { MediaType, Episode } from '../models/movie.model';
 
 const STORAGE_KEY = 'yorutube-history';
+const PAUSED_KEY = 'yorutube-history-paused';
 
 @Injectable({
   providedIn: 'root'
 })
 export class HistoryService {
   history = signal<HistoryItem[]>([]);
+  isPaused = signal<boolean>(false);
 
   constructor() {
     this.loadFromStorage();
+    this.loadPausedState();
     effect(() => {
-      this.saveToStorage(this.history());
+      const items = this.history();
+      untracked(() => this.saveToStorage(items));
+    });
+    effect(() => {
+      const paused = this.isPaused();
+      untracked(() => this.savePausedState(paused));
     });
   }
 
@@ -37,7 +45,32 @@ export class HistoryService {
     }
   }
 
+  private loadPausedState(): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(PAUSED_KEY);
+        if (stored) {
+            try {
+                this.isPaused.set(JSON.parse(stored));
+            } catch (e) {
+                console.error('Error parsing history paused state from localStorage', e);
+                this.isPaused.set(false);
+            }
+        }
+    }
+  }
+
+  private savePausedState(paused: boolean): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(PAUSED_KEY, JSON.stringify(paused));
+    }
+  }
+
   addToHistory(media: MediaType, episode?: Episode): void {
+    // Don't add to history if paused
+    if (this.isPaused()) {
+      return;
+    }
+
     const id = episode 
         ? `tv-${media.id}-${episode.id}` 
         : `${media.media_type}-${media.id}`;
@@ -62,5 +95,9 @@ export class HistoryService {
 
   clearHistory(): void {
     this.history.set([]);
+  }
+
+  togglePaused(): void {
+    this.isPaused.update(v => !v);
   }
 }

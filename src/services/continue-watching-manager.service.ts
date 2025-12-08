@@ -2,6 +2,7 @@ import { Injectable, inject } from "@angular/core";
 import { MovieService } from "./movie.service";
 import { PlaylistService } from "./playlist.service";
 import { ContinueWatchingService } from "./continue-watching.service";
+import { HistoryService } from "./history.service";
 import { TvShowDetails, Episode, MovieDetails } from "../models/movie.model";
 import { ContinueWatchingItem } from "../models/continue-watching.model";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
@@ -12,6 +13,7 @@ export class ContinueWatchingManagerService {
   private movieService = inject(MovieService);
   private playlistService = inject(PlaylistService);
   private continueWatchingService = inject(ContinueWatchingService);
+  private historyService = inject(HistoryService);
   private destroyRef = inject(DestroyRef);
 
   /**
@@ -23,6 +25,11 @@ export class ContinueWatchingManagerService {
     episode?: Episode,
     playlistId?: string
   ): void {
+    // Don't update continue watching if history is paused
+    if (this.historyService.isPaused()) {
+      return;
+    }
+
     if (playlistId) {
       const nextItem = this.playlistService.getNextItemFromPlaylist(
         playlistId,
@@ -107,6 +114,11 @@ export class ContinueWatchingManagerService {
     episode?: Episode | null,
     playlistId?: string
   ): void {
+    // Don't update continue watching if history is paused
+    if (this.historyService.isPaused()) {
+      return;
+    }
+
     if (media.media_type === "movie") {
       this.continueWatchingService.removeItem(media.id);
       return;
