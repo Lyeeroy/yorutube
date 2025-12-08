@@ -8,7 +8,7 @@
 >
   <!-- 1. Thumbnail Section -->
   <div
-    class="relative flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900"
+    class="relative flex-shrink-0 self-start overflow-hidden rounded-xl bg-zinc-900"
     [ngClass]="imageContainerClasses()"
   >
     <img
@@ -102,9 +102,11 @@
     <div class="relative min-w-0 flex-1">
       <div class="flex items-start justify-between pr-6">
         <h3
-          class="line-clamp-2 text-base font-medium leading-snug text-white transition-colors group-hover:text-red-500"
+          class="text-base font-medium leading-snug text-white transition-colors group-hover:text-red-500"
           [class.text-red-500]="tapRevealed() || menuStyle()"
           [class.text-sm]="layout() === 'list'"
+          [class.line-clamp-2]="layout() === 'grid'"
+          [class.line-clamp-1]="layout() === 'list'"
           [title]="mediaTitle()"
         >
           {{ mediaTitle() }}
@@ -126,7 +128,7 @@
       </div>
 
       <div
-        class="mt-1 text-gray-400"
+        class="mt-1 text-gray-400 overflow-hidden"
         [class.text-xs]="layout() === 'list'"
         [class.text-sm]="layout() === 'grid'"
       >

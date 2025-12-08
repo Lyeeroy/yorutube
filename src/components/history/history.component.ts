@@ -1,19 +1,26 @@
-import { Component, ChangeDetectionStrategy, inject, computed, signal, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HistoryService } from '../../services/history.service';
-import { HistoryItem } from '../../models/history.model';
-import { HistoryItemCardComponent } from '../history-item-card/history-item-card.component';
-import { NavigationService } from '../../services/navigation.service';
-import { SubscribableChannel } from '../../models/movie.model';
-import { ContinueWatchingComponent } from '../continue-watching/continue-watching.component';
-import { ContinueWatchingService } from '../../services/continue-watching.service';
-import { PlaybackProgressService } from '../../services/playback-progress.service';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  computed,
+  signal,
+  OnDestroy,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { HistoryService } from "../../services/history.service";
+import { HistoryItem } from "../../models/history.model";
+import { HistoryItemCardComponent } from "../history-item-card/history-item-card.component";
+import { NavigationService } from "../../services/navigation.service";
+import { SubscribableChannel } from "../../models/movie.model";
+import { ContinueWatchingComponent } from "../continue-watching/continue-watching.component";
+import { ContinueWatchingService } from "../../services/continue-watching.service";
+import { PlaybackProgressService } from "../../services/playback-progress.service";
 
 @Component({
-  selector: 'app-history',
+  selector: "app-history",
   standalone: true,
   imports: [CommonModule, HistoryItemCardComponent, ContinueWatchingComponent],
-  templateUrl: './history.component.html',
+  templateUrl: "./history.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HistoryComponent implements OnDestroy {
@@ -23,12 +30,13 @@ export class HistoryComponent implements OnDestroy {
   private playbackProgressService = inject(PlaybackProgressService);
 
   private clearHistoryTimeout: ReturnType<typeof setTimeout> | null = null;
-  private clearContinueWatchingTimeout: ReturnType<typeof setTimeout> | null = null;
+  private clearContinueWatchingTimeout: ReturnType<typeof setTimeout> | null =
+    null;
 
   history = this.historyService.history;
   confirmingClear = signal(false);
   confirmingClearContinueWatching = signal(false);
-  searchQuery = signal('');
+  searchQuery = signal("");
   isHistoryPaused = this.historyService.isPaused;
 
   filteredHistory = computed(() => {
@@ -36,9 +44,9 @@ export class HistoryComponent implements OnDestroy {
     if (!query) {
       return this.history();
     }
-    return this.history().filter(item => {
+    return this.history().filter((item) => {
       const media = item.media;
-      const title = media.media_type === 'movie' ? media.title : media.name;
+      const title = media.media_type === "movie" ? media.title : media.name;
       if (title.toLowerCase().includes(query)) {
         return true;
       }
@@ -52,11 +60,11 @@ export class HistoryComponent implements OnDestroy {
   groupedHistory = computed(() => {
     const history = this.filteredHistory();
     if (history.length === 0) {
-        return [];
+      return [];
     }
 
     const groups: { title: string; items: HistoryItem[] }[] = [];
-    let lastGroupTitle = '';
+    let lastGroupTitle = "";
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -64,35 +72,35 @@ export class HistoryComponent implements OnDestroy {
     yesterday.setDate(today.getDate() - 1);
 
     for (const item of history) {
-        const itemDate = new Date(item.watchedAt);
-        itemDate.setHours(0, 0, 0, 0);
+      const itemDate = new Date(item.watchedAt);
+      itemDate.setHours(0, 0, 0, 0);
 
-        let groupTitle: string;
-        if (itemDate.getTime() === today.getTime()) {
-            groupTitle = 'Today';
-        } else if (itemDate.getTime() === yesterday.getTime()) {
-            groupTitle = 'Yesterday';
-        } else {
-            groupTitle = itemDate.toLocaleDateString(undefined, {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-        }
+      let groupTitle: string;
+      if (itemDate.getTime() === today.getTime()) {
+        groupTitle = "Today";
+      } else if (itemDate.getTime() === yesterday.getTime()) {
+        groupTitle = "Yesterday";
+      } else {
+        groupTitle = itemDate.toLocaleDateString(undefined, {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      }
 
-        if (groupTitle !== lastGroupTitle) {
-            groups.push({ title: groupTitle, items: [item] });
-            lastGroupTitle = groupTitle;
-        } else {
-            groups[groups.length - 1].items.push(item);
-        }
+      if (groupTitle !== lastGroupTitle) {
+        groups.push({ title: groupTitle, items: [item] });
+        lastGroupTitle = groupTitle;
+      } else {
+        groups[groups.length - 1].items.push(item);
+      }
     }
     return groups;
   });
 
   onRemoveItem(id: string): void {
-    const item = this.history().find(h => h.id === id);
+    const item = this.history().find((h) => h.id === id);
     if (item) {
       // Clear progress using the correct ID (episode.id for TV shows, media.id for movies)
       const progressId = item.episode ? item.episode.id : item.media.id;
@@ -129,11 +137,11 @@ export class HistoryComponent implements OnDestroy {
       params.season = episode.season_number;
       params.episode = episode.episode_number;
     }
-    this.navigationService.navigateTo('watch', params);
+    this.navigationService.navigateTo("watch", params);
   }
 
   onChannelClicked(channel: SubscribableChannel): void {
-    this.navigationService.navigateTo('channel', channel);
+    this.navigationService.navigateTo("channel", channel);
   }
 
   updateSearchQuery(event: Event): void {
@@ -141,7 +149,7 @@ export class HistoryComponent implements OnDestroy {
   }
 
   clearSearch(): void {
-    this.searchQuery.set('');
+    this.searchQuery.set("");
   }
 
   togglePauseHistory(): void {

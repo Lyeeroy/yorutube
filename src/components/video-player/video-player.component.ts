@@ -68,14 +68,20 @@ interface PlayerEpisodeState {
   styles: [
     `
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
       .animate-fade-in {
         animation: fadeIn 0.3s ease-out forwards;
       }
-    `
-  ]
+    `,
+  ],
 })
 export class VideoPlayerComponent implements OnInit, OnDestroy {
   private movieService = inject(MovieService);
@@ -126,7 +132,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private isNavigating = signal(false);
 
   private constructedPlayerUrl = signal<string>("about:blank");
-  
+
   // Track if we are currently reloading the player (forcing a blank state)
   private reloading = signal(false);
 
@@ -148,7 +154,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   // Cache for season details to avoid repeated API calls during auto-next
   private seasonDetailsCache = new Map<string, any>();
-  
+
   // Debounce counter for progress updates
   private lastProgressUpdateTime = 0;
 
@@ -174,20 +180,23 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       // If we want to be precise, we might need to expose that logic or just assume true for now.
       // Given the user request "movies do not have episode therefore there is no need for auto next",
       // sticking to "TV shows always have auto-next candidate" (unless it's the very last one, which we handle gracefully by failing to play) is a safe start.
-      return true; 
+      return true;
     } else if (media.media_type === "movie") {
       // For movies, only if in a playlist and not the last item
       const playlist = this.playlist();
       const video = this.videoDetails(); // Note: videoDetails might be trailer info, not playlist item info
-      
-      if (!playlist || !playlist.items || playlist.items.length === 0) return false;
-      
-      // We need to find the current index. 
+
+      if (!playlist || !playlist.items || playlist.items.length === 0)
+        return false;
+
+      // We need to find the current index.
       // The playlist service/component usually handles this, but we can try to find by ID.
-      const currentIndex = playlist.items.findIndex(item => item.id === media.id);
+      const currentIndex = playlist.items.findIndex(
+        (item) => item.id === media.id
+      );
       return currentIndex !== -1 && currentIndex < playlist.items.length - 1;
     }
-    
+
     return false;
   });
 
@@ -197,7 +206,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const hasNext = this.hasNextItem();
     const isNavigating = this.isNavigating();
     const nextButtonEnabled = this.playerService.nextButtonEnabled();
-    
+
     // Show if:
     // 1. Next button setting is ENABLED
     // 2. We have a next item
@@ -205,7 +214,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // 4. AND either:
     //    a. Progress is > 90% (pre-show button)
     //    b. OR we are actively counting down (auto-next triggered)
-    return nextButtonEnabled && hasNext && !isNavigating && (progress >= 90 || isCountingDown);
+    return (
+      nextButtonEnabled &&
+      hasNext &&
+      !isNavigating &&
+      (progress >= 90 || isCountingDown)
+    );
   });
 
   backdropUrl = computed(() => {
@@ -245,13 +259,21 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // applied to the new episode URL.
     const params = untracked(() => this.params());
     const episode = this.currentEpisode();
-    
+
     // Determine progressId based on params (source of truth) rather than currentEpisode
     let progressId: number;
-    if (media.media_type === "tv" && params?.season && params?.episode && episode) {
+    if (
+      media.media_type === "tv" &&
+      params?.season &&
+      params?.episode &&
+      episode
+    ) {
       // For TV shows, only use episode.id if the episode matches what params say we're navigating to
       // This prevents using the old episode's ID during navigation
-      if (episode.season_number === +params.season && episode.episode_number === +params.episode) {
+      if (
+        episode.season_number === +params.season &&
+        episode.episode_number === +params.episode
+      ) {
         progressId = episode.id;
       } else {
         // Episode signal hasn't updated yet, use media.id as fallback
@@ -371,12 +393,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.lastKnownPlaybackTime.set(0);
         this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
-        
+
         // Reset auto-next state
         this.currentProgressPercent.set(0);
         this.clearAutoNextTimer();
         this.autoNextState.set("idle");
-        
+
         // Unlock any auto-next if we just navigated to a different media
         this.playerService.unlockAutoNext();
 
@@ -636,7 +658,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     if (shouldUpdateProgress) {
       this.lastProgressUpdateTime = now;
-      
+
       const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
         progress: progressPercent,
         timestamp: currentTime,
@@ -648,7 +670,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     // Add to history after significant playback
-    if (!this.historyAdded() && (currentTime > this.PLAYBACK_THRESHOLD_SECONDS || progressPercent > 5)) {
+    if (
+      !this.historyAdded() &&
+      (currentTime > this.PLAYBACK_THRESHOLD_SECONDS || progressPercent > 5)
+    ) {
       this.historyService.addToHistory(
         media,
         this.currentEpisode() || undefined
@@ -657,7 +682,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     // Update continue watching list based on current progress
-    if (!this.historyService.isPaused() && progressPercent >= 5 && progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT) {
+    if (
+      !this.historyService.isPaused() &&
+      progressPercent >= 5 &&
+      progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT
+    ) {
       const continueWatchingItem: Omit<ContinueWatchingItem, "updatedAt"> = {
         id: media.id,
         media: media,
@@ -700,8 +729,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (this.isNavigating()) {
       const startAt = this.initialStartAt() || 0;
       const timeSinceNav = Date.now() - this.navigationStartTime;
-      const isTimeMismatch = Math.abs(currentTime - startAt) > this.STALE_EVENT_TIME_DIFF;
-      
+      const isTimeMismatch =
+        Math.abs(currentTime - startAt) > this.STALE_EVENT_TIME_DIFF;
+
       // Filter out stale events occurring shortly after navigation start
       if (timeSinceNav < this.STALE_EVENT_THRESHOLD_MS && isTimeMismatch) {
         return true;
@@ -732,9 +762,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Reset auto-next trigger if user seeks back significantly
     // Guard against glitches where progress might briefly drop to 0
     if (
-      this.autoPlayNextTriggered() && 
-      progressPercent > 0 && 
-      currentTime > this.MIN_PLAYBACK_FOR_RESET && 
+      this.autoPlayNextTriggered() &&
+      progressPercent > 0 &&
+      currentTime > this.MIN_PLAYBACK_FOR_RESET &&
       progressPercent < threshold - this.SEEK_RESET_THRESHOLD_PERCENT
     ) {
       this.autoPlayNextTriggered.set(false);
@@ -832,7 +862,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         appEpisodeState &&
         playerEpisode.season === appEpisodeState.season &&
         playerEpisode.episode === appEpisodeState.episode + 1;
-      
+
       const isSequentialPrevious =
         appEpisodeState &&
         playerEpisode.season === appEpisodeState.season &&
@@ -945,7 +975,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (this.autoNextState() === "counting_down") {
       this.clearAutoNextTimer();
     }
-    
+
     // Lock if not already locked (manual click should also prevent other auto-events)
     this.playerService.tryLockAutoNext();
     this.executeAutoNext(media);
@@ -956,7 +986,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     this.autoNextState.set("idle");
     // Do NOT reset autoPlayNextTriggered here, otherwise it will immediately re-trigger
     // if the video is still playing and past the threshold.
-    // this.autoPlayNextTriggered.set(false); 
+    // this.autoPlayNextTriggered.set(false);
     this.playerService.unlockAutoNext();
   }
 
@@ -1112,7 +1142,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                   return; // Found and navigated, so exit.
                 }
               }
-              
+
               if (!foundNextSeason) {
                 // No next season found, try playlist
                 this.tryPlayNextAfterSeriesEnd(tvShow);
@@ -1124,9 +1154,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           }
         },
         error: (err) => {
-          console.error('Failed to fetch season details for auto-next:', err);
+          console.error("Failed to fetch season details for auto-next:", err);
           this.playerService.unlockAutoNext();
-        }
+        },
       });
   }
 
@@ -1325,12 +1355,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   onMaximizeBackdropClick(event: MouseEvent): void {
     // Close if clicking the backdrop (not the iframe)
     const target = event.target as HTMLElement;
-    if (target.classList.contains('fixed')) {
+    if (target.classList.contains("fixed")) {
       this.closeMaximize();
     }
   }
 
-  @HostListener('document:keydown.escape', ['$event'])
+  @HostListener("document:keydown.escape", ["$event"])
   onEscapeKey(event: KeyboardEvent): void {
     if (this.isMaximized()) {
       this.closeMaximize();

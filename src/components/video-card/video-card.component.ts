@@ -136,7 +136,7 @@ export class VideoCardComponent {
     // Common aspect-video
     return this.layout() === "grid"
       ? "w-full aspect-video"
-      : "w-2/5 aspect-video";
+      : "w-1/2 aspect-video";
   });
 
   progress = computed(() => {

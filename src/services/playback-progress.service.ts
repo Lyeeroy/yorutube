@@ -1,11 +1,11 @@
-import { Injectable, signal, effect, untracked } from '@angular/core';
-import { PlaybackProgress } from '../models/playback-progress.model';
+import { Injectable, signal, effect, untracked } from "@angular/core";
+import { PlaybackProgress } from "../models/playback-progress.model";
 
-const STORAGE_KEY = 'yorutube-playback-progress';
+const STORAGE_KEY = "yorutube-playback-progress";
 const SAVE_THROTTLE_MS = 1000; // Throttle saves to once per second
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class PlaybackProgressService {
   // Store progress as a map of mediaId -> PlaybackProgress
@@ -27,13 +27,13 @@ export class PlaybackProgressService {
   }
 
   private loadFromStorage(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== "undefined" && window.localStorage) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
           this.progressData.set(JSON.parse(stored));
         } catch (e) {
-          console.error('Error parsing playback progress from localStorage', e);
+          console.error("Error parsing playback progress from localStorage", e);
           this.progressData.set({});
         }
       }
@@ -41,18 +41,21 @@ export class PlaybackProgressService {
   }
 
   private saveToStorage(data: Record<number, PlaybackProgress>): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== "undefined" && window.localStorage) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
   }
 
-  updateProgress(mediaId: number, progress: Omit<PlaybackProgress, 'updatedAt'>): void {
-    this.progressData.update(currentData => ({
+  updateProgress(
+    mediaId: number,
+    progress: Omit<PlaybackProgress, "updatedAt">
+  ): void {
+    this.progressData.update((currentData) => ({
       ...currentData,
       [mediaId]: {
         ...progress,
-        updatedAt: Date.now()
-      }
+        updatedAt: Date.now(),
+      },
     }));
   }
 
@@ -61,7 +64,7 @@ export class PlaybackProgressService {
   }
 
   clearProgress(mediaId: number): void {
-    this.progressData.update(currentData => {
+    this.progressData.update((currentData) => {
       const newData = { ...currentData };
       delete newData[mediaId];
       return newData;

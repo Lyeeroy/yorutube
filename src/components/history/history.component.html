@@ -4,63 +4,69 @@
     <div class="xl:sticky xl:top-6">
       <!-- Search History -->
       <div class="relative mb-4">
-        <input 
-          type="text" 
+        <input
+          type="text"
           placeholder="Search watch history"
           [value]="searchQuery()"
           (input)="updateSearchQuery($event)"
           class="w-full bg-zinc-800 border border-zinc-700 text-white rounded-full px-5 py-2 pr-10 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-        >
+        />
         @if (searchQuery()) {
-            <button (click)="clearSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
-                <span class="material-symbols-outlined text-lg">close</span>
-            </button>
+        <button
+          (click)="clearSearch()"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+        >
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
         } @else {
-            <div class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
-                <span class="material-symbols-outlined">search</span>
-            </div>
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
+          <span class="material-symbols-outlined">search</span>
+        </div>
         }
       </div>
-      
+
       <div class="border-t border-zinc-700 my-4"></div>
 
       <!-- History Management -->
       <div class="flex flex-col space-y-2">
-        <button 
-          (click)="onClearContinueWatching()" 
+        <button
+          (click)="onClearContinueWatching()"
           class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium"
-          [class.text-red-500]="confirmingClearContinueWatching()">
+          [class.text-red-500]="confirmingClearContinueWatching()"
+        >
           <span class="material-symbols-outlined">delete_sweep</span>
           @if(confirmingClearContinueWatching()) {
-             <span>Confirm Clear?</span>
+          <span>Confirm Clear?</span>
           } @else {
-             <span>Clear all continue watching</span>
+          <span>Clear all continue watching</span>
           }
         </button>
 
-        <button 
-          (click)="onClearHistory()" 
+        <button
+          (click)="onClearHistory()"
           class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium"
-          [class.text-red-500]="confirmingClear()">
+          [class.text-red-500]="confirmingClear()"
+        >
           <span class="material-symbols-outlined">delete</span>
           @if(confirmingClear()) {
-             <span>Confirm Clear?</span>
+          <span>Confirm Clear?</span>
           } @else {
-             <span>Clear all watch history</span>
+          <span>Clear all watch history</span>
           }
         </button>
 
-        <button (click)="togglePauseHistory()" class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium">
+        <button
+          (click)="togglePauseHistory()"
+          class="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-left text-zinc-200 hover:bg-zinc-800 transition-colors uppercase font-medium"
+        >
           @if (isHistoryPaused()) {
-            <span class="material-symbols-outlined">play_circle</span>
-            <span>Turn on watch history</span>
+          <span class="material-symbols-outlined">play_circle</span>
+          <span>Turn on watch history</span>
           } @else {
-            <span class="material-symbols-outlined">pause_circle</span>
-            <span>Pause watch history</span>
+          <span class="material-symbols-outlined">pause_circle</span>
+          <span>Pause watch history</span>
           }
         </button>
-        
-
       </div>
     </div>
   </div>
@@ -70,38 +76,45 @@
     <app-continue-watching></app-continue-watching>
 
     <h1 class="text-3xl font-bold text-white mb-6">Watch History</h1>
-    @if (history().length > 0) {
-      @if(groupedHistory().length > 0) {
-        @for(group of groupedHistory(); track group.title; let groupIndex = $index) {
-          <div class="mb-8">
-            <h2 class="text-xl font-semibold text-white border-b border-zinc-700 pb-2 mb-4">{{ group.title }}</h2>
-            <div class="flex flex-col divide-y divide-zinc-800">
-              @for(item of group.items; track item.id; let itemIndex = $index) {
-                <div class="py-4 relative group">
-                  <app-history-item-card 
-                    [item]="item"
-                    [isPriority]="groupIndex === 0 && itemIndex === 0"
-                    (remove)="onRemoveItem($event)"
-                    (mediaClicked)="onMediaClicked(item)"
-                    (channelClicked)="onChannelClicked($event)"
-                    />
-                </div>
-              }
-            </div>
-          </div>
-        }
-      } @else {
-        <div class="text-center py-16">
-          <h2 class="mt-4 text-2xl font-semibold text-zinc-400">No results for "{{ searchQuery() }}"</h2>
-          <p class="text-zinc-500 mt-2">Try searching for something else.</p>
+    @if (history().length > 0) { @if(groupedHistory().length > 0) { @for(group
+    of groupedHistory(); track group.title; let groupIndex = $index) {
+    <div class="mb-8">
+      <h2
+        class="text-xl font-semibold text-white border-b border-zinc-700 pb-2 mb-4"
+      >
+        {{ group.title }}
+      </h2>
+      <div class="flex flex-col divide-y divide-zinc-800">
+        @for(item of group.items; track item.id; let itemIndex = $index) {
+        <div class="py-4 relative group">
+          <app-history-item-card
+            [item]="item"
+            [isPriority]="groupIndex === 0 && itemIndex === 0"
+            (remove)="onRemoveItem($event)"
+            (mediaClicked)="onMediaClicked(item)"
+            (channelClicked)="onChannelClicked($event)"
+          />
         </div>
-      }
-    } @else {
-      <div class="text-center py-16">
-        <span class="material-symbols-outlined text-7xl text-zinc-600">history</span>
-        <h2 class="mt-4 text-2xl font-semibold text-zinc-400">Your watch history is empty</h2>
-        <p class="text-zinc-500 mt-2">Videos you watch will appear here.</p>
+        }
       </div>
+    </div>
+    } } @else {
+    <div class="text-center py-16">
+      <h2 class="mt-4 text-2xl font-semibold text-zinc-400">
+        No results for "{{ searchQuery() }}"
+      </h2>
+      <p class="text-zinc-500 mt-2">Try searching for something else.</p>
+    </div>
+    } } @else {
+    <div class="text-center py-16">
+      <span class="material-symbols-outlined text-7xl text-zinc-600"
+        >history</span
+      >
+      <h2 class="mt-4 text-2xl font-semibold text-zinc-400">
+        Your watch history is empty
+      </h2>
+      <p class="text-zinc-500 mt-2">Videos you watch will appear here.</p>
+    </div>
     }
   </div>
 </div>
