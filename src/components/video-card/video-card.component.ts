@@ -140,6 +140,12 @@ export class VideoCardComponent {
   });
 
   constructor() {
+    console.log('[VideoCard] Constructor - isTouch:', this.isTouch, {
+      isPlatformBrowser: isPlatformBrowser(this.platformId),
+      maxTouchPoints: isPlatformBrowser(this.platformId) ? navigator.maxTouchPoints : 'N/A',
+      hasOntouchstart: isPlatformBrowser(this.platformId) ? 'ontouchstart' in window : 'N/A'
+    });
+    
     // Data Fetching Effect
     effect((onCleanup) => {
       // Only fetch if priority is true to save bandwidth
@@ -191,18 +197,31 @@ export class VideoCardComponent {
 
   onCardClick(event: Event): void {
     const target = event.target as HTMLElement;
-    if (target?.closest("button, a")) return;
+    console.log('[VideoCard] Click detected', { 
+      isTouch: this.isTouch, 
+      tapRevealed: this.tapRevealed(),
+      target: target.tagName,
+      closestButton: target?.closest("button, a")
+    });
+    
+    if (target?.closest("button, a")) {
+      console.log('[VideoCard] Click on button/link, ignoring');
+      return;
+    }
 
     if (!this.isTouch) {
+      console.log('[VideoCard] Non-touch device, playing immediately');
       this.mediaClicked.emit();
       return;
     }
 
     if (this.tapRevealed()) {
+      console.log('[VideoCard] Second tap detected, playing video');
       this.mediaClicked.emit();
       return;
     }
 
+    console.log('[VideoCard] First tap detected, revealing buttons');
     this.tapRevealed.set(true);
     setTimeout(() => this.tapRevealed.set(false), 3000);
   }
