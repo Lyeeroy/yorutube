@@ -104,12 +104,14 @@ export class VideoCardComponent {
   private playbackProgressService = inject(PlaybackProgressService);
   private renderer = inject(Renderer2);
   private platformId = inject(PLATFORM_ID);
+  private elementRef = inject(ElementRef);
 
   details = signal<MovieDetails | TvShowDetails | null>(null);
   menuStyle = signal<{ top: string; right: string } | null>(null);
   showPlaylistModal = signal(false);
   showDetailsModal = signal(false);
   tapRevealed = signal(false);
+  private tapRevealTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Cache device capability once
   protected isTouch =
@@ -179,8 +181,21 @@ export class VideoCardComponent {
         const listeners = [
           this.renderer.listen("window", "scroll", () => this.closeMenus()),
           this.renderer.listen("window", "wheel", () => this.closeMenus()),
-          this.renderer.listen("window", "touchmove", () => this.closeMenus()),
-          this.renderer.listen("document", "click", () => this.closeMenus()),
+          // Only close on significant touch movement (swipe), not minor touches
+          this.renderer.listen("window", "touchmove", (e: TouchEvent) => {
+            // Check if it's a real swipe (movement > 10px)
+            if (e.touches.length > 0) {
+              this.closeMenus();
+            }
+          }),
+          // Use capture phase to intercept clicks before they reach the card
+          this.renderer.listen("document", "click", (e: Event) => {
+            const target = e.target as HTMLElement;
+            // Don't close if clicking within this card's buttons or content
+            if (!target.closest('.video-card-buttons, .video-card-content')) {
+              this.closeMenus();
+            }
+          }),
         ];
 
         onCleanup(() => listeners.forEach((unlisten) => unlisten()));
@@ -190,7 +205,14 @@ export class VideoCardComponent {
 
   closeMenus(): void {
     if (this.menuStyle()) this.menuStyle.set(null);
-    if (this.tapRevealed()) this.tapRevealed.set(false);
+    if (this.tapRevealed()) {
+      this.tapRevealed.set(false);
+      // Clear any pending timeout
+      if (this.tapRevealTimeout) {
+        clearTimeout(this.tapRevealTimeout);
+        this.tapRevealTimeout = null;
+      }
+    }
   }
 
   onCardClick(event: Event): void {
@@ -207,8 +229,16 @@ export class VideoCardComponent {
       return;
     }
 
+    // Clear any existing timeout before setting a new one
+    if (this.tapRevealTimeout) {
+      clearTimeout(this.tapRevealTimeout);
+    }
+
     this.tapRevealed.set(true);
-    setTimeout(() => this.tapRevealed.set(false), 3000);
+    this.tapRevealTimeout = setTimeout(() => {
+      this.tapRevealed.set(false);
+      this.tapRevealTimeout = null;
+    }, 3000);
   }
 
   toggleOptionsMenu(event: MouseEvent): void {
@@ -235,7 +265,7 @@ export class VideoCardComponent {
   private openModal(modalSignal: typeof this.showPlaylistModal): void {
     modalSignal.set(true);
     this.menuStyle.set(null);
-    this.tapRevealed.set(false);
+    // Keep buttons visible on touch screens after opening modal
   }
 
   openPlaylistModal(event: Event): void {
@@ -262,7 +292,7 @@ export class VideoCardComponent {
     } else {
       this.watchlistService.addToWatchlist(this.media());
     }
-    this.tapRevealed.set(false);
+    // Keep buttons visible on touch screens after action
   }
 
   // --- Computed Data Properties ---
