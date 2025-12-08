@@ -143,10 +143,12 @@ export class VideoCardComponent {
     // Data Fetching Effect
     effect((onCleanup) => {
       // Only fetch if priority is true to save bandwidth
-      if (!this.isPriority()) {
-        this.details.set(null);
-        return;
-      }
+      // Only fetch if priority is true to save bandwidth
+      // REMOVED: Fetching details for all cards to ensure Channel/Network is displayed instead of Genre
+      // if (!this.isPriority()) {
+      //   this.details.set(null);
+      //   return;
+      // }
 
       const currentMedia = this.media();
       this.details.set(null);
