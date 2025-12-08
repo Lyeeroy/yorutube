@@ -48,12 +48,18 @@
     >
       <button
         (click)="toggleWatchlist($event)"
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        class="flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        [class.h-10]="layout() === 'grid'"
+        [class.w-10]="layout() === 'grid'"
+        [class.h-7]="layout() === 'list'"
+        [class.w-7]="layout() === 'list'"
         [title]="isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'"
       >
         <span
-          class="material-symbols-outlined text-base"
+          class="material-symbols-outlined"
           [class.material-symbols-filled]="isOnWatchlist()"
+          [class.text-xl]="layout() === 'grid'"
+          [class.text-base]="layout() === 'list'"
         >
           watch_later
         </span>
@@ -61,10 +67,14 @@
 
       <button
         (click)="openPlaylistModal($event)"
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        class="flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+        [class.h-10]="layout() === 'grid'"
+        [class.w-10]="layout() === 'grid'"
+        [class.h-7]="layout() === 'list'"
+        [class.w-7]="layout() === 'list'"
         [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
       >
-        <span class="material-symbols-outlined text-base">
+        <span class="material-symbols-outlined" [class.text-xl]="layout() === 'grid'" [class.text-base]="layout() === 'list'">
           {{ isInPlaylist() ? "playlist_add_check" : "playlist_add" }}
         </span>
       </button>

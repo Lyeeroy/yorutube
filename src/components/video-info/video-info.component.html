@@ -71,10 +71,10 @@
       <div class="relative">
         <button
           (click)="toggleSourcesDropdown($event)"
-          class="sources-button h-10 w-10 md:w-auto md:px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
+          class="sources-button h-10 w-10 w-auto px-4 flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 rounded-full"
         >
           <span class="material-symbols-outlined text-xl">play_circle</span>
-          <span class="hidden md:inline">Sources</span>
+          <span class="inline">Sources</span>
           <span
             class="material-symbols-outlined text-base transition-transform"
             [class.rotate-180]="showSourcesDropdown()"
@@ -140,7 +140,7 @@
         @if (showMoreOptionsMenu()) {
         <div
           (click)="$event.stopPropagation()"
-          class="more-options-menu absolute top-full left-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1 overflow-hidden"
+          class="more-options-menu absolute top-full right-0 md:right-0 md:left-auto mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1 overflow-hidden"
         >
           <!-- PLAYBACK CONTROLS GROUP -->
           <div class="py-1">
@@ -265,10 +265,12 @@
               </button>
               <button
                 (click)="maximizePlayer()"
-                class="flex-1 flex items-center justify-center p-2 rounded-lg  hover:bg-zinc-600 transition-colors"
+                class="flex-1 flex items-center justify-center p-2 rounded-lg hover:bg-zinc-600 transition-colors"
                 title="Maximize"
               >
-                <span class="material-symbols-outlined text-xl">fullscreen</span>
+                <span class="material-symbols-outlined text-xl"
+                  >fullscreen</span
+                >
               </button>
               <button
                 (click)="openDetailsModal()"
