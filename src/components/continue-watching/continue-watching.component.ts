@@ -1,5 +1,5 @@
-import { Component, ChangeDetectionStrategy, signal, inject, computed, effect, viewChild, ElementRef, DestroyRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ChangeDetectionStrategy, signal, inject, computed, effect, viewChild, ElementRef, DestroyRef, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { fromEvent } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -24,6 +24,16 @@ export class ContinueWatchingComponent {
   private movieService = inject(MovieService);
   private navigationService = inject(NavigationService);
   private destroyRef = inject(DestroyRef);
+  private platformId = inject(PLATFORM_ID);
+
+  // Cache device capability once
+  protected isTouch =
+    isPlatformBrowser(this.platformId) &&
+    (navigator.maxTouchPoints > 0 ||
+      "ontouchstart" in window ||
+      (typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(pointer: coarse)").matches));
 
   suggestions = this.continueWatchingService.items;
   isLoading = signal(false);
@@ -121,6 +131,8 @@ export class ContinueWatchingComponent {
   }
 
   onMouseDown(e: MouseEvent): void {
+    if (this.isTouch) return;
+
     // FIX: Check if the click originated inside a modal or other fixed element.
     // This prevents the drag-scroll from interfering with modal interactions.
     let targetElement = e.target as HTMLElement | null;
