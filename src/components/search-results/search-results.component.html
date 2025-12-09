@@ -24,11 +24,14 @@
     class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 border-b border-zinc-800 pb-4"
   >
     <div
-      class="flex items-center space-x-2 self-start sm:self-center overflow-x-auto"
+      class="flex flex-wrap sm:flex-nowrap items-center gap-2 self-start sm:self-center"
+      role="toolbar"
+      aria-label="Search filters"
     >
       <button
         (click)="activeFilter.set('all')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [attr.aria-pressed]="activeFilter() === 'all'"
+        class="px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
         [class.bg-white]="activeFilter() === 'all'"
         [class.text-black]="activeFilter() === 'all'"
         [class.bg-zinc-800]="activeFilter() !== 'all'"
@@ -39,7 +42,8 @@
       </button>
       <button
         (click)="activeFilter.set('movie')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [attr.aria-pressed]="activeFilter() === 'movie'"
+        class="px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
         [class.bg-white]="activeFilter() === 'movie'"
         [class.text-black]="activeFilter() === 'movie'"
         [class.bg-zinc-800]="activeFilter() !== 'movie'"
@@ -50,7 +54,8 @@
       </button>
       <button
         (click)="activeFilter.set('tv')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [attr.aria-pressed]="activeFilter() === 'tv'"
+        class="px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
         [class.bg-white]="activeFilter() === 'tv'"
         [class.text-black]="activeFilter() === 'tv'"
         [class.bg-zinc-800]="activeFilter() !== 'tv'"
@@ -61,7 +66,8 @@
       </button>
       <button
         (click)="activeFilter.set('channel')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [attr.aria-pressed]="activeFilter() === 'channel'"
+        class="px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
         [class.bg-white]="activeFilter() === 'channel'"
         [class.text-black]="activeFilter() === 'channel'"
         [class.bg-zinc-800]="activeFilter() !== 'channel'"
@@ -72,7 +78,8 @@
       </button>
       <button
         (click)="activeFilter.set('collection')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        [attr.aria-pressed]="activeFilter() === 'collection'"
+        class="px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
         [class.bg-white]="activeFilter() === 'collection'"
         [class.text-black]="activeFilter() === 'collection'"
         [class.bg-zinc-800]="activeFilter() !== 'collection'"
@@ -83,11 +90,11 @@
       </button>
     </div>
 
-    <div class="self-end sm:self-center">
+    <div class="self-end sm:self-center w-full sm:w-auto mt-2 sm:mt-0">
       <select
         [value]="sortBy()"
         (change)="onSortChange($event)"
-        class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+        class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm w-full sm:w-auto"
       >
         <option value="relevance">Relevance</option>
         <option value="newest">Newest</option>
