@@ -99,6 +99,7 @@ export class HeaderComponent {
       this.closeMobileSearch();
     }
     this.historyVisible.set(false);
+    this.searchInput()?.nativeElement.blur();
   }
 
   updateSearchQuery(event: Event): void {
