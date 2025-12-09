@@ -19,6 +19,7 @@
       (mouseleave)="onMouseLeave()"
       (mouseup)="onMouseUp()"
       (mousemove)="onMouseMove($event)"
+      (dragstart)="$event.preventDefault()"
       class="flex overflow-x-auto space-x-4 sm:space-x-6 pb-24 -mb-24"
       [class.cursor-grabbing]="isGrabbing()"
       [class.select-none]="isGrabbing()"

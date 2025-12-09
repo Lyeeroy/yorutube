@@ -145,7 +145,7 @@ export class ContinueWatchingComponent {
 
     const element = this.scrollContainer()?.nativeElement;
     if (!element) return;
-    e.preventDefault();
+    // e.preventDefault();
     this.isMouseDown = true;
     this.hasDragged = false;
     this.isGrabbing.set(true);
