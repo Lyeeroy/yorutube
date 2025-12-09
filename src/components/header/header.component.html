@@ -218,13 +218,74 @@
   </div>
 
   <!-- Right Section -->
-  <div class="flex items-center space-x-1 sm:space-x-2">
+  <div class="relative flex items-center space-x-1 sm:space-x-2">
     <button
       (click)="openMobileSearch()"
       class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white md:hidden shrink-0 flex items-center justify-center"
     >
       <span class="material-symbols-outlined text-white text-2xl">search</span>
     </button>
+
+    <!-- Mobile-only three-dot overflow menu (shows items hidden on small screens) -->
+    <button
+      (click)="toggleOverflow($event)"
+      class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none md:hidden shrink-0 flex items-center justify-center"
+      aria-label="More options"
+      title="More"
+    >
+      <span class="material-symbols-outlined text-white text-2xl">more_vert</span>
+    </button>
+
+    @if (overflowVisible()) {
+    <div
+      class="absolute top-full right-0 mt-2 w-44 bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-700 p-1"
+    >
+      <button
+        (click)="toggleOverflowNotifications($event)"
+        class="w-full text-left flex items-center px-3 py-2 text-white hover:bg-zinc-700 rounded-md"
+      >
+        <span class="material-symbols-outlined mr-3">notifications</span>
+        <span class="flex-1">Notifications</span>
+        @if (unreadNotificationCount() > 0) {
+        <span class="ml-2 inline-flex items-center justify-center h-5 px-2 rounded-full bg-red-600 text-xs font-bold text-white">{{ unreadNotificationCount() > 9 ? '9+' : unreadNotificationCount() }}</span>
+        }
+      </button>
+
+      @if (overflowShowNotifications() && notifications().length > 0) {
+      <div class="mt-1 max-h-48 overflow-y-auto text-sm text-white border-t border-zinc-700 pt-1">
+        @for (notification of notifications(); track notification.id) {
+        <div
+          (click)="onNotificationClick(notification); overflowVisible.set(false); overflowShowNotifications.set(false)"
+          class="flex items-start p-2 hover:bg-zinc-700 cursor-pointer rounded-md border-b border-zinc-700/30"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-xs text-white line-clamp-2">{{ notification.message }}</p>
+            <p class="text-xs text-zinc-400 mt-1">{{ getRelativeTime(notification.timestamp) }} ago</p>
+          </div>
+        </div>
+        }
+      </div>
+      } @else {
+      @if (overflowShowNotifications()) {
+      <div class="mt-1 p-2 text-xs text-zinc-400 border-t border-zinc-700">No notifications.</div>
+      }
+      }
+      <button
+        (click)="onHelpClick(); overflowVisible.set(false)"
+        class="w-full text-left flex items-center px-3 py-2 text-white hover:bg-zinc-700 rounded-md mt-1"
+      >
+        <span class="material-symbols-outlined mr-3">help</span>
+        <span>Help</span>
+      </button>
+      <button
+        (click)="signInClicked.emit(); overflowVisible.set(false)"
+        class="w-full text-left flex items-center px-3 py-2 text-white hover:bg-zinc-700 rounded-md mt-1"
+      >
+        <span class="material-symbols-outlined mr-3">account_circle</span>
+        <span>Sign in</span>
+      </button>
+    </div>
+    }
     <button
       (click)="onHelpClick()"
       class="hidden lg:flex w-10 h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 items-center justify-center"

@@ -34,6 +34,10 @@ export class HeaderComponent {
   mobileSearchActive = signal(false);
   historyVisible = signal(false);
   notificationsVisible = signal(false);
+  // Mobile overflow menu for items hidden on smaller breakpoints
+  overflowVisible = signal(false);
+  // when the mobile overflow menu has an inline notifications preview
+  overflowShowNotifications = signal(false);
 
   hamburgerClick = output<void>();
   signInClicked = output<void>();
@@ -49,11 +53,40 @@ export class HeaderComponent {
   @HostListener("document:click", ["$event"])
   onDocumentClick(event: MouseEvent): void {
     if (
-      this.notificationsVisible() &&
+      (this.notificationsVisible() || this.overflowVisible()) &&
       !this.elementRef.nativeElement.contains(event.target)
     ) {
       this.closeNotifications();
+      this.closeOverflow();
     }
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onDocumentEscape(_event: KeyboardEvent): void {
+    // Close small popups with Escape
+    if (this.overflowVisible()) {
+      this.closeOverflow();
+    }
+    if (this.notificationsVisible()) {
+      this.closeNotifications();
+    }
+    if (this.overflowShowNotifications()) {
+      this.overflowShowNotifications.set(false);
+    }
+  }
+
+  toggleOverflow(event: MouseEvent): void {
+    event.stopPropagation();
+    this.overflowVisible.update((v) => !v);
+  }
+
+  toggleOverflowNotifications(event: MouseEvent): void {
+    event.stopPropagation();
+    this.overflowShowNotifications.update((v) => !v);
+  }
+
+  closeOverflow(): void {
+    this.overflowVisible.set(false);
   }
 
   onSearch(): void {
