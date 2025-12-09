@@ -41,6 +41,8 @@
         (mouseup)="onMouseUp()"
         (mousemove)="onMouseMove($event)"
         class="flex overflow-x-auto space-x-4 sm:space-x-6 pb-24 -mb-24"
+        (dragstart)="$event.preventDefault()"
+        style="touch-action: pan-y; -ms-touch-action: pan-y; scrollbar-width: none; -ms-overflow-style: none"
         [class.cursor-grabbing]="isGrabbing()"
         [class.select-none]="isGrabbing()"
         style="scrollbar-width: none; -ms-overflow-style: none"

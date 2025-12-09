@@ -5,6 +5,7 @@
   class="relative cursor-pointer rounded-xl transition-colors duration-200"
   [class.group]="!isTouch"
   [ngClass]="containerClasses()"
+  style="touch-action: manipulation; -ms-touch-action: manipulation"
 >
   <!-- 1. Thumbnail Section -->
   <div
