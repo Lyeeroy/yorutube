@@ -7,26 +7,26 @@
 } @else if(channelDetails(); as channel) {
   <div class="flex flex-col">
     <!-- Channel Header -->
-    <div class="relative w-full h-48 sm:h-56 md:h-64 bg-zinc-800">
+    <div class="relative w-full h-40 sm:h-56 md:h-72 lg:h-80 bg-zinc-800">
       @if (bannerUrl()) {
         <img [ngSrc]="bannerUrl()!" [alt]="channel.name + ' banner'" fill priority class="object-cover object-center">
       }
       <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent"></div>
     </div>
     
-    <div class="px-4 sm:px-6 -mt-10 sm:-mt-20 z-10 relative">
-      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div class="flex flex-col sm:flex-row items-center gap-4">
-          <div class="relative h-20 w-20 sm:h-32 sm:w-32 bg-zinc-900 border-4 border-zinc-900 rounded-full flex items-center justify-center shrink-0">
+    <div class="px-4 sm:px-6 -mt-12 sm:-mt-16 md:-mt-20 z-10 relative">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div class="flex flex-col sm:flex-row items-center md:items-end gap-4 sm:gap-6">
+          <div class="relative h-24 w-24 sm:h-32 sm:w-32 md:h-40 md:w-40 bg-zinc-900 border-4 border-zinc-900 rounded-full flex items-center justify-center shrink-0 shadow-xl">
             @if (logoUrl()) {
               <img [ngSrc]="logoUrl()!" [alt]="channel.name + ' Logo'" fill class="p-2 object-contain">
             } @else {
-              <span class="material-symbols-outlined text-4xl text-zinc-400">movie</span>
+              <span class="material-symbols-outlined text-4xl sm:text-5xl text-zinc-400">movie</span>
             }
           </div>
-          <div class="text-center sm:text-left pt-2 sm:pb-2">
-            <h1 class="text-2xl sm:text-3xl font-bold text-white">{{ channel.name }}</h1>
-            <div class="text-sm text-zinc-400 flex items-center justify-center sm:justify-start space-x-2 mt-1">
+          <div class="text-center sm:text-left pb-2 md:pb-4">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white">{{ channel.name }}</h1>
+            <div class="text-sm sm:text-base text-zinc-400 flex items-center justify-center sm:justify-start space-x-2 mt-1">
               <span>@{{ channel.name }}</span>
               <span>•</span>
               <span>{{ channel.origin_country }}</span>
@@ -35,7 +35,7 @@
         </div>
         <button
           (click)="toggleSubscription()"
-          class="w-full sm:w-auto text-sm font-bold py-2 px-6 rounded-full transition-colors shrink-0"
+          class="w-full md:w-auto text-sm font-bold py-3 px-8 rounded-full transition-colors shrink-0 mb-2 md:mb-4"
           [class.bg-white]="!isSubscribed()"
           [class.text-black]="!isSubscribed()"
           [class.hover:bg-zinc-200]="!isSubscribed()"
@@ -47,7 +47,7 @@
       </div>
 
       @if (channelDescription(); as description) {
-        <div class="mt-4 text-sm text-zinc-300 max-w-3xl cursor-pointer" (click)="descriptionExpanded.set(!descriptionExpanded())">
+        <div class="mt-6 text-sm sm:text-base text-zinc-300 max-w-3xl cursor-pointer" (click)="descriptionExpanded.set(!descriptionExpanded())">
           <p [class.line-clamp-2]="!descriptionExpanded()">{{ description }}</p>
           <button class="font-semibold text-zinc-400 hover:text-white mt-1">
             {{ descriptionExpanded() ? 'Show less' : '...more' }}
@@ -57,31 +57,33 @@
     </div>
 
     <!-- Tabs -->
-    <div class="mt-8 border-b border-zinc-700 flex space-x-4 sm:space-x-6 px-4 sm:px-6">
-      <button (click)="onTabClick('home')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors"
-        [class.text-white]="activeTab() === 'home'"
-        [class.border-b-2]="activeTab() === 'home'"
-        [class.border-white]="activeTab() === 'home'"
-        [class.text-zinc-400]="activeTab() !== 'home'"
-        [class.hover:text-white]="activeTab() !== 'home'">
-        Home
-      </button>
-      <button (click)="onTabClick('videos')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors"
-        [class.text-white]="activeTab() === 'videos'"
-        [class.border-b-2]="activeTab() === 'videos'"
-        [class.border-white]="activeTab() === 'videos'"
-        [class.text-zinc-400]="activeTab() !== 'videos'"
-        [class.hover:text-white]="activeTab() !== 'videos'">
-        Videos
-      </button>
-      <button (click)="onTabClick('about')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors"
-        [class.text-white]="activeTab() === 'about'"
-        [class.border-b-2]="activeTab() === 'about'"
-        [class.border-white]="activeTab() === 'about'"
-        [class.text-zinc-400]="activeTab() !== 'about'"
-        [class.hover:text-white]="activeTab() !== 'about'">
-        About
-      </button>
+    <div class="mt-8 border-b border-zinc-700">
+      <div class="flex space-x-6 px-4 sm:px-6 overflow-x-auto no-scrollbar">
+        <button (click)="onTabClick('home')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors whitespace-nowrap border-b-2"
+          [class.border-white]="activeTab() === 'home'"
+          [class.border-transparent]="activeTab() !== 'home'"
+          [class.text-white]="activeTab() === 'home'"
+          [class.text-zinc-400]="activeTab() !== 'home'"
+          [class.hover:text-white]="activeTab() !== 'home'">
+          Home
+        </button>
+        <button (click)="onTabClick('videos')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors whitespace-nowrap border-b-2"
+          [class.border-white]="activeTab() === 'videos'"
+          [class.border-transparent]="activeTab() !== 'videos'"
+          [class.text-white]="activeTab() === 'videos'"
+          [class.text-zinc-400]="activeTab() !== 'videos'"
+          [class.hover:text-white]="activeTab() !== 'videos'">
+          Videos
+        </button>
+        <button (click)="onTabClick('about')" class="py-3 text-sm font-semibold uppercase tracking-wider transition-colors whitespace-nowrap border-b-2"
+          [class.border-white]="activeTab() === 'about'"
+          [class.border-transparent]="activeTab() !== 'about'"
+          [class.text-white]="activeTab() === 'about'"
+          [class.text-zinc-400]="activeTab() !== 'about'"
+          [class.hover:text-white]="activeTab() !== 'about'">
+          About
+        </button>
+      </div>
     </div>
 
     <!-- Channel Content -->
@@ -134,12 +136,12 @@
         }
         @case ('videos') {
           <div>
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
               @if (channelType() === 'merged') {
-                <div class="flex items-center space-x-2 self-start overflow-x-auto pb-2">
+                <div class="flex items-center space-x-2 self-start overflow-x-auto pb-2 max-w-full no-scrollbar">
                   <button 
                     (click)="contentFilter.set('all')"
-                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
                     [class.bg-white]="contentFilter() === 'all'"
                     [class.text-black]="contentFilter() === 'all'"
                     [class.bg-zinc-800]="contentFilter() !== 'all'"
@@ -149,7 +151,7 @@
                   </button>
                   <button 
                     (click)="contentFilter.set('movie')"
-                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
                     [class.bg-white]="contentFilter() === 'movie'"
                     [class.text-black]="contentFilter() === 'movie'"
                     [class.bg-zinc-800]="contentFilter() !== 'movie'"
@@ -159,7 +161,7 @@
                   </button>
                    <button 
                     (click)="contentFilter.set('tv')"
-                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+                    class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
                     [class.bg-white]="contentFilter() === 'tv'"
                     [class.text-black]="contentFilter() === 'tv'"
                     [class.bg-zinc-800]="contentFilter() !== 'tv'"
@@ -169,11 +171,11 @@
                   </button>
                 </div>
               }
-              <div class="w-full md:w-auto flex flex-wrap gap-2" [class.md:ml-auto]="channelType() !== 'merged'">
+              <div class="w-full lg:w-auto grid grid-cols-2 sm:flex sm:flex-wrap gap-2" [class.lg:ml-auto]="channelType() !== 'merged'">
                   <select 
                       [value]="sortBy()"
                       (change)="onSortChange($event)"
-                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      class="col-span-2 sm:col-span-1 bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[140px]">
                       @for(option of sortOptions(); track option.value) {
                         <option [value]="option.value">{{ option.label }}</option>
                       }
@@ -181,7 +183,7 @@
                   <select 
                       [value]="selectedGenre() || ''"
                       (change)="onGenreChange($event)"
-                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[120px]">
                       <option value="">Any Genre</option>
                       @for(genre of availableGenres(); track genre.id) {
                         <option [value]="genre.id">{{ genre.name }}</option>
@@ -190,7 +192,7 @@
                   <select 
                       [value]="selectedYear() || ''"
                       (change)="onYearChange($event)"
-                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[100px]">
                       <option value="">Any Year</option>
                       @for(year of years(); track year) {
                         <option [value]="year">{{ year }}</option>
@@ -199,7 +201,7 @@
                   <select 
                       [value]="selectedMinRating() || ''"
                       (change)="onRatingChange($event)"
-                      class="flex-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px]">
+                      class="col-span-2 sm:col-span-1 bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[120px]">
                       <option value="">Any Rating</option>
                       @for(rating of ratings; track rating) {
                         <option [value]="rating">{{ rating }}+ Rating</option>

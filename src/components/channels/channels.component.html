@@ -3,10 +3,10 @@
 
   <!-- Tabs -->
   <div class="border-b border-zinc-800">
-    <div class="flex items-center space-x-2 pb-2 overflow-x-auto">
+    <div class="flex items-center space-x-2 pb-2 overflow-x-auto no-scrollbar">
       <button
         (click)="setActiveTab('networks')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
         [class.bg-white]="activeTab() === 'networks'"
         [class.text-black]="activeTab() === 'networks'"
         [class.bg-zinc-800]="activeTab() !== 'networks'"
@@ -16,7 +16,7 @@
       </button>
       <button
         (click)="setActiveTab('movieStudios')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
         [class.bg-white]="activeTab() === 'movieStudios'"
         [class.text-black]="activeTab() === 'movieStudios'"
         [class.bg-zinc-800]="activeTab() !== 'movieStudios'"
@@ -26,7 +26,7 @@
       </button>
       <button
         (click)="setActiveTab('animeStudios')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
         [class.bg-white]="activeTab() === 'animeStudios'"
         [class.text-black]="activeTab() === 'animeStudios'"
         [class.bg-zinc-800]="activeTab() !== 'animeStudios'"
@@ -55,11 +55,11 @@
       }
     </div>
     
-    <div class="flex items-center gap-2 self-stretch md:self-auto">
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
       <select 
         [value]="sortBy()" 
         (change)="onSortChange($event)"
-        class="flex-1 md:flex-none bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm">
+        class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm w-full sm:w-auto">
         <option value="relevance">Sort by: Relevance</option>
         <option value="name_asc">A-Z</option>
         <option value="name_desc">Z-A</option>
@@ -67,7 +67,7 @@
       <select 
         [value]="selectedCountry()" 
         (change)="onCountryChange($event)"
-        class="flex-1 md:flex-none bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm">
+        class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm w-full sm:w-auto">
         <option value="all">All Countries</option>
         @for (country of availableCountries(); track country.code) {
           <option [value]="country.code">{{ country.name }}</option>
@@ -83,7 +83,7 @@
       @case ('networks') {
         @if (loading().networks) {
           <!-- Skeleton loader -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
             @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
               <div class="animate-pulse flex flex-col items-center gap-4">
                   <div class="w-32 h-32 rounded-full bg-zinc-800"></div>
@@ -99,7 +99,7 @@
               <p class="text-zinc-500 mt-2">Try adjusting your search or filters.</p>
             </div>
           } @else {
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
               @for (network of filteredChannels(); track network.id) {
                 <app-channel-card
                   [channel]="network"
@@ -115,7 +115,7 @@
       @case ('movieStudios') {
         @if (loading().movieStudios) {
           <!-- Skeleton loader -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
             @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
               <div class="animate-pulse flex flex-col items-center gap-4">
                   <div class="w-32 h-32 rounded-full bg-zinc-800"></div>
@@ -131,7 +131,7 @@
               <p class="text-zinc-500 mt-2">Try adjusting your search or filters.</p>
             </div>
           } @else {
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
               @for (studio of filteredChannels(); track studio.id) {
                 <app-channel-card
                   [channel]="studio"
@@ -147,7 +147,7 @@
       @case ('animeStudios') {
         @if (loading().animeStudios) {
           <!-- Skeleton loader -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
             @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
               <div class="animate-pulse flex flex-col items-center gap-4">
                   <div class="w-32 h-32 rounded-full bg-zinc-800"></div>
@@ -163,7 +163,7 @@
               <p class="text-zinc-500 mt-2">Try adjusting your search or filters.</p>
             </div>
           } @else {
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
               @for (studio of filteredChannels(); track studio.id) {
                 <app-channel-card
                   [channel]="studio"
