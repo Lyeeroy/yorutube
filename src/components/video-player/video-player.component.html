@@ -30,13 +30,13 @@
   
         <!-- Close Button (Only visible in Cinema Mode) -->
         @if (isMaximized()) {
-          <div class="absolute top-4 right-4 z-[10000]">
+          <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[10000]">
             <button
               (click)="closeMaximize(); $event.stopPropagation()"
-              class="flex items-center justify-center w-12 h-12 bg-zinc-900/90 hover:bg-zinc-800 rounded-full transition-colors shadow-lg backdrop-blur-sm border border-zinc-700/50"
+              class="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12  rounded-full transition-colors shadow-lg backdrop-blur-sm "
               title="Exit Cinema Mode (ESC)"
             >
-              <span class="material-symbols-outlined text-2xl text-white">close</span>
+              <span class="material-symbols-outlined text-xl sm:text-2xl text-white">close</span>
             </button>
           </div>
         }
@@ -63,10 +63,10 @@
         
         <!-- Next Episode Overlay -->
         @if (showNextEpisodeButton()) {
-          <div class="absolute top-8 right-8 z-50 animate-fade-in">
+          <div class="absolute top-2 sm:top-4 md:top-6 lg:top-8 right-2 sm:right-4 md:right-6 lg:right-8 z-50 animate-fade-in">
             <button
               (click)="onNextEpisodeClick()"
-              class="group relative overflow-hidden bg-zinc-900/90 hover:bg-zinc-800 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-all duration-300 flex items-center gap-3 border border-zinc-700/50 backdrop-blur-sm"
+              class="group relative overflow-hidden bg-zinc-900/90 hover:bg-zinc-800 text-white px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-2.5 lg:px-6 lg:py-3 rounded-md sm:rounded-lg font-medium shadow-lg transition-all duration-300 flex items-center gap-2 sm:gap-2.5 md:gap-3 border border-zinc-700/50 backdrop-blur-sm"
             >
               <!-- Progress Bar Background (only when counting down) -->
               @if (autoNextState() === 'counting_down') {
@@ -77,14 +77,14 @@
               }
   
               <!-- Icon -->
-              <span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform">
+              <span class="material-symbols-outlined text-lg sm:text-xl md:text-2xl group-hover:scale-110 transition-transform">
                 skip_next
               </span>
   
               <!-- Text -->
               <div class="flex flex-col items-start z-10">
-                <span class="text-sm uppercase tracking-wider text-zinc-400 text-[10px] leading-none mb-1">Up Next</span>
-                <span class="font-bold leading-none">
+                <span class="text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-wider text-zinc-400 leading-none mb-0.5 sm:mb-1">Up Next</span>
+                <span class="text-xs sm:text-sm md:text-base font-bold leading-none">
                   @if (autoNextState() === 'counting_down') {
                     Playing in {{ autoNextCountdown() }}...
                   } @else {
@@ -97,10 +97,10 @@
               @if (autoNextState() === 'counting_down') {
                 <div 
                   (click)="$event.stopPropagation(); cancelAutoNext()"
-                  class="ml-3 p-1 hover:bg-white/20 rounded-full transition-colors"
+                  class="ml-1 sm:ml-2 md:ml-3 p-0.5 sm:p-1 hover:bg-white/20 rounded-full transition-colors"
                   title="Cancel Auto-Play"
                 >
-                  <span class="material-symbols-outlined text-lg">close</span>
+                  <span class="material-symbols-outlined text-sm sm:text-base md:text-lg">close</span>
                 </div>
               }
             </button>
