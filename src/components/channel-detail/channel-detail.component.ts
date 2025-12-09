@@ -195,10 +195,17 @@ export class ChannelDetailComponent {
             return;
         }
 
+        // Handle aliases for merging (e.g. Prime Video network <-> Amazon Studios company)
+        const alias = this.getAlias(name, type);
+        const searchName = alias || name;
+
         let mergeCheckSub: any;
         if (type === 'network') {
-            mergeCheckSub = this.movieService.searchCompanies(name, 1).pipe(
-                map(response => response.results.find(c => c.name.toLowerCase() === name.toLowerCase())),
+            mergeCheckSub = this.movieService.searchCompanies(searchName, 1).pipe(
+                map(response => response.results.find(c => 
+                    c.name.toLowerCase() === searchName.toLowerCase() || 
+                    c.name.toLowerCase() === name.toLowerCase()
+                )),
                 catchError(() => of(undefined))
             ).subscribe(company => {
                 if (company) {
@@ -209,7 +216,10 @@ export class ChannelDetailComponent {
             });
         } else { // type === 'company'
             mergeCheckSub = this.movieService.getPopularNetworks().pipe(
-                map(networks => networks.find(n => n.name.toLowerCase() === name.toLowerCase())),
+                map(networks => networks.find(n => 
+                    n.name.toLowerCase() === searchName.toLowerCase() || 
+                    n.name.toLowerCase() === name.toLowerCase()
+                )),
                 catchError(() => of(undefined))
             ).subscribe(network => {
                 if (network) {
@@ -444,5 +454,21 @@ export class ChannelDetailComponent {
     const select = event.target as HTMLSelectElement;
     this.selectedGenre.set(Number(select.value) || null);
     this.applyVideosFiltersAndLoad();
+  }
+
+  private getAlias(name: string, currentType: 'network' | 'company'): string | null {
+    const lowerName = name.toLowerCase();
+    if (currentType === 'network') {
+        // Searching for company counterpart
+        if (lowerName === 'prime video') return 'Amazon Studios';
+        if (lowerName === 'apple tv+') return 'Apple Studios';
+        if (lowerName === 'disney+') return 'Walt Disney Pictures';
+    } else {
+        // Searching for network counterpart
+        if (lowerName === 'amazon studios') return 'Prime Video';
+        if (lowerName === 'apple studios') return 'Apple TV+';
+        if (lowerName === 'walt disney pictures') return 'Disney+';
+    }
+    return null;
   }
 }
