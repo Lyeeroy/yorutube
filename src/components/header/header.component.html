@@ -13,7 +13,7 @@
       >
     </button>
     <div
-      class="flex-1 flex items-center h-10 ml-1 sm:ml-2 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black"
+      class="flex-1 flex items-center h-10 ml-1 sm:ml-2 rounded-3xl border border-zinc-700 bg-black"
     >
       <input
         #searchInput
@@ -97,7 +97,7 @@
   <div class="flex items-center space-x-1 sm:space-x-2 lg:space-x-4">
     <button
       (click)="hamburgerClick.emit()"
-      class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 flex items-center justify-center"
+      class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none shrink-0 flex items-center justify-center"
     >
       <span class="material-symbols-outlined text-white text-2xl">menu</span>
     </button>
@@ -129,7 +129,7 @@
     <div class="w-full max-w-2xl flex items-center relative" role="search">
       <!-- Input Section - Rounded Left -->
       <div
-        class="flex-1 flex items-center h-9 md:h-10 rounded-l-3xl border border-zinc-700 focus-within:border-red-500 bg-black transition-colors duration-200"
+        class="flex-1 flex items-center h-9 md:h-10 rounded-l-3xl border border-zinc-700 bg-black transition-colors duration-200"
       >
         <input
           #searchInput
@@ -213,7 +213,7 @@
           <div class="flex items-center shrink-0 space-x-1">
             <button
               (click)="selectHistoryItem($event, item)"
-              class="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-600 shrink-0 transition-colors duration-150"
+              class="p-1 rounded-full text-zinc-400 hover:text-white shrink-0 transition-colors duration-150"
               aria-label="Place '{{ item }}' in search input"
             >
               <span class="material-symbols-outlined text-sm" aria-hidden="true"
@@ -222,7 +222,7 @@
             </button>
             <button
               (click)="removeHistoryItem($event, item)"
-              class="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-600 shrink-0 transition-colors duration-150"
+              class="p-1 rounded-full text-zinc-400 hover:text-white shrink-0 transition-colors duration-150"
               aria-label="Remove '{{ item }}' from history"
             >
               <span class="material-symbols-outlined text-sm" aria-hidden="true"
@@ -239,7 +239,7 @@
       <button
         aria-label="Search with your voice"
         title="Search with your voice"
-        class="ml-2 md:ml-4 w-9 h-9 md:w-10 md:h-10 hidden lg:flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-red-500 shrink-0 transition-colors duration-150"
+        class="ml-2 md:ml-4 w-9 h-9 md:w-10 md:h-10 hidden lg:flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none shrink-0 transition-colors duration-150"
       >
         <span
           class="material-symbols-outlined text-white text-2xl"
@@ -254,7 +254,7 @@
   <div class="relative flex items-center space-x-1 sm:space-x-2">
     <button
       (click)="openMobileSearch()"
-      class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white md:hidden shrink-0 flex items-center justify-center"
+      class="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none md:hidden shrink-0 flex items-center justify-center"
     >
       <span class="material-symbols-outlined text-white text-2xl">search</span>
     </button>
@@ -338,7 +338,7 @@
     }
     <button
       (click)="onHelpClick()"
-      class="hidden lg:flex w-10 h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 items-center justify-center"
+      class="hidden lg:flex w-10 h-10 rounded-full hover:bg-zinc-800 focus:outline-none shrink-0 items-center justify-center"
     >
       <span class="material-symbols-outlined text-white text-2xl">help</span>
     </button>
@@ -347,7 +347,7 @@
     <div class="relative hidden md:inline-flex">
       <button
         (click)="toggleNotifications($event)"
-        class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white shrink-0 flex items-center justify-center"
+        class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-zinc-800 focus:outline-none shrink-0 flex items-center justify-center"
       >
         <span class="material-symbols-outlined text-white text-2xl"
           >notifications</span
@@ -437,7 +437,7 @@
 
     <button
       (click)="signInClicked.emit()"
-      class="flex items-center space-x-1 sm:space-x-2 border border-zinc-700 text-white hover:bg-zinc-700 active:bg-zinc-600 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-red-500 shrink-0"
+      class="flex items-center space-x-1 sm:space-x-2 border border-zinc-700 text-white hover:bg-zinc-700 active:bg-zinc-600 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold transition-colors focus:outline-none shrink-0"
     >
       <span class="material-symbols-outlined text-2xl">account_circle</span>
       <span class="hidden sm:inline">Sign in</span>
