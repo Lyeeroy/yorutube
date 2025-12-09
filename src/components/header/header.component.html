@@ -22,7 +22,8 @@
         [value]="searchQuery()"
         (input)="updateSearchQuery($event)"
         (keyup.enter)="onSearch()"
-        (focus)="historyVisible.set(true)"
+        (focus)="historyVisible.set(true); selectedHistoryTerm.set(null)"
+        (keydown)="onSearchInputKeydown($event)"
         (blur)="closeHistoryWithDelay()"
         class="w-full h-full bg-transparent pl-5 text-white focus:outline-none rounded-l-3xl"
       />
@@ -46,10 +47,21 @@
     <div
       class="absolute top-full left-0 right-0 mt-2 bg-zinc-800 rounded-lg shadow-lg z-50 p-2 mx-2"
     >
+      <div class="flex items-center justify-between px-2 mb-1">
+        <div class="text-xs text-zinc-400">Search history</div>
+        <button
+          (click)="clearAllHistory(); $event.stopPropagation()"
+          class="text-xs text-zinc-400 hover:text-white px-2 py-0.5"
+        >
+          Clear all
+        </button>
+      </div>
       @for (item of searchHistory(); track item) {
       <div
         (click)="onHistorySearch(item)"
+        (mouseenter)="selectedHistoryTerm.set(item)"
         class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm"
+        [class.bg-zinc-700]="selectedHistoryTerm() === item"
       >
         <div class="flex items-center min-w-0">
           <span
@@ -58,12 +70,22 @@
           >
           <span class="truncate">{{ item }}</span>
         </div>
-        <button
-          (click)="removeHistoryItem($event, item)"
-          class="w-7 h-7 rounded-full hover:bg-zinc-600 text-zinc-400 hover:text-white shrink-0 flex items-center justify-center"
-        >
-          <span class="material-symbols-outlined text-lg">close</span>
-        </button>
+        <div class="flex items-center shrink-0 space-x-2">
+          <button
+            (click)="selectHistoryItem($event, item)"
+            class="w-7 h-7 rounded-full text-zinc-300 hover:text-white shrink-0"
+            aria-label="Use this search term"
+            title="Place in input"
+          >
+            <span class="material-symbols-outlined text-lg">arrow_insert</span>
+          </button>
+          <button
+            (click)="removeHistoryItem($event, item)"
+            class="w-7 h-7 rounded-full text-zinc-300 hover:text-white shrink-0"
+          >
+            <span class="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
       </div>
       }
     </div>
@@ -115,7 +137,8 @@
           [value]="searchQuery()"
           (input)="updateSearchQuery($event)"
           (keyup.enter)="onSearch()"
-          (focus)="historyVisible.set(true)"
+          (focus)="historyVisible.set(true); selectedHistoryTerm.set(null)"
+          (keydown)="onSearchInputKeydown($event)"
           (blur)="closeHistoryWithDelay()"
           class="w-full h-full bg-transparent pl-3 md:pl-5 text-sm md:text-base text-white focus:outline-none rounded-l-3xl"
         />
@@ -141,10 +164,21 @@
       <div
         class="absolute top-full left-0 right-0 mt-2 bg-zinc-800 rounded-lg shadow-lg z-50 p-2"
       >
+        <div class="flex items-center justify-between px-2 mb-1">
+          <div class="text-xs text-zinc-400">Search history</div>
+          <button
+            (click)="clearAllHistory(); $event.stopPropagation()"
+            class="text-xs text-zinc-400 hover:text-white px-2 py-0.5"
+          >
+            Clear all
+          </button>
+        </div>
         @for (item of searchHistory(); track item) {
         <div
           (click)="onHistorySearch(item)"
+          (mouseenter)="selectedHistoryTerm.set(item)"
           class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm"
+          [class.bg-zinc-700]="selectedHistoryTerm() === item"
         >
           <div class="flex items-center min-w-0">
             <span
@@ -153,12 +187,24 @@
             >
             <span class="truncate">{{ item }}</span>
           </div>
-          <button
-            (click)="removeHistoryItem($event, item)"
-            class="p-1 rounded-full hover:bg-zinc-600 text-zinc-400 hover:text-white shrink-0"
-          >
-            <span class="material-symbols-outlined text-sm">close</span>
-          </button>
+          <div class="flex items-center shrink-0 space-x-2">
+            <button
+              (click)="selectHistoryItem($event, item)"
+              class="p-1 rounded-full text-zinc-400 hover:text-white shrink-0"
+              aria-label="Use this search term"
+              title="Place in input"
+            >
+              <span class="material-symbols-outlined text-sm"
+                >arrow_insert</span
+              >
+            </button>
+            <button
+              (click)="removeHistoryItem($event, item)"
+              class="p-1 rounded-full text-zinc-400 hover:text-white shrink-0"
+            >
+              <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
         </div>
         }
       </div>

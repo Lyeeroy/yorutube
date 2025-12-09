@@ -207,6 +207,26 @@ export class NavigationService {
       return;
     }
 
+    // Parse collection
+    const collectionMatch = pathname.match(/^\/collection\/(\d+)/);
+    if (collectionMatch) {
+      this.currentView.set({
+        view: "collection-detail",
+        params: { id: Number(collectionMatch[1]) },
+      });
+      return;
+    }
+
+    // Parse playlist
+    const playlistMatch = pathname.match(/^\/playlists\/(\d+)/);
+    if (playlistMatch) {
+      this.currentView.set({
+        view: "playlist-detail",
+        params: { id: Number(playlistMatch[1]) },
+      });
+      return;
+    }
+
     // Simple path mapping
     switch (pathname) {
       case "/discover":

@@ -39,6 +39,8 @@ export class HeaderComponent {
   signInClicked = output<void>();
 
   searchHistory = this.searchHistoryService.history;
+  // currently selected history item (when navigating with arrow keys)
+  selectedHistoryTerm = signal<string | null>(null);
   notifications = this.notificationService.notifications;
   unreadNotificationCount = computed(
     () => this.notifications().filter((n) => !n.isRead).length
@@ -91,7 +93,10 @@ export class HeaderComponent {
 
   closeHistoryWithDelay(): void {
     // Delay closing to allow click events on history items to register
-    setTimeout(() => this.historyVisible.set(false), 200);
+    setTimeout(() => {
+      this.historyVisible.set(false);
+      this.selectedHistoryTerm.set(null);
+    }, 200);
   }
 
   onHistorySearch(term: string): void {
@@ -102,6 +107,73 @@ export class HeaderComponent {
   removeHistoryItem(event: MouseEvent, term: string): void {
     event.stopPropagation();
     this.searchHistoryService.removeSearchTerm(term);
+  }
+
+  /**
+   * Copy a history term into the input (do not trigger the search).
+   */
+  selectHistoryItem(event: MouseEvent, term: string): void {
+    event.stopPropagation();
+    this.searchQuery.set(term);
+    this.selectedHistoryTerm.set(term);
+    // keep the panel open and focus the input so user can press Enter to search
+    setTimeout(() => this.searchInput()?.nativeElement.focus(), 0);
+  }
+
+  clearAllHistory(): void {
+    this.searchHistoryService.clearAll();
+    this.selectedHistoryTerm.set(null);
+  }
+
+  /**
+   * Handle keyboard navigation inside the search input when history panel is visible.
+   * Arrow keys will only set the input value / selection — they will NOT trigger a search.
+   * Enter will trigger a search for the currently selected history item (if any).
+   */
+  onSearchInputKeydown(event: KeyboardEvent): void {
+    const list = this.searchHistory();
+    if (!this.historyVisible() || !list || list.length === 0) {
+      // If panel not visible or no history, let other keys behave normally
+      if (event.key === "Escape") {
+        this.historyVisible.set(false);
+        this.selectedHistoryTerm.set(null);
+      }
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      const cur = this.selectedHistoryTerm();
+      const nextIndex =
+        cur === null ? 0 : Math.min(list.indexOf(cur) + 1, list.length - 1);
+      const next = list[nextIndex];
+      this.selectedHistoryTerm.set(next);
+      this.searchQuery.set(next);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      const cur = this.selectedHistoryTerm();
+      let nextIndex = -1;
+      if (cur === null) {
+        nextIndex = list.length - 1;
+      } else {
+        nextIndex = Math.max(list.indexOf(cur) - 1, 0);
+      }
+      const next = list[nextIndex];
+      this.selectedHistoryTerm.set(next);
+      this.searchQuery.set(next);
+    } else if (event.key === "Enter") {
+      // If an item is selected, perform the history search; otherwise perform normal search
+      const selected = this.selectedHistoryTerm();
+      if (selected) {
+        event.preventDefault();
+        this.onHistorySearch(selected);
+      } else {
+        this.onSearch();
+      }
+    } else if (event.key === "Escape") {
+      this.selectedHistoryTerm.set(null);
+      this.historyVisible.set(false);
+    }
   }
 
   toggleNotifications(event: MouseEvent): void {
