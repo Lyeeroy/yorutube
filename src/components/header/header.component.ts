@@ -61,7 +61,7 @@ export class HeaderComponent {
     }
   }
 
-  @HostListener('document:keydown.escape', ['$event'])
+  @HostListener("document:keydown.escape", ["$event"])
   onDocumentEscape(_event: KeyboardEvent): void {
     // Close small popups with Escape
     if (this.overflowVisible()) {

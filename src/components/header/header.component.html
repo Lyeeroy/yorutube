@@ -126,93 +126,126 @@
 
   <!-- Center Section: Search (hidden on small screens) -->
   <div class="flex-1 justify-center px-2 md:px-4 lg:px-8 hidden md:flex">
-    <div class="w-full max-w-2xl flex items-center relative">
+    <div class="w-full max-w-2xl flex items-center relative" role="search">
+      <!-- Input Section - Rounded Left -->
       <div
-        class="flex-1 flex items-center h-9 md:h-10 rounded-3xl border border-zinc-700 focus-within:border-red-500 bg-black"
+        class="flex-1 flex items-center h-9 md:h-10 rounded-l-3xl border border-zinc-700 focus-within:border-red-500 bg-black transition-colors duration-200"
       >
         <input
           #searchInput
           type="text"
+          id="search-input"
           placeholder="Search"
+          aria-label="Search"
           [value]="searchQuery()"
           (input)="updateSearchQuery($event)"
           (keyup.enter)="onSearch()"
+          (keyup.escape)="historyVisible.set(false)"
           (focus)="historyVisible.set(true); selectedHistoryTerm.set(null)"
           (keydown)="onSearchInputKeydown($event)"
           (blur)="closeHistoryWithDelay()"
-          class="w-full h-full bg-transparent pl-3 md:pl-5 text-sm md:text-base text-white focus:outline-none rounded-l-3xl"
+          class="w-full h-full bg-transparent pl-3 md:pl-5 text-sm md:text-base text-white focus:outline-none placeholder-zinc-500"
         />
+
         @if (searchQuery()) {
         <button
           (click)="clearSearchQuery()"
-          class="p-1.5 md:p-2 text-zinc-400 hover:text-white shrink-0"
+          aria-label="Clear search"
+          class="p-1.5 md:p-2 text-zinc-400 hover:text-white shrink-0 transition-colors duration-150"
         >
-          <span class="material-symbols-outlined text-2xl">close</span>
-        </button>
-        }
-        <button
-          (click)="onSearch()"
-          class="h-full bg-zinc-800 hover:bg-zinc-700 text-white px-4 md:px-6 rounded-r-3xl border-l border-zinc-700 flex items-center justify-center shrink-0"
-        >
-          <span class="material-symbols-outlined text-zinc-400 text-2xl"
-            >search</span
+          <span class="material-symbols-outlined text-2xl" aria-hidden="true"
+            >close</span
           >
         </button>
+        }
       </div>
+
+      <!-- Search Button - Rounded Right -->
+      <button
+        (click)="onSearch()"
+        aria-label="Search"
+        class="h-9 md:h-10 bg-zinc-800 hover:bg-zinc-700 text-white px-4 md:px-6 rounded-r-3xl border border-l-0 border-zinc-700 flex items-center justify-center shrink-0 transition-colors duration-150"
+      >
+        <span
+          class="material-symbols-outlined text-zinc-400 text-2xl"
+          aria-hidden="true"
+          >search</span
+        >
+      </button>
+
       <!-- Search History Panel -->
       @if (historyVisible() && searchHistory().length > 0) {
       <div
-        class="absolute top-full left-0 right-0 mt-2 bg-zinc-800 rounded-lg shadow-lg z-50 p-2"
+        id="search-history-listbox"
+        role="listbox"
+        aria-label="Search history"
+        class="absolute top-full left-0 right-12 mt-2 bg-zinc-800 rounded-lg shadow-lg z-50 p-2"
       >
         <div class="flex items-center justify-between px-2 mb-1">
-          <div class="text-xs text-zinc-400">Search history</div>
+          <span class="text-xs text-zinc-400">Search history</span>
           <button
             (click)="clearAllHistory(); $event.stopPropagation()"
-            class="text-xs text-zinc-400 hover:text-white px-2 py-0.5"
+            class="text-xs text-zinc-400 hover:text-white px-2 py-0.5 transition-colors duration-150"
+            aria-label="Clear all search history"
           >
             Clear all
           </button>
         </div>
-        @for (item of searchHistory(); track item) {
+
+        @for (item of searchHistory(); track $index) {
         <div
+          [id]="'history-' + item"
+          role="option"
+          [attr.aria-selected]="selectedHistoryTerm() === item"
           (click)="onHistorySearch(item)"
           (mouseenter)="selectedHistoryTerm.set(item)"
-          class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm"
+          class="flex items-center justify-between px-3 py-2 text-white rounded-md hover:bg-zinc-700 cursor-pointer text-sm transition-colors duration-150"
           [class.bg-zinc-700]="selectedHistoryTerm() === item"
         >
           <div class="flex items-center min-w-0">
             <span
               class="material-symbols-outlined text-base mr-3 text-zinc-400 shrink-0"
+              aria-hidden="true"
               >history</span
             >
             <span class="truncate">{{ item }}</span>
           </div>
-          <div class="flex items-center shrink-0 space-x-2">
+          <div class="flex items-center shrink-0 space-x-1">
             <button
               (click)="selectHistoryItem($event, item)"
-              class="p-1 rounded-full text-zinc-400 hover:text-white shrink-0"
-              aria-label="Use this search term"
-              title="Place in input"
+              class="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-600 shrink-0 transition-colors duration-150"
+              aria-label="Place '{{ item }}' in search input"
             >
-              <span class="material-symbols-outlined text-sm"
+              <span class="material-symbols-outlined text-sm" aria-hidden="true"
                 >arrow_insert</span
               >
             </button>
             <button
               (click)="removeHistoryItem($event, item)"
-              class="p-1 rounded-full text-zinc-400 hover:text-white shrink-0"
+              class="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-600 shrink-0 transition-colors duration-150"
+              aria-label="Remove '{{ item }}' from history"
             >
-              <span class="material-symbols-outlined text-sm">close</span>
+              <span class="material-symbols-outlined text-sm" aria-hidden="true"
+                >close</span
+              >
             </button>
           </div>
         </div>
         }
       </div>
       }
+
+      <!-- Mic Button -->
       <button
-        class="ml-2 md:ml-4 w-9 h-9 md:w-10 md:h-10 hidden lg:flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none shrink-0"
+        aria-label="Search with your voice"
+        title="Search with your voice"
+        class="ml-2 md:ml-4 w-9 h-9 md:w-10 md:h-10 hidden lg:flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-red-500 shrink-0 transition-colors duration-150"
       >
-        <span class="material-symbols-outlined text-white text-2xl">mic</span>
+        <span
+          class="material-symbols-outlined text-white text-2xl"
+          aria-hidden="true"
+          >mic</span
+        >
       </button>
     </div>
   </div>
@@ -233,7 +266,9 @@
       aria-label="More options"
       title="More"
     >
-      <span class="material-symbols-outlined text-white text-2xl">more_vert</span>
+      <span class="material-symbols-outlined text-white text-2xl"
+        >more_vert</span
+      >
     </button>
 
     @if (overflowVisible()) {
@@ -247,29 +282,44 @@
         <span class="material-symbols-outlined mr-3">notifications</span>
         <span class="flex-1">Notifications</span>
         @if (unreadNotificationCount() > 0) {
-        <span class="ml-2 inline-flex items-center justify-center h-5 px-2 rounded-full bg-red-600 text-xs font-bold text-white">{{ unreadNotificationCount() > 9 ? '9+' : unreadNotificationCount() }}</span>
+        <span
+          class="ml-2 inline-flex items-center justify-center h-5 px-2 rounded-full bg-red-600 text-xs font-bold text-white"
+          >{{
+            unreadNotificationCount() > 9 ? "9+" : unreadNotificationCount()
+          }}</span
+        >
         }
       </button>
 
       @if (overflowShowNotifications() && notifications().length > 0) {
-      <div class="mt-1 max-h-48 overflow-y-auto text-sm text-white border-t border-zinc-700 pt-1">
+      <div
+        class="mt-1 max-h-48 overflow-y-auto text-sm text-white border-t border-zinc-700 pt-1"
+      >
         @for (notification of notifications(); track notification.id) {
         <div
-          (click)="onNotificationClick(notification); overflowVisible.set(false); overflowShowNotifications.set(false)"
+          (click)="
+            onNotificationClick(notification);
+            overflowVisible.set(false);
+            overflowShowNotifications.set(false)
+          "
           class="flex items-start p-2 hover:bg-zinc-700 cursor-pointer rounded-md border-b border-zinc-700/30"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-xs text-white line-clamp-2">{{ notification.message }}</p>
-            <p class="text-xs text-zinc-400 mt-1">{{ getRelativeTime(notification.timestamp) }} ago</p>
+            <p class="text-xs text-white line-clamp-2">
+              {{ notification.message }}
+            </p>
+            <p class="text-xs text-zinc-400 mt-1">
+              {{ getRelativeTime(notification.timestamp) }} ago
+            </p>
           </div>
         </div>
         }
       </div>
-      } @else {
-      @if (overflowShowNotifications()) {
-      <div class="mt-1 p-2 text-xs text-zinc-400 border-t border-zinc-700">No notifications.</div>
-      }
-      }
+      } @else { @if (overflowShowNotifications()) {
+      <div class="mt-1 p-2 text-xs text-zinc-400 border-t border-zinc-700">
+        No notifications.
+      </div>
+      } }
       <button
         (click)="onHelpClick(); overflowVisible.set(false)"
         class="w-full text-left flex items-center px-3 py-2 text-white hover:bg-zinc-700 rounded-md mt-1"
