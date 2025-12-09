@@ -23,10 +23,13 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
 
   media = signal<MediaType[]>([]);
   loading = signal(true);
+  isInView = signal(false);
+  containerHeight = signal<number | null>(null);
 
   private elementRef = inject(ElementRef);
   private destroyRef = inject(DestroyRef);
   private observer: IntersectionObserver | null = null;
+  private resizeObserver: ResizeObserver | null = null;
   private checkScrollTimeout: number | null = null; // FIX: Track timeout ID
   private hasLoadedContent = false; // FIX: Prevent duplicate loads
   
@@ -71,12 +74,26 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.observer = new IntersectionObserver(([entry]) => {
+      this.isInView.set(entry.isIntersecting);
       if (entry.isIntersecting) {
         this.loadContent();
-        this.observer?.disconnect();
+        // We do NOT disconnect the observer anymore to track visibility
       }
-    }, { rootMargin: '200px' });
+    }, { rootMargin: '600px' }); // Increased margin for smoother scrolling
     this.observer.observe(this.elementRef.nativeElement);
+
+    if (isPlatformBrowser(this.platformId)) {
+      this.resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          // Only update height if we are currently viewing the content
+          // This prevents capturing the height of the placeholder/empty state
+          if (entry.contentRect.height > 0 && this.isInView() && !this.loading()) {
+            this.containerHeight.set(entry.contentRect.height);
+          }
+        }
+      });
+      this.resizeObserver.observe(this.elementRef.nativeElement);
+    }
 
     fromEvent(window, 'resize').pipe(
         debounceTime(200),
@@ -86,6 +103,7 @@ export class ContentCategoryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.observer?.disconnect();
+    this.resizeObserver?.disconnect();
     // FIX: Clear timeout on destroy
     if (this.checkScrollTimeout !== null) {
       clearTimeout(this.checkScrollTimeout);
