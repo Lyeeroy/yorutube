@@ -15,17 +15,16 @@ export interface BaseMedia {
 export interface Movie extends BaseMedia {
   title: string;
   release_date: string;
-  media_type: 'movie';
+  media_type: "movie";
 }
 
 export interface TvShow extends BaseMedia {
   name: string;
   first_air_date: string;
-  media_type: 'tv';
+  media_type: "tv";
 }
 
 export type MediaType = Movie | TvShow;
-
 
 // =======================================
 // Detailed Media Types
@@ -36,6 +35,11 @@ export interface BelongsToCollection {
   name: string;
   poster_path: string | null;
   backdrop_path: string | null;
+}
+
+export interface CollectionSearchResult extends BelongsToCollection {
+  media_type: "collection";
+  overview: string;
 }
 
 export interface CastMember {
@@ -60,13 +64,13 @@ export interface Credits {
 }
 
 export interface MovieDetails extends Movie {
-    runtime: number | null;
-    production_companies: ProductionCompany[];
-    tagline: string | null;
-    belongs_to_collection: BelongsToCollection | null;
-    // FIX: Add homepage property to align with the TMDB API.
-    homepage: string | null;
-    credits?: Credits;
+  runtime: number | null;
+  production_companies: ProductionCompany[];
+  tagline: string | null;
+  belongs_to_collection: BelongsToCollection | null;
+  // FIX: Add homepage property to align with the TMDB API.
+  homepage: string | null;
+  credits?: Credits;
 }
 
 export interface Episode {
@@ -91,22 +95,21 @@ export interface Season {
 }
 
 export interface SeasonDetails extends Season {
-    episodes: Episode[];
+  episodes: Episode[];
 }
 
 export interface TvShowDetails extends TvShow {
-    seasons: Season[];
-    number_of_seasons: number;
-    number_of_episodes: number;
-    created_by: { id: number; name: string }[];
-    last_air_date: string | null;
-    networks: Network[];
-    last_episode_to_air?: Episode | null;
-    // FIX: Add homepage property to align with the TMDB API.
-    homepage: string | null;
-    credits?: Credits;
+  seasons: Season[];
+  number_of_seasons: number;
+  number_of_episodes: number;
+  created_by: { id: number; name: string }[];
+  last_air_date: string | null;
+  networks: Network[];
+  last_episode_to_air?: Episode | null;
+  // FIX: Add homepage property to align with the TMDB API.
+  homepage: string | null;
+  credits?: Credits;
 }
-
 
 // =======================================
 // Channel/Company Types
@@ -126,7 +129,7 @@ export interface ProductionCompany extends ChannelEntity {}
 export interface Network extends ChannelEntity {}
 
 export interface SubscribableChannel extends ChannelEntity {
-  type: 'network' | 'company' | 'merged';
+  type: "network" | "company" | "merged";
   networkId?: number;
   companyId?: number;
 }
@@ -135,7 +138,10 @@ export interface SubscribableChannel extends ChannelEntity {
 // API Response & Search Types
 // =======================================
 
-export type SearchResult = MediaType | SubscribableChannel;
+export type SearchResult =
+  | MediaType
+  | SubscribableChannel
+  | CollectionSearchResult;
 
 export interface MediaResponse {
   page: number;
@@ -180,13 +186,12 @@ export interface Collection {
   parts: Movie[];
 }
 
-
 // =======================================
 // Service Parameter Types
 // =======================================
 
 export interface DiscoverParams {
-  type: 'movie' | 'tv' | 'anime';
+  type: "movie" | "tv" | "anime";
   page?: number;
   with_genres?: number[];
   with_network?: number;

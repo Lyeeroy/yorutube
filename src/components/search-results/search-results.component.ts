@@ -8,13 +8,16 @@ import {
   effect,
   DestroyRef,
 } from "@angular/core";
+import { forkJoin } from "rxjs";
 import { CommonModule } from "@angular/common";
 import {
   MediaType,
   SubscribableChannel,
   SearchResult,
+  CollectionSearchResult,
 } from "../../models/movie.model";
 import { SearchResultCardComponent } from "../search-result-card/search-result-card.component";
+import { SearchResultCollectionCardComponent } from "../search-result-collection-card/search-result-collection-card.component";
 import { InfiniteScrollTriggerComponent } from "../infinite-scroll-trigger/infinite-scroll-trigger.component";
 import { NavigationService } from "../../services/navigation.service";
 import { MovieService } from "../../services/movie.service";
@@ -28,6 +31,7 @@ import { SubscriptionService } from "../../services/subscription.service";
   imports: [
     CommonModule,
     SearchResultCardComponent,
+    SearchResultCollectionCardComponent,
     InfiniteScrollTriggerComponent,
     SearchResultChannelCardComponent,
   ],
@@ -51,9 +55,13 @@ export class SearchResultsComponent {
   searchPage = signal(1);
   totalPages = signal(1);
   searchQuery = signal("");
+  hiddenCount = signal(0);
+  showingHidden = signal(false);
 
   // New signals for filtering and sorting
-  activeFilter = signal<"all" | "movie" | "tv" | "channel">("all");
+  activeFilter = signal<"all" | "movie" | "tv" | "channel" | "collection">(
+    "all"
+  );
   sortBy = signal<"relevance" | "newest" | "rating">("relevance");
 
   hasMore = computed(() => this.searchPage() < this.totalPages());
@@ -74,6 +82,7 @@ export class SearchResultsComponent {
         if (filter === "tv")
           return this.isMedia(item) && item.media_type === "tv";
         if (filter === "channel") return this.isChannel(item);
+        if (filter === "collection") return this.isCollection(item);
         return false;
       });
     }
@@ -143,15 +152,18 @@ export class SearchResultsComponent {
         return;
       }
 
-      const sub = this.movieService.searchAll(query, 1).subscribe({
+      const sub = this.movieService.searchAll(query, 1, false).subscribe({
         next: (data) => {
           this.searchResults.set(data.results);
           this.totalPages.set(data.total_pages);
+          this.hiddenCount.set(data.hidden_count || 0);
+          this.showingHidden.set(false);
           this.loading.set(false);
         },
         error: () => {
           this.searchResults.set([]);
           this.totalPages.set(1);
+          this.hiddenCount.set(0);
           this.loading.set(false);
         },
       });
@@ -168,7 +180,7 @@ export class SearchResultsComponent {
     this.searchPage.update((p) => p + 1);
 
     this.movieService
-      .searchAll(this.searchQuery(), this.searchPage())
+      .searchAll(this.searchQuery(), this.searchPage(), this.showingHidden())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (data) => {
@@ -177,6 +189,57 @@ export class SearchResultsComponent {
             ...data.results,
           ]);
           this.totalPages.set(data.total_pages);
+          this.hiddenCount.update((count) => count + (data.hidden_count || 0));
+          this.loadingMore.set(false);
+        },
+        error: () => {
+          this.loadingMore.set(false);
+        },
+      });
+  }
+
+  loadHiddenResults() {
+    if (this.loading() || this.loadingMore() || this.showingHidden()) {
+      return;
+    }
+
+    this.loadingMore.set(true);
+    this.showingHidden.set(true);
+
+    // Reload all pages with includeNoPoster = true
+    const currentPage = this.searchPage();
+    const requests = Array.from({ length: currentPage }, (_, i) =>
+      this.movieService.searchAll(this.searchQuery(), i + 1, true)
+    );
+
+    // Helper for de-duplicating items across the visible list and the full list
+    const keyFor = (item: SearchResult) => {
+      if (this.isMedia(item)) return `${item.media_type}-${item.id}`;
+      if (this.isCollection(item)) return `collection-${item.id}`;
+      // channel/other
+      return `channel-${(item as any).id}`;
+    };
+
+    forkJoin(requests)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (results) => {
+          const allResults = results.flatMap((r) => r.results);
+
+          // Start with currently visible results (unchanged order)
+          const current = this.searchResults() || [];
+          const existingKeys = new Set(current.map(keyFor));
+
+          // Hidden-only = items present in allResults that are NOT in current visible set
+          const hiddenOnly = allResults.filter(
+            (it) => !existingKeys.has(keyFor(it))
+          );
+
+          // Append hidden-only results to bottom rather than re-inserting into the main ordering
+          const merged = [...current, ...hiddenOnly];
+
+          this.searchResults.set(merged);
+          this.hiddenCount.set(0);
           this.loadingMore.set(false);
         },
         error: () => {
@@ -186,7 +249,11 @@ export class SearchResultsComponent {
   }
 
   isMedia(item: SearchResult): item is MediaType {
-    return "media_type" in item;
+    return "media_type" in item && item.media_type !== "collection";
+  }
+
+  isCollection(item: SearchResult): item is CollectionSearchResult {
+    return "media_type" in item && item.media_type === "collection";
   }
 
   isChannel(item: SearchResult): item is SubscribableChannel {
