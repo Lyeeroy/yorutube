@@ -164,13 +164,27 @@ export class HeaderComponent {
    * Enter will trigger a search for the currently selected history item (if any).
    */
   onSearchInputKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      this.historyVisible.set(false);
+      this.selectedHistoryTerm.set(null);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      // If an item is selected, perform the history search; otherwise perform normal search
+      const selected = this.selectedHistoryTerm();
+      if (selected) {
+        event.preventDefault();
+        this.onHistorySearch(selected);
+      } else {
+        this.onSearch();
+      }
+      return;
+    }
+
     const list = this.searchHistory();
     if (!this.historyVisible() || !list || list.length === 0) {
       // If panel not visible or no history, let other keys behave normally
-      if (event.key === "Escape") {
-        this.historyVisible.set(false);
-        this.selectedHistoryTerm.set(null);
-      }
       return;
     }
 
@@ -194,18 +208,6 @@ export class HeaderComponent {
       const next = list[nextIndex];
       this.selectedHistoryTerm.set(next);
       this.searchQuery.set(next);
-    } else if (event.key === "Enter") {
-      // If an item is selected, perform the history search; otherwise perform normal search
-      const selected = this.selectedHistoryTerm();
-      if (selected) {
-        event.preventDefault();
-        this.onHistorySearch(selected);
-      } else {
-        this.onSearch();
-      }
-    } else if (event.key === "Escape") {
-      this.selectedHistoryTerm.set(null);
-      this.historyVisible.set(false);
     }
   }
 
