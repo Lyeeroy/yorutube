@@ -29,19 +29,21 @@
       </div>
       } @if (media().media_type === 'movie') {
       <span
-        class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md"
+        class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md transition-opacity duration-200 group-hover:opacity-0"
         >MOVIE</span
       >
       } @else {
       <span
-        class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md"
+        class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md transition-opacity duration-200 group-hover:opacity-0"
         >TV SHOW</span
       >
       }
-      <div class="absolute top-2 right-2 flex flex-col space-y-2 z-10">
+      <div
+        class="pointer-events-none absolute right-1 top-1 z-10 flex flex-col space-y-1 transition-opacity duration-200 opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto"
+      >
         <button
           (click)="toggleWatchlist($event)"
-          class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
+          class="flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80 h-9 w-9"
           [title]="
             isOnWatchlist() ? 'Remove from Watchlist' : 'Add to Watchlist'
           "
@@ -54,7 +56,7 @@
         </button>
         <button
           (click)="openPlaylistModal($event)"
-          class="bg-black/60 backdrop-blur-sm p-1.5 rounded-md text-white hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity"
+          class="flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80 h-9 w-9"
           [title]="isInPlaylist() ? 'Saved to playlist' : 'Save to playlist'"
         >
           <span class="material-symbols-outlined text-lg">{{
