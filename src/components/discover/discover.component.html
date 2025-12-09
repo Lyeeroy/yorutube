@@ -1,12 +1,12 @@
 <div class="flex flex-col space-y-6 p-4 sm:p-6">
-  <div class="flex flex-col space-y-4">
-    <h1 class="text-3xl font-bold text-white">Discover</h1>
+  <h1 class="text-3xl font-bold text-white">Discover</h1>
 
-    <!-- Media Type Buttons -->
-    <div class="flex items-center space-x-2 border-b border-zinc-800 pb-4">
+  <!-- Media Type Buttons (Tabs Style) -->
+  <div class="border-b border-zinc-800">
+    <div class="flex items-center space-x-2 pb-2 overflow-x-auto no-scrollbar">
       <button
         (click)="setActiveType('movie')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
         [class.bg-white]="activeType() === 'movie'"
         [class.text-black]="activeType() === 'movie'"
         [class.bg-zinc-800]="activeType() !== 'movie'"
@@ -16,7 +16,7 @@
       </button>
       <button
         (click)="setActiveType('tv')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
         [class.bg-white]="activeType() === 'tv'"
         [class.text-black]="activeType() === 'tv'"
         [class.bg-zinc-800]="activeType() !== 'tv'"
@@ -26,7 +26,7 @@
       </button>
       <button
         (click)="setActiveType('anime')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
+        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
         [class.bg-white]="activeType() === 'anime'"
         [class.text-black]="activeType() === 'anime'"
         [class.bg-zinc-800]="activeType() !== 'anime'"
@@ -35,9 +35,10 @@
         Anime
       </button>
     </div>
+  </div>
 
-    <!-- NEW Filter Bar -->
-    <div class="flex items-center gap-2 flex-wrap">
+  <!-- Filter Bar -->
+  <div class="flex items-center gap-2 flex-wrap">
       <!-- Sort By Filter -->
       <div class="relative">
         <button (click)="toggleDropdown('sort', $event)"
@@ -186,8 +187,6 @@
         </button>
       }
     </div>
-
-  </div>
 
   <!-- Content Grid -->
   <app-video-grid 

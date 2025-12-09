@@ -1,6 +1,8 @@
-<div class="p-4 sm:p-6 text-white">
-  <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-    <div class="flex items-center space-x-2 sm:space-x-4 self-start sm:self-center">
+<div class="flex flex-col space-y-6 p-4 sm:p-6">
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <h1 class="text-3xl font-bold text-white">Release Calendar</h1>
+    
+    <div class="flex flex-wrap items-center gap-2 sm:gap-4">
       <div class="flex items-center space-x-2">
         <select [value]="displayMonth().getMonth()" (change)="onMonthChange($event)" class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-semibold">
             @for(month of availableMonths; track month; let i = $index) {
@@ -15,63 +17,74 @@
       </div>
       <div class="flex items-center space-x-1">
           <button (click)="previousMonth()" class="p-2 rounded-full hover:bg-zinc-800 transition-colors" aria-label="Previous month">
-             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
           <button (click)="nextMonth()" class="p-2 rounded-full hover:bg-zinc-800 transition-colors" aria-label="Next month">
-             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
           </button>
       </div>
+      <button (click)="goToToday()" class="px-4 py-2 border border-zinc-700 text-white text-sm font-semibold rounded-md hover:bg-zinc-800 transition-colors">Today</button>
     </div>
-    <button (click)="goToToday()" class="px-4 py-2 border border-zinc-700 text-sm font-semibold rounded-md hover:bg-zinc-800 transition-colors self-end sm:self-center">Today</button>
   </div>
   
-  <!-- Filter Bar -->
-  <div class="flex flex-wrap gap-2 items-center mb-6 pb-4 border-b border-zinc-800">
-      <button 
-        (click)="setMediaType('all')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
-        [class.bg-white]="activeMediaType() === 'all'"
-        [class.text-black]="activeMediaType() === 'all'"
-        [class.bg-zinc-800]="activeMediaType() !== 'all'"
-        [class.hover:bg-zinc-700]="activeMediaType() !== 'all'">
-          All
-      </button>
-      <button 
-        (click)="setMediaType('movie')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
-        [class.bg-white]="activeMediaType() === 'movie'"
-        [class.text-black]="activeMediaType() === 'movie'"
-        [class.bg-zinc-800]="activeMediaType() !== 'movie'"
-        [class.hover:bg-zinc-700]="activeMediaType() !== 'movie'">
-          Movies
-      </button>
-       <button 
-        (click)="setMediaType('tv')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
-        [class.bg-white]="activeMediaType() === 'tv'"
-        [class.text-black]="activeMediaType() === 'tv'"
-        [class.bg-zinc-800]="activeMediaType() !== 'tv'"
-        [class.hover:bg-zinc-700]="activeMediaType() !== 'tv'">
-          TV Shows
-      </button>
-      <button 
-        (click)="setMediaType('anime')"
-        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0"
-        [class.bg-white]="activeMediaType() === 'anime'"
-        [class.text-black]="activeMediaType() === 'anime'"
-        [class.bg-zinc-800]="activeMediaType() !== 'anime'"
-        [class.hover:bg-zinc-700]="activeMediaType() !== 'anime'">
-          Anime
-      </button>
+  <!-- Tabs & Filters -->
+  <div class="border-b border-zinc-800">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+      <!-- Tabs -->
+      <div class="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+        <button 
+          (click)="setMediaType('all')"
+          class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
+          [class.bg-white]="activeMediaType() === 'all'"
+          [class.text-black]="activeMediaType() === 'all'"
+          [class.bg-zinc-800]="activeMediaType() !== 'all'"
+          [class.text-white]="activeMediaType() !== 'all'"
+          [class.hover:bg-zinc-700]="activeMediaType() !== 'all'">
+            All
+        </button>
+        <button 
+          (click)="setMediaType('movie')"
+          class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
+          [class.bg-white]="activeMediaType() === 'movie'"
+          [class.text-black]="activeMediaType() === 'movie'"
+          [class.bg-zinc-800]="activeMediaType() !== 'movie'"
+          [class.text-white]="activeMediaType() !== 'movie'"
+          [class.hover:bg-zinc-700]="activeMediaType() !== 'movie'">
+            Movies
+        </button>
+         <button 
+          (click)="setMediaType('tv')"
+          class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
+          [class.bg-white]="activeMediaType() === 'tv'"
+          [class.text-black]="activeMediaType() === 'tv'"
+          [class.bg-zinc-800]="activeMediaType() !== 'tv'"
+          [class.text-white]="activeMediaType() !== 'tv'"
+          [class.hover:bg-zinc-700]="activeMediaType() !== 'tv'">
+            TV Shows
+        </button>
+        <button 
+          (click)="setMediaType('anime')"
+          class="px-4 py-2 rounded-full text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
+          [class.bg-white]="activeMediaType() === 'anime'"
+          [class.text-black]="activeMediaType() === 'anime'"
+          [class.bg-zinc-800]="activeMediaType() !== 'anime'"
+          [class.text-white]="activeMediaType() !== 'anime'"
+          [class.hover:bg-zinc-700]="activeMediaType() !== 'anime'">
+            Anime
+        </button>
+      </div>
+
+      <!-- Genre Filter -->
       <select 
           [value]="selectedGenre() || ''"
           (change)="onGenreChange($event)"
-          class="ml-auto bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px] text-sm">
+          class="bg-zinc-800 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[150px] text-sm">
           <option value="">All Genres</option>
           @for(genre of availableGenres(); track genre.id) {
             <option [value]="genre.id">{{ genre.name }}</option>
           }
       </select>
+    </div>
   </div>
 
   @if (loading()) {
