@@ -28,10 +28,14 @@ import { VideoInfoComponent } from "../video-info/video-info.component";
 import { RelatedVideosComponent } from "../related-videos/related-videos.component";
 import { MovieService } from "../../services/movie.service";
 import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
-import { toSignal, takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import {
+  toSignal,
+  takeUntilDestroyed,
+  toObservable,
+} from "@angular/core/rxjs-interop";
 import { NavigationService } from "../../services/navigation.service";
 import { Observable, of } from "rxjs";
-import { map } from "rxjs/operators";
+import { map, switchMap } from "rxjs/operators";
 import { HistoryService } from "../../services/history.service";
 import { PlaylistService } from "../../services/playlist.service";
 import { Playlist } from "../../models/playlist.model";
@@ -108,6 +112,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   iframeLoading = signal(false);
   isMaximized = signal(false);
   currentEpisode = signal<Episode | null>(null);
+  nextEpisode = signal<Episode | null>(null);
 
   playlist = computed(() => {
     const p = this.params();
@@ -160,8 +165,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   // Auto-next visualization signals
   autoNextState = signal<"idle" | "counting_down">("idle");
-  autoNextCountdown = signal(3); // 3 seconds countdown
+  autoNextCountdown = signal(5); // 5 seconds countdown
   currentProgressPercent = signal(0);
+  nextEpisodeMinimized = signal(false);
   private autoNextTimer: any = null;
 
   // Computed signal to check if there is a next item available
@@ -495,6 +501,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       onCleanup(() => sub.unsubscribe());
     });
+
+    toObservable(this.currentEpisode)
+      .pipe(
+        takeUntilDestroyed(),
+        switchMap((currentEp) => {
+          const media = this.selectedMediaItem();
+          if (!currentEp || !media || media.media_type !== "tv") {
+            return of(null);
+          }
+          return this.fetchNextEpisode(media as TvShowDetails, currentEp);
+        })
+      )
+      .subscribe((nextEp) => this.nextEpisode.set(nextEp));
   }
 
   ngOnInit(): void {
@@ -941,7 +960,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   private startAutoNextCountdown(media: MovieDetails | TvShowDetails): void {
     this.autoNextState.set("counting_down");
-    this.autoNextCountdown.set(3);
+    this.autoNextCountdown.set(5);
+    // this.nextEpisodeMinimized.set(false); // Ensure it's visible when countdown starts
 
     this.autoNextTimer = setInterval(() => {
       const current = this.autoNextCountdown();
@@ -951,6 +971,36 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.autoNextCountdown.set(current - 1);
       }
     }, 1000);
+  }
+
+  toggleNextEpisodeMinimized(): void {
+    this.nextEpisodeMinimized.update((v) => !v);
+  }
+
+  toggleAutoNext(media: MovieDetails | TvShowDetails): void {
+    if (this.autoNextState() === "counting_down") {
+      this.cancelAutoNext();
+    } else {
+      // If idle
+      if (this.autoPlayNextTriggered()) {
+        // Was cancelled or finished -> Restart
+        const currentProgress = this.currentProgressPercent();
+        const threshold = this.playerService.autoNextThreshold();
+
+        if (currentProgress >= threshold) {
+          // We are already past threshold, so start countdown immediately
+          this.startAutoNextCountdown(media);
+        } else {
+          // We are before threshold, just re-arm it.
+          this.autoPlayNextTriggered.set(false);
+          // Unlock so checkAndTriggerAutoNext can pick it up again
+          this.playerService.unlockAutoNext();
+        }
+      } else {
+        // Not yet triggered -> Pre-emptive cancel
+        this.cancelAutoNext();
+      }
+    }
   }
 
   private executeAutoNext(media: MovieDetails | TvShowDetails): void {
@@ -984,9 +1034,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   cancelAutoNext(): void {
     this.clearAutoNextTimer();
     this.autoNextState.set("idle");
-    // Do NOT reset autoPlayNextTriggered here, otherwise it will immediately re-trigger
-    // if the video is still playing and past the threshold.
-    // this.autoPlayNextTriggered.set(false);
+    // Ensure we mark it as triggered so it doesn't auto-fire again if we pre-emptively cancelled
+    this.autoPlayNextTriggered.set(true);
     this.playerService.unlockAutoNext();
   }
 
@@ -1067,6 +1116,61 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       !this.isNavigating() &&
       (this.lastKnownPlaybackTime() >= 5 || nonRoutineEvent)
     );
+  }
+
+  private fetchNextEpisode(
+    tvShow: TvShowDetails,
+    currentEp: Episode
+  ): Observable<Episode | null> {
+    return this.movieService
+      .getSeasonDetails(tvShow.id, currentEp.season_number)
+      .pipe(
+        map((seasonDetails) => {
+          const episodes = seasonDetails.episodes || [];
+          const currentIndex = episodes.findIndex(
+            (e) => e.episode_number === currentEp.episode_number
+          );
+
+          if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
+            return episodes[currentIndex + 1];
+          }
+          return null;
+        }),
+        switchMap((nextEp) => {
+          if (nextEp) return of(nextEp);
+
+          // Check next season
+          const currentSeasonIndex = tvShow.seasons.findIndex(
+            (s) => s.season_number === currentEp.season_number
+          );
+
+          if (currentSeasonIndex > -1) {
+            for (
+              let i = currentSeasonIndex + 1;
+              i < tvShow.seasons.length;
+              i++
+            ) {
+              const nextSeasonObj = tvShow.seasons[i];
+              if (
+                nextSeasonObj &&
+                nextSeasonObj.episode_count > 0 &&
+                nextSeasonObj.season_number > 0
+              ) {
+                return this.movieService
+                  .getSeasonDetails(tvShow.id, nextSeasonObj.season_number)
+                  .pipe(
+                    map((nextSeasonDetails) => {
+                      return nextSeasonDetails.episodes.length > 0
+                        ? nextSeasonDetails.episodes[0]
+                        : null;
+                    })
+                  );
+              }
+            }
+          }
+          return of(null);
+        })
+      );
   }
 
   private playNextEpisode(tvShow: TvShowDetails): void {
