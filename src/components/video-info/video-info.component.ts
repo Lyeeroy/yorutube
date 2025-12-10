@@ -185,6 +185,14 @@ export class VideoInfoComponent {
     return this.currentEpisode()?.overview || this.media().overview;
   });
 
+  episodeLabel = computed(() => {
+    const ep = this.currentEpisode();
+    if (!ep) return "";
+    const season = String(ep.season_number ?? 0).padStart(2, "0");
+    const episode = String(ep.episode_number ?? 0).padStart(2, "0");
+    return `S${season}E${episode}`;
+  });
+
   topCast = computed(() => {
     const credits = (this.media() as MovieDetails | TvShowDetails).credits;
     if (!credits || !credits.cast) return [];
@@ -287,15 +295,18 @@ export class VideoInfoComponent {
   @HostListener("document:click", ["$event"])
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
-    
+
     // Check if click is outside the more options menu and its button
-    const clickedInsideMoreOptions = target.closest('.more-options-menu') || target.closest('.more-options-button');
+    const clickedInsideMoreOptions =
+      target.closest(".more-options-menu") ||
+      target.closest(".more-options-button");
     if (!clickedInsideMoreOptions && this.showMoreOptionsMenu()) {
       this.showMoreOptionsMenu.set(false);
     }
-    
+
     // Check if click is outside the sources dropdown and its button
-    const clickedInsideSources = target.closest('.sources-dropdown') || target.closest('.sources-button');
+    const clickedInsideSources =
+      target.closest(".sources-dropdown") || target.closest(".sources-button");
     if (!clickedInsideSources && this.showSourcesDropdown()) {
       this.showSourcesDropdown.set(false);
     }
