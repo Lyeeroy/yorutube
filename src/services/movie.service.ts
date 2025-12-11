@@ -146,6 +146,8 @@ export class MovieService {
       with_genres,
       with_network,
       with_company,
+      with_watch_providers,
+      watch_region,
       sort_by,
       primary_release_year,
       first_air_date_year,
@@ -157,6 +159,13 @@ export class MovieService {
 
     if (vote_average_gte) {
       baseQueryParams += `&vote_average.gte=${vote_average_gte}`;
+    }
+
+    if (with_watch_providers) {
+      baseQueryParams += `&with_watch_providers=${with_watch_providers}`;
+      if (watch_region) {
+        baseQueryParams += `&watch_region=${watch_region}`;
+      }
     }
 
     if (type === "anime") {
@@ -894,5 +903,18 @@ export class MovieService {
           })),
         }))
       );
+  }
+
+  getProviderIdForNetwork(networkId: number): number | null {
+    const mapping: Record<number, number> = {
+      213: 8, // Netflix
+      1024: 9, // Amazon Prime Video
+      2739: 337, // Disney+
+      2552: 350, // Apple TV+
+      453: 15, // Hulu
+      3353: 386, // Peacock
+      49: 1899, // HBO -> Max (using Max provider ID)
+    };
+    return mapping[networkId] || null;
   }
 }

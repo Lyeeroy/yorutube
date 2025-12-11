@@ -268,10 +268,13 @@ export class ChannelDetailComponent {
     let latest$: Observable<MediaType[]>;
 
     if (type === 'merged') {
+        const providerId = this.movieService.getProviderIdForNetwork(params.networkId);
+        const movieQuery = providerId ? { with_watch_providers: providerId, watch_region: 'US' } : { with_company: params.companyId };
+
         const popularTV$ = this.movieService.discoverMedia({ type: 'tv', ...commonParams, sort_by: popularSort, with_network: params.networkId }).pipe(map(res => res.results), catchError(() => of([])));
-        const popularMovies$ = this.movieService.discoverMedia({ type: 'movie', ...commonParams, sort_by: popularSort, with_company: params.companyId }).pipe(map(res => res.results), catchError(() => of([])));
+        const popularMovies$ = this.movieService.discoverMedia({ type: 'movie', ...commonParams, sort_by: popularSort, ...movieQuery }).pipe(map(res => res.results), catchError(() => of([])));
         const latestTV$ = this.movieService.discoverMedia({ type: 'tv', ...commonParams, sort_by: latestSortTv, with_network: params.networkId }).pipe(map(res => res.results), catchError(() => of([])));
-        const latestMovies$ = this.movieService.discoverMedia({ type: 'movie', ...commonParams, sort_by: latestSortMovie, with_company: params.companyId }).pipe(map(res => res.results), catchError(() => of([])));
+        const latestMovies$ = this.movieService.discoverMedia({ type: 'movie', ...commonParams, sort_by: latestSortMovie, ...movieQuery }).pipe(map(res => res.results), catchError(() => of([])));
         
         popular$ = forkJoin([popularTV$, popularMovies$]).pipe(map(([tv, movies]) => [...tv, ...movies].sort((a,b) => (b.popularity ?? 0) - (a.popularity ?? 0))));
         latest$ = forkJoin([latestTV$, latestMovies$]).pipe(map(([tv, movies]) => [...tv, ...movies].sort((a,b) => (b.popularity ?? 0) - (a.popularity ?? 0))));
@@ -321,6 +324,9 @@ export class ChannelDetailComponent {
             with_genres: this.selectedGenre() ? [this.selectedGenre()!] : undefined,
         };
 
+        const providerId = this.movieService.getProviderIdForNetwork(params.networkId);
+        const movieQuery = providerId ? { with_watch_providers: providerId, watch_region: 'US' } : { with_company: params.companyId };
+
         const tvRequest$ = this.movieService.discoverMedia({
             type: 'tv',
             ...commonParams,
@@ -333,7 +339,7 @@ export class ChannelDetailComponent {
             type: 'movie',
             ...commonParams,
             sort_by: movieSort,
-            with_company: params.companyId,
+            ...movieQuery,
             primary_release_year: this.selectedYear() ?? undefined,
         }).pipe(catchError(() => of({ results: [], total_pages: 0 })));
 
