@@ -53,6 +53,7 @@ export class ChannelDetailComponent {
   selectedMinRating = signal<number | null>(null);
   selectedGenre = signal<number | null>(null);
   contentFilter = signal<'all' | 'movie' | 'tv'>('all');
+  providerId = signal<number | null>(null);
 
   // Computed Properties
   channelType = computed(() => this.effectiveParams()?.type as 'network' | 'company' | 'merged');
@@ -95,10 +96,9 @@ export class ChannelDetailComponent {
 
   isMixedContent = computed(() => {
     const type = this.channelType();
-    const params = this.effectiveParams();
     if (type === "merged") return true;
-    if (type === "network" && params?.id) {
-      return !!this.movieService.getProviderIdForNetwork(params.id);
+    if (type === "network") {
+      return !!this.providerId();
     }
     return false;
   });
@@ -246,8 +246,39 @@ export class ChannelDetailComponent {
         onCleanup(() => mergeCheckSub?.unsubscribe());
     }, { allowSignalWrites: true });
 
+    // Effect to resolve provider ID dynamically
+    effect((onCleanup) => {
+        const details = this.channelDetails();
+        const type = this.channelType();
+        const params = this.effectiveParams();
+        
+        // Reset provider ID when channel changes
+        if (!details) {
+            this.providerId.set(null);
+            return;
+        }
+
+        if (type === 'network' && params) {
+            const hardcoded = this.movieService.getProviderIdForNetwork(params.id);
+            if (hardcoded) {
+                this.providerId.set(hardcoded);
+            } else {
+                // Try dynamic search
+                const sub = this.movieService.searchWatchProvider(details.name).subscribe(id => {
+                    if (id) this.providerId.set(id);
+                });
+                onCleanup(() => sub.unsubscribe());
+            }
+        } else if (type === 'merged' && params) {
+             const hardcoded = this.movieService.getProviderIdForNetwork(params.networkId);
+             if (hardcoded) this.providerId.set(hardcoded);
+        }
+    }, { allowSignalWrites: true });
+
     effect((onCleanup) => {
         if (this.channelDetails()) {
+            // Trigger load when providerId is resolved (or not)
+            this.providerId(); 
             const homeSub = this.loadHomeContent();
             onCleanup(() => homeSub.unsubscribe());
             this.resetVideosTab();
@@ -457,11 +488,8 @@ export class ChannelDetailComponent {
   }
 
   private getProviderId(type: string, params: any): number | null {
-    return type === "network"
-      ? this.movieService.getProviderIdForNetwork(params.id)
-      : type === "merged"
-      ? this.movieService.getProviderIdForNetwork(params.networkId)
-      : null;
+    // Use the resolved provider ID signal
+    return this.providerId();
   }
 
   private getMovieQuery(params: any, providerId: number | null): any {
@@ -566,19 +594,18 @@ export class ChannelDetailComponent {
   private getAlias(name: string, currentType: 'network' | 'company'): string | null {
     const lowerName = name.toLowerCase();
     if (currentType === 'network') {
-        // Searching for company counterpart
-        if (lowerName === 'prime video') return 'Amazon Studios';
-        if (lowerName === 'apple tv+') return 'Apple Studios';
-        if (lowerName === 'disney+') return 'Walt Disney Pictures';
+        // Legacy Broadcast Networks -> Movie Studios
+        // These need manual mapping because they don't have a direct 1:1 streaming provider with the same name
+        // or the provider (like "Fox Now") doesn't have the full movie back-catalog.
         if (lowerName === 'fox') return '20th Century Studios';
         if (lowerName === 'nbc') return 'Universal Pictures';
         if (lowerName === 'abc') return 'ABC Studios';
         if (lowerName === 'cbs') return 'CBS Studios';
+        
+        // Note: Streaming services (Disney+, Prime Video, Apple TV+) are now handled 
+        // automatically by the dynamic Provider Search, so they don't need aliases here.
     } else {
         // Searching for network counterpart
-        if (lowerName === 'amazon studios') return 'Prime Video';
-        if (lowerName === 'apple studios') return 'Apple TV+';
-        if (lowerName === 'walt disney pictures') return 'Disney+';
         if (lowerName === '20th century studios') return 'Fox';
         if (lowerName === 'universal pictures') return 'NBC';
     }

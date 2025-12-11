@@ -47,6 +47,7 @@ export class MovieService {
     null;
   private popularAnimeStudiosCache$: Observable<ProductionCompany[]> | null =
     null;
+  private watchProvidersCache$: Observable<any[]> | null = null;
 
   private createGenreMapObservable(
     url: string
@@ -918,5 +919,46 @@ export class MovieService {
       4: 531, // CBS -> Paramount+ (CBS content is on Paramount+)
     };
     return mapping[networkId] || null;
+  }
+
+  getWatchProviders(): Observable<any[]> {
+    if (this.watchProvidersCache$) {
+      return this.watchProvidersCache$;
+    }
+
+    const movieProvidersUrl = `${this.BASE_URL}/watch/providers/movie?api_key=${this.API_KEY}&watch_region=US`;
+    const tvProvidersUrl = `${this.BASE_URL}/watch/providers/tv?api_key=${this.API_KEY}&watch_region=US`;
+
+    this.watchProvidersCache$ = forkJoin([
+      this.http.get<{ results: any[] }>(movieProvidersUrl),
+      this.http.get<{ results: any[] }>(tvProvidersUrl)
+    ]).pipe(
+      map(([movieRes, tvRes]) => {
+        const allProviders = [...movieRes.results, ...tvRes.results];
+        // Deduplicate by provider_id
+        const unique = new Map();
+        allProviders.forEach(p => unique.set(p.provider_id, p));
+        return Array.from(unique.values());
+      }),
+      shareReplay(1)
+    );
+
+    return this.watchProvidersCache$;
+  }
+
+  searchWatchProvider(query: string): Observable<number | null> {
+    return this.getWatchProviders().pipe(
+      map(providers => {
+        const normalizedQuery = query.toLowerCase().trim();
+        // Exact match first
+        const exact = providers.find(p => p.provider_name.toLowerCase() === normalizedQuery);
+        if (exact) return exact.provider_id;
+        
+        // Then contains match
+        const match = providers.find(p => p.provider_name.toLowerCase().includes(normalizedQuery));
+        return match ? match.provider_id : null;
+      }),
+      catchError(() => of(null))
+    );
   }
 }
