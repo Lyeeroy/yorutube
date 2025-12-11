@@ -914,6 +914,8 @@ export class MovieService {
       453: 15, // Hulu
       3353: 386, // Peacock
       49: 1899, // HBO -> Max (using Max provider ID)
+      6: 386, // NBC -> Peacock (NBC content is on Peacock)
+      4: 531, // CBS -> Paramount+ (CBS content is on Paramount+)
     };
     return mapping[networkId] || null;
   }

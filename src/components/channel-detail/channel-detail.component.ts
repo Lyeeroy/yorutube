@@ -278,80 +278,42 @@ export class ChannelDetailComponent {
     const latestSortMovie = "primary_release_date.desc";
     const latestSortTv = "first_air_date.desc";
 
+    const providerId = this.getProviderId(type, params);
+    const isMixed = type === "merged" || (type === "network" && !!providerId);
+
     let popular$: Observable<MediaType[]>;
     let latest$: Observable<MediaType[]>;
 
-    // Check if this is a network that is also a streaming provider (e.g. Hulu, Netflix)
-    const providerId =
-      type === "network"
-        ? this.movieService.getProviderIdForNetwork(params.id)
-        : type === "merged"
-        ? this.movieService.getProviderIdForNetwork(params.networkId)
-        : null;
-
-    if (type === "merged" || (type === "network" && providerId)) {
+    if (isMixed) {
       const networkId = type === "merged" ? params.networkId : params.id;
-      const movieQuery = providerId
-        ? { with_watch_providers: providerId, watch_region: "US" }
-        : { with_company: params.companyId };
+      const movieQuery = this.getMovieQuery(params, providerId);
 
-      const popularTV$ = this.movieService
-        .discoverMedia({
-          type: "tv",
-          ...commonParams,
-          sort_by: popularSort,
-          with_network: networkId,
-        })
-        .pipe(
-          map((res) => res.results),
-          catchError(() => of([]))
-        );
-      const popularMovies$ = this.movieService
-        .discoverMedia({
-          type: "movie",
-          ...commonParams,
-          sort_by: popularSort,
-          ...movieQuery,
-        })
-        .pipe(
-          map((res) => res.results),
-          catchError(() => of([]))
-        );
-      const latestTV$ = this.movieService
-        .discoverMedia({
-          type: "tv",
-          ...commonParams,
-          sort_by: latestSortTv,
-          with_network: networkId,
-        })
-        .pipe(
-          map((res) => res.results),
-          catchError(() => of([]))
-        );
-      const latestMovies$ = this.movieService
-        .discoverMedia({
-          type: "movie",
-          ...commonParams,
-          sort_by: latestSortMovie,
-          ...movieQuery,
-        })
-        .pipe(
-          map((res) => res.results),
-          catchError(() => of([]))
-        );
+      const fetch = (type: "tv" | "movie", sort: string) =>
+        this.movieService
+          .discoverMedia({
+            type,
+            ...commonParams,
+            sort_by: sort,
+            ...(type === "tv" ? { with_network: networkId } : movieQuery),
+          })
+          .pipe(
+            map((res) => res.results),
+            catchError(() => of([]))
+          );
 
-      popular$ = forkJoin([popularTV$, popularMovies$]).pipe(
-        map(([tv, movies]) =>
-          [...tv, ...movies].sort(
-            (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)
-          )
-        )
+      popular$ = forkJoin([
+        fetch("tv", popularSort),
+        fetch("movie", popularSort),
+      ]).pipe(
+        map(([tv, movies]) => this.sortMedia([...tv, ...movies], popularSort))
       );
-      latest$ = forkJoin([latestTV$, latestMovies$]).pipe(
+
+      latest$ = forkJoin([
+        fetch("tv", latestSortTv),
+        fetch("movie", latestSortMovie),
+      ]).pipe(
         map(([tv, movies]) =>
-          [...tv, ...movies].sort(
-            (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)
-          )
+          this.sortMedia([...tv, ...movies], "primary_release_date.desc")
         )
       );
     } else {
@@ -362,28 +324,21 @@ export class ChannelDetailComponent {
           : { with_company: params.id };
       const latestSort = type === "network" ? latestSortTv : latestSortMovie;
 
-      popular$ = this.movieService
-        .discoverMedia({
-          type: discoverType,
-          ...commonParams,
-          sort_by: popularSort,
-          ...idParam,
-        })
-        .pipe(
-          map((res) => res.results),
-          catchError(() => of([]))
-        );
-      latest$ = this.movieService
-        .discoverMedia({
-          type: discoverType,
-          ...commonParams,
-          sort_by: latestSort,
-          ...idParam,
-        })
-        .pipe(
-          map((res) => res.results),
-          catchError(() => of([]))
-        );
+      const fetch = (sort: string) =>
+        this.movieService
+          .discoverMedia({
+            type: discoverType,
+            ...commonParams,
+            sort_by: sort,
+            ...idParam,
+          })
+          .pipe(
+            map((res) => res.results),
+            catchError(() => of([]))
+          );
+
+      popular$ = fetch(popularSort);
+      latest$ = fetch(latestSort);
     }
 
     return forkJoin({ pop: popular$, lat: latest$ }).subscribe(
@@ -414,17 +369,22 @@ export class ChannelDetailComponent {
 
     const type = this.channelType();
     const params = this.effectiveParams();
+    const providerId = this.getProviderId(type, params);
+    const isMixed = type === "merged" || (type === "network" && !!providerId);
 
-    // Check if this is a network that is also a streaming provider
-    const providerId =
-      type === "network"
-        ? this.movieService.getProviderIdForNetwork(params.id)
-        : type === "merged"
-        ? this.movieService.getProviderIdForNetwork(params.networkId)
-        : null;
+    const commonParams = {
+      page: this.page(),
+      vote_average_gte: this.selectedMinRating() ?? undefined,
+      with_genres: this.selectedGenre() ? [this.selectedGenre()!] : undefined,
+    };
 
-    if (type === "merged" || (type === "network" && providerId)) {
+    let request$: Observable<{ results: MediaType[]; total_pages: number }>;
+
+    if (isMixed) {
       const networkId = type === "merged" ? params.networkId : params.id;
+      const movieQuery = this.getMovieQuery(params, providerId);
+
+      // Sort params for individual requests (approximate)
       const movieSort = this.sortBy().replace(
         "first_air_date",
         "primary_release_date"
@@ -433,16 +393,6 @@ export class ChannelDetailComponent {
         "primary_release_date",
         "first_air_date"
       );
-
-      const commonParams = {
-        page: this.page(),
-        vote_average_gte: this.selectedMinRating() ?? undefined,
-        with_genres: this.selectedGenre() ? [this.selectedGenre()!] : undefined,
-      };
-
-      const movieQuery = providerId
-        ? { with_watch_providers: providerId, watch_region: "US" }
-        : { with_company: params.companyId };
 
       const tvRequest$ = this.movieService
         .discoverMedia({
@@ -464,89 +414,94 @@ export class ChannelDetailComponent {
         })
         .pipe(catchError(() => of({ results: [], total_pages: 0 })));
 
-      forkJoin({ tv: tvRequest$, movie: movieRequest$ })
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          // FIX: Explicitly type the response from forkJoin to resolve an issue where properties were being accessed on an 'unknown' type.
-          next: (response: {
-            tv: { results: MediaType[]; total_pages: number };
-            movie: { results: MediaType[]; total_pages: number };
-          }) => {
-            const { tv, movie } = response;
-            let combined = [...tv.results, ...movie.results];
-            const sortByValue = this.sortBy();
-
-            if (sortByValue.includes("date")) {
-              const getDate = (item: MediaType): number => {
-                const dateStr =
-                  item.media_type === "movie"
-                    ? item.release_date
-                    : item.first_air_date;
-                return dateStr ? new Date(dateStr).getTime() : 0;
-              };
-              if (sortByValue.endsWith(".desc")) {
-                // Newest
-                combined.sort((a, b) => getDate(b) - getDate(a));
-              } else {
-                // Oldest
-                combined.sort((a, b) => getDate(a) - getDate(b));
-              }
-            } else if (sortByValue.includes("vote_average")) {
-              if (sortByValue.endsWith(".desc")) {
-                // Top Rated
-                combined.sort((a, b) => b.vote_average - a.vote_average);
-              } else {
-                // Lowest Rated
-                combined.sort((a, b) => a.vote_average - b.vote_average);
-              }
-            } else {
-              // Default to popularity
-              combined.sort(
-                (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)
-              );
-            }
-
-            this.mediaItems.update((current) =>
-              loadMore ? [...current, ...combined] : combined
-            );
-            this.totalPages.set(Math.max(tv.total_pages, movie.total_pages));
-          },
-          complete: () => {
-            this.loadingVideos.set(false);
-            this.loadingMore.set(false);
-          },
-        });
+      request$ = forkJoin({ tv: tvRequest$, movie: movieRequest$ }).pipe(
+        map(({ tv, movie }) => ({
+          results: this.sortMedia(
+            [...tv.results, ...movie.results],
+            this.sortBy()
+          ),
+          total_pages: Math.max(tv.total_pages, movie.total_pages),
+        }))
+      );
     } else {
-      this.movieService
-        .discoverMedia({
-          type: type === "network" ? "tv" : "movie",
-          page: this.page(),
-          sort_by: this.sortBy(),
-          with_genres: this.selectedGenre()
-            ? [this.selectedGenre()!]
-            : undefined,
-          with_network: type === "network" ? currentChannel.id : undefined,
-          with_company: type === "company" ? currentChannel.id : undefined,
-          primary_release_year:
-            type === "company" ? this.selectedYear() ?? undefined : undefined,
-          first_air_date_year:
-            type === "network" ? this.selectedYear() ?? undefined : undefined,
-          vote_average_gte: this.selectedMinRating() ?? undefined,
-        })
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (data) => {
-            this.mediaItems.update((current) =>
-              loadMore ? [...current, ...data.results] : data.results
-            );
-            this.totalPages.set(data.total_pages);
-          },
-          complete: () => {
-            this.loadingVideos.set(false);
-            this.loadingMore.set(false);
-          },
-        });
+      const discoverType = type === "network" ? "tv" : "movie";
+      const idParam =
+        type === "network"
+          ? { with_network: params.id }
+          : { with_company: params.id };
+
+      request$ = this.movieService.discoverMedia({
+        type: discoverType,
+        ...commonParams,
+        sort_by: this.sortBy(),
+        ...idParam,
+        primary_release_year:
+          type === "company" ? this.selectedYear() ?? undefined : undefined,
+        first_air_date_year:
+          type === "network" ? this.selectedYear() ?? undefined : undefined,
+      });
     }
+
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (data) => {
+        this.mediaItems.update((current) =>
+          loadMore ? [...current, ...data.results] : data.results
+        );
+        this.totalPages.set(data.total_pages);
+      },
+      complete: () => {
+        this.loadingVideos.set(false);
+        this.loadingMore.set(false);
+      },
+    });
+  }
+
+  private getProviderId(type: string, params: any): number | null {
+    return type === "network"
+      ? this.movieService.getProviderIdForNetwork(params.id)
+      : type === "merged"
+      ? this.movieService.getProviderIdForNetwork(params.networkId)
+      : null;
+  }
+
+  private getMovieQuery(params: any, providerId: number | null): any {
+    return providerId
+      ? { with_watch_providers: providerId, watch_region: "US" }
+      : { with_company: params.companyId };
+  }
+
+  private sortMedia(items: MediaType[], sortBy: string): MediaType[] {
+    // Filter out items without backdrop_path to ensure quality
+    const validItems = items.filter(item => !!item.backdrop_path);
+    const sorted = [...validItems];
+    if (sortBy.includes("date")) {
+      const getDate = (item: MediaType): number => {
+        const dateStr =
+          item.media_type === "movie"
+            ? item.release_date
+            : item.first_air_date;
+        return dateStr ? new Date(dateStr).getTime() : 0;
+      };
+      if (sortBy.endsWith(".desc")) {
+        // Newest
+        sorted.sort((a, b) => getDate(b) - getDate(a));
+      } else {
+        // Oldest
+        sorted.sort((a, b) => getDate(a) - getDate(b));
+      }
+    } else if (sortBy.includes("vote_average")) {
+      if (sortBy.endsWith(".desc")) {
+        // Top Rated
+        sorted.sort((a, b) => b.vote_average - a.vote_average);
+      } else {
+        // Lowest Rated
+        sorted.sort((a, b) => a.vote_average - b.vote_average);
+      }
+    } else {
+      // Default to popularity
+      sorted.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+    }
+    return sorted;
   }
 
   loadMoreMedia(): void {
@@ -615,11 +570,17 @@ export class ChannelDetailComponent {
         if (lowerName === 'prime video') return 'Amazon Studios';
         if (lowerName === 'apple tv+') return 'Apple Studios';
         if (lowerName === 'disney+') return 'Walt Disney Pictures';
+        if (lowerName === 'fox') return '20th Century Studios';
+        if (lowerName === 'nbc') return 'Universal Pictures';
+        if (lowerName === 'abc') return 'ABC Studios';
+        if (lowerName === 'cbs') return 'CBS Studios';
     } else {
         // Searching for network counterpart
         if (lowerName === 'amazon studios') return 'Prime Video';
         if (lowerName === 'apple studios') return 'Apple TV+';
         if (lowerName === 'walt disney pictures') return 'Disney+';
+        if (lowerName === '20th century studios') return 'Fox';
+        if (lowerName === 'universal pictures') return 'NBC';
     }
     return null;
   }
