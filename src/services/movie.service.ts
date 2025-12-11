@@ -244,8 +244,11 @@ export class MovieService {
     }
 
     let queryParams = baseQueryParams;
-    if (with_genres?.length) {
-      queryParams += `&with_genres=${with_genres.join(",")}`;
+    if (with_genres) {
+      const genresParam = Array.isArray(with_genres)
+        ? with_genres.join(",")
+        : with_genres;
+      queryParams += `&with_genres=${genresParam}`;
     }
 
     const today = new Date().toISOString().split("T")[0];

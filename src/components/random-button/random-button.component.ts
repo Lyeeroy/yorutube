@@ -4,11 +4,20 @@ import {
   signal,
   inject,
   HostListener,
+  OnInit,
+  computed,
 } from "@angular/core";
 import { CommonModule, NgOptimizedImage } from "@angular/common";
 import { MovieService } from "../../services/movie.service";
 import { NavigationService } from "../../services/navigation.service";
 import { DiscoverParams, MediaType } from "../../models/movie.model";
+import { forkJoin } from "rxjs";
+
+interface GenreOption {
+  id: number;
+  name: string;
+  types: ("movie" | "tv")[];
+}
 
 @Component({
   selector: "app-random-button",
@@ -115,7 +124,7 @@ import { DiscoverParams, MediaType } from "../../models/movie.model";
     `,
   ],
 })
-export class RandomButtonComponent {
+export class RandomButtonComponent implements OnInit {
   private movieService = inject(MovieService);
   private navigationService = inject(NavigationService);
 
@@ -124,7 +133,51 @@ export class RandomButtonComponent {
   randomTvShow = signal(true);
   randomMovie = signal(true);
   randomAnime = signal(true);
-  randomMaxAge = signal(50);
+  randomMaxAge = signal(20);
+
+  // Genre state
+  genres = signal<GenreOption[]>([]);
+  selectedGenres = signal<Set<number>>(new Set());
+  genresExpanded = signal(false);
+
+  isSelectionValid = computed(() => {
+    const types: ("movie" | "tv" | "anime")[] = [];
+    if (this.randomTvShow()) types.push("tv");
+    if (this.randomMovie()) types.push("movie");
+    if (this.randomAnime()) types.push("anime");
+
+    if (types.length === 0) return false;
+
+    const selected = this.selectedGenres();
+    if (selected.size === 0) return true;
+
+    // Anime searches both, so it's usually valid unless the genre is totally obscure (but we don't check that deep)
+    if (types.includes("anime")) return true;
+
+    // Check if ANY selected genre is compatible with ANY selected type
+    // Actually, we need to ensure that for the selected type, there is at least one valid genre if we are filtering by genre.
+    // But since we pick a random type first, we just need to ensure that the pool isn't empty.
+    // If I select "Action" (Movie) and "Comedy" (Movie/TV) and enable only "TV",
+    // then "Action" is invalid for TV, but "Comedy" is valid.
+    // So if we pick TV, we can filter by Comedy.
+    // If we pick Movie, we can filter by Action OR Comedy.
+
+    // So we need to check if there is at least one intersection between (Selected Types) and (Types supported by Selected Genres).
+    // Let's collect all types supported by the selected genres.
+    const supportedTypes = new Set<string>();
+    this.genres().forEach((g) => {
+      if (selected.has(g.id)) {
+        g.types.forEach((t) => supportedTypes.add(t));
+      }
+    });
+
+    const validTypes = types.filter((t) => {
+      if (t === "anime") return true; // Anime is special
+      return supportedTypes.has(t);
+    });
+
+    return validTypes.length > 0;
+  });
 
   // Roulette state
   showRoulette = signal(false);
@@ -132,6 +185,53 @@ export class RandomButtonComponent {
   rouletteTransform = signal("translateX(0px)");
   rouletteTransition = signal("none");
   winnerItem = signal<MediaType | null>(null);
+
+  ngOnInit() {
+    forkJoin([
+      this.movieService.getMovieGenreMap(),
+      this.movieService.getTvGenreMap(),
+    ]).subscribe(([movieMap, tvMap]) => {
+      const options = new Map<number, GenreOption>();
+
+      movieMap.forEach((name, id) => {
+        options.set(id, { id, name, types: ["movie"] });
+      });
+
+      tvMap.forEach((name, id) => {
+        if (options.has(id)) {
+          const existing = options.get(id)!;
+          existing.types.push("tv");
+        } else {
+          options.set(id, { id, name, types: ["tv"] });
+        }
+      });
+
+      const sorted = Array.from(options.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+      this.genres.set(sorted);
+    });
+  }
+
+  toggleGenresExpanded() {
+    this.genresExpanded.update((v) => !v);
+  }
+
+  toggleGenre(genreId: number) {
+    this.selectedGenres.update((set) => {
+      const newSet = new Set(set);
+      if (newSet.has(genreId)) {
+        newSet.delete(genreId);
+      } else {
+        newSet.add(genreId);
+      }
+      return newSet;
+    });
+  }
+
+  clearGenres() {
+    this.selectedGenres.set(new Set());
+  }
 
   toggleVisible(event: MouseEvent): void {
     event.stopPropagation();
@@ -188,9 +288,31 @@ export class RandomButtonComponent {
     if (this.randomMovie()) types.push("movie");
     if (this.randomAnime()) types.push("anime");
 
-    if (types.length === 0) return;
+    // Filter types based on genre
+    const selectedGenres = this.selectedGenres();
+    let validTypes = types;
 
-    const selectedType = types[Math.floor(Math.random() * types.length)];
+    if (selectedGenres.size > 0) {
+      // We need to filter out types that don't support ANY of the selected genres.
+      // E.g. if I select "Action" (Movie) and "News" (TV), and I have both Movie and TV enabled.
+      // If I pick Movie, I should filter by Action.
+      // If I pick TV, I should filter by News.
+      // If I pick Anime, I ignore genres for now (or pass them if they match).
+
+      // Let's refine validTypes.
+      validTypes = types.filter((t) => {
+        if (t === "anime") return true;
+        // Check if this type supports at least one selected genre
+        return this.genres().some(
+          (g) => selectedGenres.has(g.id) && g.types.includes(t)
+        );
+      });
+    }
+
+    if (validTypes.length === 0) return;
+
+    const selectedType =
+      validTypes[Math.floor(Math.random() * validTypes.length)];
     const maxAge = this.randomMaxAge();
     const currentYear = new Date().getFullYear();
     const minYear = currentYear - maxAge;
@@ -202,6 +324,21 @@ export class RandomButtonComponent {
       sort_by: "popularity.desc",
       page: 1,
     };
+
+    if (selectedGenres.size > 0) {
+      // Filter genres relevant to the selected type
+      const relevantGenres = Array.from(selectedGenres).filter((id) => {
+        const g = this.genres().find((gen) => gen.id === id);
+        if (!g) return false;
+        if (selectedType === "anime") return true; // Pass all to anime? Or just anime ones?
+        return g.types.includes(selectedType);
+      });
+
+      if (relevantGenres.length > 0) {
+        // Use pipe for OR logic
+        baseParams.with_genres = relevantGenres.join("|");
+      }
+    }
 
     this.movieService.discoverMedia(baseParams).subscribe({
       next: (initialRes) => {
