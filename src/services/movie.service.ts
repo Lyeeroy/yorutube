@@ -153,6 +153,7 @@ export class MovieService {
       primary_release_year,
       first_air_date_year,
       vote_average_gte,
+      release_date_gte,
     } = params;
 
     const sortByQuery = `&sort_by=${sort_by || "popularity.desc"}`;
@@ -160,6 +161,10 @@ export class MovieService {
 
     if (vote_average_gte) {
       baseQueryParams += `&vote_average.gte=${vote_average_gte}`;
+    }
+
+    if (release_date_gte) {
+      // For generic queries, we'll append this. Specific types handle it below.
     }
 
     if (with_watch_providers) {
@@ -178,11 +183,15 @@ export class MovieService {
       if (with_company) movieQueryParams += `&with_companies=${with_company}`;
       if (primary_release_year)
         movieQueryParams += `&primary_release_year=${primary_release_year}`;
+      if (release_date_gte)
+        movieQueryParams += `&primary_release_date.gte=${release_date_gte}`;
 
       let tvQueryParams = `${baseQueryParams}${genreQuery}${langQuery}`;
       if (with_network) tvQueryParams += `&with_networks=${with_network}`;
       if (first_air_date_year)
         tvQueryParams += `&first_air_date_year=${first_air_date_year}`;
+      if (release_date_gte)
+        tvQueryParams += `&first_air_date.gte=${release_date_gte}`;
 
       const movieUrl = `${this.BASE_URL}/discover/movie?${movieQueryParams}`;
       const tvUrl = `${this.BASE_URL}/discover/tv?${tvQueryParams}`;
@@ -248,6 +257,9 @@ export class MovieService {
       if (primary_release_year) {
         queryParams += `&primary_release_year=${primary_release_year}`;
       }
+      if (release_date_gte) {
+        queryParams += `&primary_release_date.gte=${release_date_gte}`;
+      }
       if (sort_by?.startsWith("primary_release_date.desc")) {
         queryParams += `&primary_release_date.lte=${today}`;
       }
@@ -270,6 +282,9 @@ export class MovieService {
       }
       if (first_air_date_year) {
         queryParams += `&first_air_date_year=${first_air_date_year}`;
+      }
+      if (release_date_gte) {
+        queryParams += `&first_air_date.gte=${release_date_gte}`;
       }
       if (sort_by?.startsWith("first_air_date.desc")) {
         queryParams += `&first_air_date.lte=${today}`;

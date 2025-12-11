@@ -203,4 +203,5 @@ export interface DiscoverParams {
   primary_release_year?: number;
   first_air_date_year?: number;
   vote_average_gte?: number;
+  release_date_gte?: string;
 }

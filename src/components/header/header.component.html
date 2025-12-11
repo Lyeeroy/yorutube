@@ -41,6 +41,7 @@
         <span class="material-symbols-outlined text-zinc-400">search</span>
       </button>
     </div>
+    <app-random-button></app-random-button>
     <!-- Search History Panel (Mobile) -->
     @if (historyVisible() && searchHistory().length > 0) {
     <div
@@ -233,18 +234,7 @@
       </div>
       }
 
-      <!-- Mic Button -->
-      <button
-        aria-label="Search with your voice"
-        title="Search with your voice"
-        class="ml-2 md:ml-4 w-9 h-9 md:w-10 md:h-10 hidden lg:flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none shrink-0 transition-colors duration-150"
-      >
-        <span
-          class="material-symbols-outlined text-white text-2xl"
-          aria-hidden="true"
-          >mic</span
-        >
-      </button>
+      <app-random-button></app-random-button>
     </div>
   </div>
 

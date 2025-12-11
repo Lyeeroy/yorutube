@@ -1,0 +1,175 @@
+<div class="relative ml-2 md:ml-4">
+  <button
+    (click)="toggleVisible($event)"
+    aria-label="Random content"
+    title="Random content"
+    class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-zinc-800 rounded-full hover:bg-zinc-700 focus:outline-none shrink-0 transition-colors duration-150"
+  >
+    <span class="material-symbols-outlined text-white text-2xl">shuffle</span>
+  </button>
+
+  @if (visible()) {
+  <div
+    (click)="$event.stopPropagation()"
+    class="absolute top-full right-0 mt-2 w-64 bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-700 py-1 overflow-hidden"
+  >
+    <!-- Switches -->
+    <div class="py-1">
+      <!-- Random TV Show -->
+      <button
+        (click)="toggleRandomTvShow()"
+        class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+      >
+        <div class="flex items-center space-x-3">
+          <span class="material-symbols-outlined text-xl">tv</span>
+          <span>Random TV Show</span>
+        </div>
+        <div
+          class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+          [class.bg-red-600]="randomTvShow()"
+          [class.bg-zinc-600]="!randomTvShow()"
+        >
+          <span
+            class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+            [class.translate-x-6]="randomTvShow()"
+            [class.translate-x-1]="!randomTvShow()"
+          ></span>
+        </div>
+      </button>
+
+      <!-- Random Movie -->
+      <button
+        (click)="toggleRandomMovie()"
+        class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+      >
+        <div class="flex items-center space-x-3">
+          <span class="material-symbols-outlined text-xl">movie</span>
+          <span>Random Movie</span>
+        </div>
+        <div
+          class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+          [class.bg-red-600]="randomMovie()"
+          [class.bg-zinc-600]="!randomMovie()"
+        >
+          <span
+            class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+            [class.translate-x-6]="randomMovie()"
+            [class.translate-x-1]="!randomMovie()"
+          ></span>
+        </div>
+      </button>
+
+      <!-- Random Anime -->
+      <button
+        (click)="toggleRandomAnime()"
+        class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
+      >
+        <div class="flex items-center space-x-3">
+          <span class="material-symbols-outlined text-xl">animation</span>
+          <span>Random Anime</span>
+        </div>
+        <div
+          class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors"
+          [class.bg-red-600]="randomAnime()"
+          [class.bg-zinc-600]="!randomAnime()"
+        >
+          <span
+            class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform"
+            [class.translate-x-6]="randomAnime()"
+            [class.translate-x-1]="!randomAnime()"
+          ></span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Slider -->
+    <div class="px-3 py-3 text-sm text-left text-zinc-200 bg-zinc-800/50 border-t border-zinc-700">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-zinc-400">Max Age (Years)</span>
+        <span class="text-xs text-zinc-200">{{ randomMaxAge() }} years</span>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        [value]="randomMaxAge()"
+        (input)="setRandomMaxAge($any($event.target).value)"
+        class="w-full h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer"
+        style="accent-color: #dc2626"
+      />
+    </div>
+
+    <!-- Action Button -->
+    <div class="p-2 border-t border-zinc-700">
+      <button
+        (click)="onRandomSearch()"
+        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors"
+      >
+        Roll the Dice
+      </button>
+    </div>
+  </div>
+  }
+
+  @if (showRoulette()) {
+  <div class="roulette-overlay" (click)="$event.stopPropagation()">
+    <div class="roulette-container">
+      <div class="center-line"></div>
+      <div
+        class="roulette-track"
+        [style.transform]="rouletteTransform()"
+        [style.transition]="rouletteTransition()"
+      >
+        @for (item of rouletteItems(); track $index) {
+        <div class="roulette-item">
+          @if (item.backdrop_path) {
+          <img
+            [ngSrc]="'https://image.tmdb.org/t/p/w500' + item.backdrop_path"
+            [alt]="item.media_type === 'movie' ? item.title : item.name"
+            width="304"
+            height="171"
+          />
+          } @else if (item.poster_path) {
+          <img
+            [ngSrc]="'https://image.tmdb.org/t/p/w300' + item.poster_path"
+            [alt]="item.media_type === 'movie' ? item.title : item.name"
+            width="304"
+            height="171"
+          />
+          } @else {
+          <div
+            class="w-full aspect-video bg-zinc-800 flex items-center justify-center rounded-xl mb-3"
+          >
+            <span class="material-symbols-outlined text-4xl text-zinc-600"
+              >movie</span
+            >
+          </div>
+          }
+          <div class="item-info opacity-50 transition-opacity duration-300" [class.opacity-100]="winnerItem() === item">
+            <div class="item-title">
+              {{ item.media_type === "movie" ? item.title : item.name }}
+            </div>
+            <div class="item-meta">
+              {{ item.media_type === 'movie' ? (item.release_date | date:'yyyy') : (item.first_air_date | date:'yyyy') }} • {{ item.media_type === 'movie' ? 'Movie' : 'TV Series' }}
+            </div>
+          </div>
+        </div>
+        }
+      </div>
+    </div>
+    @if (winnerItem()) {
+    <div class="mt-8 text-center duration-300animate-fade-in">
+      <p class="text-red-600 text-xl font-bold mb-2">Winner!</p>
+      <h2 class="text-3xl text-white font-bold">
+        {{
+          winnerItem()?.media_type === "movie"
+            ? winnerItem()?.title
+            : winnerItem()?.name
+        }}
+      </h2>
+    </div>
+    }
+  </div>
+  }
+</div>

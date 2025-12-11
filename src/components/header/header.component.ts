@@ -14,12 +14,13 @@ import { NavigationService } from "../../services/navigation.service";
 import { NotificationService } from "../../services/notification.service";
 import { Notification } from "../../models/notification.model";
 import { NgOptimizedImage } from "@angular/common";
+import { RandomButtonComponent } from "../random-button/random-button.component";
 
 @Component({
   selector: "app-header",
   templateUrl: "./header.component.html",
   standalone: true,
-  imports: [NgOptimizedImage],
+  imports: [NgOptimizedImage, RandomButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HeaderComponent {
@@ -38,6 +39,7 @@ export class HeaderComponent {
   overflowVisible = signal(false);
   // when the mobile overflow menu has an inline notifications preview
   overflowShowNotifications = signal(false);
+
 
   hamburgerClick = output<void>();
   signInClicked = output<void>();
