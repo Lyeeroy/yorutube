@@ -137,7 +137,7 @@
         @case ('videos') {
           <div>
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-              @if (channelType() === 'merged') {
+              @if (isMixedContent()) {
                 <div class="flex items-center space-x-2 self-start overflow-x-auto pb-2 max-w-full no-scrollbar">
                   <button 
                     (click)="contentFilter.set('all')"
@@ -171,7 +171,7 @@
                   </button>
                 </div>
               }
-              <div class="w-full lg:w-auto grid grid-cols-2 sm:flex sm:flex-wrap gap-2" [class.lg:ml-auto]="channelType() !== 'merged'">
+              <div class="w-full lg:w-auto grid grid-cols-2 sm:flex sm:flex-wrap gap-2" [class.lg:ml-auto]="!isMixedContent()">
                   <select 
                       [value]="sortBy()"
                       (change)="onSortChange($event)"
