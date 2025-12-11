@@ -359,12 +359,29 @@ export class RandomButtonComponent implements OnInit {
         getPage$.subscribe((res) => {
           if (res.results.length === 0) return;
 
+          let results = res.results;
+
+          // If we are not explicitly searching for Anime, filter out Anime from the results
+          // to ensure "TV Show" and "Movie" buckets don't contain Anime.
+          // We define Anime as Genre 16 (Animation) + Language 'ja' (Japanese).
+          if (selectedType !== "anime") {
+            results = results.filter(
+              (item) =>
+                !(
+                  item.original_language === "ja" &&
+                  item.genre_ids.includes(16)
+                )
+            );
+          }
+
+          if (results.length === 0) return;
+
           // Prepare roulette items
           // We need enough items for a long spin.
           // Let's duplicate the results 5 times (20 * 5 = 100 items)
-          let items = [...res.results];
+          let items = [...results];
           while (items.length < 80) {
-            items = [...items, ...res.results];
+            items = [...items, ...results];
           }
           // Shuffle slightly to avoid obvious patterns if we just duplicated
           items = items.sort(() => Math.random() - 0.5);

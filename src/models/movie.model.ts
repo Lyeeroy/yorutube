@@ -10,6 +10,7 @@ export interface BaseMedia {
   genre_ids: number[];
   backdrop_path?: string | null;
   popularity?: number;
+  original_language: string;
 }
 
 export interface Movie extends BaseMedia {
