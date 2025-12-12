@@ -4,8 +4,9 @@ import { MovieService } from '../../services/movie.service';
 import { DiscoverParams, MediaType, Network, ProductionCompany } from '../../models/movie.model';
 import { VideoGridComponent } from '../video-grid/video-grid.component';
 import { InfiniteScrollTriggerComponent } from '../infinite-scroll-trigger/infinite-scroll-trigger.component';
-import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal, takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { NavigationService } from '../../services/navigation.service';
+import { debounceTime, distinctUntilChanged, switchMap, of, startWith, map } from 'rxjs';
 
 const LANGUAGES = [
   { code: "en", name: "English" },
@@ -58,8 +59,9 @@ export class DiscoverComponent implements OnInit {
 
   // Selected filters
   selectedGenres = signal<number[]>([]);
+  excludedGenres = signal<number[]>([]);
   selectedNetwork = signal<number | null>(null);
-  selectedCompany = signal<number | null>(null);
+  selectedCompany = signal<number | string | null>(null);
   selectedSortBy = signal<string>('popularity.desc');
   selectedYear = signal<number | null>(null);
   selectedLanguage = signal<string | null>(null);
@@ -69,6 +71,37 @@ export class DiscoverComponent implements OnInit {
 
   // Channel search filter
   channelSearchQuery = signal('');
+
+  // Async search results for studios
+  private searchedStudios$ = toSignal(
+    toObservable(this.channelSearchQuery).pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(query => {
+        if (!query || query.length < 2) return of(null);
+        return this.movieService.searchCompanies(query, 1).pipe(
+          map(r => {
+            // Deduplicate by name and merge IDs
+            const unique = new Map<string, { id: string, name: string, logo_path: string | null }>();
+            for (const company of r.results) {
+              if (!unique.has(company.name)) {
+                unique.set(company.name, { 
+                    id: company.id.toString(), 
+                    name: company.name, 
+                    logo_path: company.logo_path 
+                });
+              } else {
+                const entry = unique.get(company.name)!;
+                entry.id = `${entry.id}|${company.id}`;
+              }
+            }
+            return Array.from(unique.values()) as any[]; // Cast to any[] to satisfy template expecting ProductionCompany-like objects
+          })
+        );
+      })
+    ),
+    { initialValue: null }
+  );
 
   private readonly popularNetworkIds = new Set([213, 49, 2739, 1024, 453, 2552, 3353]);
 
@@ -101,7 +134,19 @@ export class DiscoverComponent implements OnInit {
   filteredStudios = computed(() => {
     const studios = this.availableStudios();
     if (!studios) return { popular: [], other: [] };
+    
     const query = this.channelSearchQuery().toLowerCase().trim();
+    const searchResults = this.searchedStudios$();
+
+    // If we have search results from API, prioritize them
+    if (searchResults) {
+        return {
+            popular: [],
+            other: searchResults
+        };
+    }
+
+    // Otherwise filter local list
     if (!query) return studios;
     
     return {
@@ -155,6 +200,7 @@ export class DiscoverComponent implements OnInit {
 
   filtersActive = computed(() => {
     return this.selectedGenres().length > 0 ||
+           this.excludedGenres().length > 0 ||
            this.selectedNetwork() !== null ||
            this.selectedCompany() !== null ||
            this.selectedSortBy() !== 'popularity.desc' ||
@@ -180,9 +226,27 @@ export class DiscoverComponent implements OnInit {
         return [...networks.popular, ...networks.other].find(n => n.id === networkId)?.name;
     }
     if (companyId) {
+        // If it's a merged ID string (e.g. "123|456"), we might not find it in the standard lists easily
+        // unless we look at the search results or just parse it.
+        // For now, let's try to find it in the available studios.
         const studios = this.availableStudios();
         if (!studios) return null;
-        return [...studios.popular, ...studios.other].find(c => c.id === companyId)?.name;
+        
+        // Check if it's a simple number ID
+        if (typeof companyId === 'number') {
+             return [...studios.popular, ...studios.other].find(c => c.id === companyId)?.name;
+        }
+        
+        // If it's a string, it might be from search results.
+        // We can try to find the name from the searchedStudios$ if available
+        const searchResults = this.searchedStudios$();
+        if (searchResults) {
+             const found = searchResults.find(c => c.id.toString() === companyId.toString());
+             if (found) return found.name;
+        }
+        
+        // Fallback: if we can't find the name, maybe just show "Selected Studio" or try to find one of the IDs
+        return "Selected Studio";
     }
     return null;
   });
@@ -199,6 +263,7 @@ export class DiscoverComponent implements OnInit {
     
     // Reset all filters on type change
     this.selectedGenres.set([]);
+    this.excludedGenres.set([]);
     this.selectedNetwork.set(null);
     this.selectedCompany.set(null);
     this.selectedSortBy.set('popularity.desc');
@@ -247,6 +312,7 @@ export class DiscoverComponent implements OnInit {
         type: this.activeType(),
         page: this.page(),
         with_genres: this.selectedGenres(),
+        without_genres: this.excludedGenres().length > 0 ? this.excludedGenres().join(',') : undefined,
         with_network: this.selectedNetwork() ?? undefined,
         with_company: this.selectedCompany() ?? undefined,
         sort_by: sortBy,
@@ -283,6 +349,7 @@ export class DiscoverComponent implements OnInit {
 
   resetAndApplyFilters(): void {
     this.selectedGenres.set([]);
+    this.excludedGenres.set([]);
     this.selectedNetwork.set(null);
     this.selectedCompany.set(null);
     this.selectedSortBy.set('popularity.desc');
@@ -308,22 +375,31 @@ export class DiscoverComponent implements OnInit {
   }
 
   toggleGenre(genreId: number): void {
-    this.selectedGenres.update(genres => {
-      const index = genres.indexOf(genreId);
-      if (index > -1) {
-        return genres.filter(g => g !== genreId);
-      } else {
-        return [...genres, genreId];
-      }
-    });
+    const selected = this.selectedGenres();
+    const excluded = this.excludedGenres();
+
+    if (selected.includes(genreId)) {
+      // Was selected, move to excluded
+      this.selectedGenres.update(g => g.filter(id => id !== genreId));
+      this.excludedGenres.update(g => [...g, genreId]);
+    } else if (excluded.includes(genreId)) {
+      // Was excluded, move to neutral
+      this.excludedGenres.update(g => g.filter(id => id !== genreId));
+    } else {
+      // Was neutral, move to selected
+      this.selectedGenres.update(g => [...g, genreId]);
+    }
   }
 
-  isSelectedGenre(genreId: number): boolean {
-    return this.selectedGenres().includes(genreId);
+  getGenreState(genreId: number): 'selected' | 'excluded' | 'neutral' {
+    if (this.selectedGenres().includes(genreId)) return 'selected';
+    if (this.excludedGenres().includes(genreId)) return 'excluded';
+    return 'neutral';
   }
 
   clearSelectedGenres() {
     this.selectedGenres.set([]);
+    this.excludedGenres.set([]);
   }
 
   selectSort(sortBy: string): void {
@@ -356,7 +432,7 @@ export class DiscoverComponent implements OnInit {
     this.applyFilters();
   }
   
-  selectCompany(id: number | null): void {
+  selectCompany(id: number | string | null): void {
     this.selectedCompany.set(id);
     this.selectedNetwork.set(null); // Ensure only one is active
     this.applyFilters();

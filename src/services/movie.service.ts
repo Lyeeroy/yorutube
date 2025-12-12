@@ -834,6 +834,8 @@ export class MovieService {
     return this.popularMovieStudiosCache$;
   }
 
+
+
   getPopularAnimeStudios(): Observable<ProductionCompany[]> {
     if (this.popularAnimeStudiosCache$) {
       return this.popularAnimeStudiosCache$;

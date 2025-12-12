@@ -64,22 +64,35 @@
       <div class="relative">
         <button (click)="toggleDropdown('genre', $event)"
           class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
-          [class.bg-white]="selectedGenres().length > 0"
-          [class.text-black]="selectedGenres().length > 0"
-          [class.bg-zinc-800]="selectedGenres().length === 0"
-          [class.text-white]="selectedGenres().length === 0"
-          [class.hover:bg-zinc-700]="selectedGenres().length === 0">
-          <span>Genre @if(selectedGenres().length > 0) {({{ selectedGenres().length }})}</span>
+          [class.bg-white]="selectedGenres().length > 0 || excludedGenres().length > 0"
+          [class.text-black]="selectedGenres().length > 0 || excludedGenres().length > 0"
+          [class.bg-zinc-800]="selectedGenres().length === 0 && excludedGenres().length === 0"
+          [class.text-white]="selectedGenres().length === 0 && excludedGenres().length === 0"
+          [class.hover:bg-zinc-700]="selectedGenres().length === 0 && excludedGenres().length === 0">
+          <span>Genre @if(selectedGenres().length > 0 || excludedGenres().length > 0) {({{ selectedGenres().length + excludedGenres().length }})}</span>
           <span class="material-symbols-outlined text-base transition-transform" [class.rotate-180]="activeDropdown() === 'genre'">expand_more</span>
         </button>
         @if (activeDropdown() === 'genre') {
           <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-72 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 flex flex-col">
             <div class="p-4 max-h-72 overflow-y-auto grid grid-cols-2 gap-2">
               @for(genre of availableGenres(); track genre.id) {
-                <label class="flex items-center space-x-2 p-1.5 rounded-md hover:bg-zinc-700 cursor-pointer">
-                  <input type="checkbox" [checked]="isSelectedGenre(genre.id)" (change)="toggleGenre(genre.id)" class="w-4 h-4 bg-zinc-900 border-zinc-600 text-red-500 focus:ring-red-500 rounded">
-                  <span class="text-sm">{{ genre.name }}</span>
-                </label>
+                <button 
+                  (click)="toggleGenre(genre.id)" 
+                  class="flex items-center justify-center px-2 py-1.5 rounded text-xs border transition-colors"
+                  [class.bg-red-600]="getGenreState(genre.id) === 'selected'"
+                  [class.border-red-600]="getGenreState(genre.id) === 'selected'"
+                  [class.text-white]="getGenreState(genre.id) === 'selected'"
+                  [class.bg-zinc-950]="getGenreState(genre.id) === 'excluded'"
+                  [class.border-zinc-800]="getGenreState(genre.id) === 'excluded'"
+                  [class.text-zinc-500]="getGenreState(genre.id) === 'excluded'"
+                  [class.line-through]="getGenreState(genre.id) === 'excluded'"
+                  [class.bg-zinc-800]="getGenreState(genre.id) === 'neutral'"
+                  [class.border-zinc-600]="getGenreState(genre.id) === 'neutral'"
+                  [class.text-zinc-300]="getGenreState(genre.id) === 'neutral'"
+                  [class.hover:bg-zinc-700]="getGenreState(genre.id) === 'neutral'"
+                >
+                  {{ genre.name }}
+                </button>
               }
             </div>
             <div class="flex justify-end items-center gap-2 p-2 border-t border-zinc-700">
@@ -226,7 +239,9 @@
                       }
                     }
                     @if (studios.other.length > 0) {
-                      <div class="px-4 pt-2 pb-1 text-xs text-zinc-400 font-bold uppercase">Other</div>
+                      <div class="px-4 pt-2 pb-1 text-xs text-zinc-400 font-bold uppercase">
+                        @if (channelSearchQuery().length >= 2) { Search Results } @else { Other }
+                      </div>
                       @for (company of studios.other; track company.id) {
                         <button (click)="selectCompany(company.id)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700">{{ company.name }}</button>
                       }
