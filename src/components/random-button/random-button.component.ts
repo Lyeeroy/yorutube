@@ -13,14 +13,16 @@ import { CommonModule, NgOptimizedImage } from "@angular/common";
 import { MovieService } from "../../services/movie.service";
 import { NavigationService } from "../../services/navigation.service";
 import { DiscoverParams, MediaType } from "../../models/movie.model";
+import { UNIFIED_GENRES } from "../../models/genres.constant";
 import { forkJoin, map, of } from "rxjs";
 
 interface GenreOption {
   id: number;
   name: string;
-  types: ("movie" | "tv")[];
+  types: ("movie" | "tv" | "anime")[];
   movieIds: number[];
   tvIds: number[];
+  animeIds: number[];
 }
 
 @Component({
@@ -187,9 +189,6 @@ export class RandomButtonComponent implements OnInit {
     const selected = this.selectedGenres();
     if (selected.size === 0) return true;
 
-    // Anime searches both, so it's usually valid unless the genre is totally obscure (but we don't check that deep)
-    if (types.includes("anime")) return true;
-
     // Check if ANY selected genre is compatible with ANY selected type
     const supportedTypes = new Set<string>();
     this.genres().forEach((g) => {
@@ -243,55 +242,38 @@ export class RandomButtonComponent implements OnInit {
   private revealTimeout: any;
 
   ngOnInit() {
-    forkJoin([
-      this.movieService.getMovieGenreMap(),
-      this.movieService.getTvGenreMap(),
-    ]).subscribe(([movieMap, tvMap]) => {
-      const genreGroups = new Map<string, { name: string, movieIds: number[], tvIds: number[] }>();
+    const options: GenreOption[] = UNIFIED_GENRES.map((g) => {
+      const types: ("movie" | "tv" | "anime")[] = [];
+      if (g.movieIds.length > 0) types.push("movie");
+      if (g.tvIds.length > 0) types.push("tv");
+      if (g.animeIds.length > 0) types.push("anime");
 
-      const process = (map: Map<number, string>, type: 'movie' | 'tv') => {
-        map.forEach((originalName, id) => {
-            let name = originalName;
-            // Normalization
-            if (name === "Action & Adventure") name = "Action";
-            if (name === "Science Fiction") name = "Sci-Fi";
-            if (name === "Sci-Fi & Fantasy") name = "Sci-Fi";
-            if (name === "War & Politics") name = "War";
-            if (name === "Kids") name = "Family"; 
-            
-            if (!genreGroups.has(name)) {
-                genreGroups.set(name, { name, movieIds: [], tvIds: [] });
-            }
-            const group = genreGroups.get(name)!;
-            if (type === 'movie') group.movieIds.push(id);
-            else group.tvIds.push(id);
-        });
+      // Use the first available ID as the unique ID for the UI
+      // We can use a hash or just pick one. Since we need a number, let's pick the first movie ID, or TV ID, or Anime ID.
+      // Or better, let's just use the first ID found.
+      // However, the previous implementation used the ID from the API.
+      // Here we can just use the first ID from any list as a unique key, OR we can generate a unique ID based on index if we wanted,
+      // but the UI uses `id` for selection.
+      // Let's use the first movie ID if available, else TV, else Anime.
+      const id =
+        g.movieIds.length > 0
+          ? g.movieIds[0]
+          : g.tvIds.length > 0
+          ? g.tvIds[0]
+          : g.animeIds[0];
+
+      return {
+        id,
+        name: g.name,
+        types,
+        movieIds: g.movieIds,
+        tvIds: g.tvIds,
+        animeIds: g.animeIds,
       };
-
-      process(movieMap, 'movie');
-      process(tvMap, 'tv');
-
-      const options: GenreOption[] = [];
-      genreGroups.forEach((group) => {
-          const types: ("movie" | "tv")[] = [];
-          if (group.movieIds.length > 0) types.push("movie");
-          if (group.tvIds.length > 0) types.push("tv");
-          
-          // Use the first available ID as the unique ID for the UI
-          const id = group.movieIds.length > 0 ? group.movieIds[0] : group.tvIds[0];
-          
-          options.push({
-              id,
-              name: group.name,
-              types,
-              movieIds: group.movieIds,
-              tvIds: group.tvIds
-          });
-      });
-
-      const sorted = options.sort((a, b) => a.name.localeCompare(b.name));
-      this.genres.set(sorted);
     });
+
+    const sorted = options.sort((a, b) => a.name.localeCompare(b.name));
+    this.genres.set(sorted);
   }
 
   clearTimers() {
@@ -427,7 +409,6 @@ export class RandomButtonComponent implements OnInit {
 
       // Let's refine validTypes.
       validTypes = types.filter((t) => {
-        if (t === "anime") return true;
         // Check if this type supports at least one selected genre
         return this.genres().some(
           (g) => selectedGenres.has(g.id) && g.types.includes(t)
