@@ -122,6 +122,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   });
 
   historyAdded = signal(false);
+
+  // Watchdog state
+  showWatchdog = signal(false);
+  watchdogData = signal<{ timestamp: number } | null>(null);
+  private watchdogDismissed = false;
+
   // provider messages are routed through PlayerMessageRouterService
 
   // Track the last episode state reported by the player
@@ -400,6 +406,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
 
+        // Reset watchdog state
+        this.watchdogDismissed = false;
+        this.showWatchdog.set(false);
+        this.watchdogData.set(null);
+
         // Reset auto-next state
         this.currentProgressPercent.set(0);
         this.clearAutoNextTimer();
@@ -416,6 +427,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         // has started or we have meaningful playback progress to avoid reusing
         // the shared startAt if the user switches player sources.
         this.initialStartAt.set(p?.startAt ? Number(p.startAt) : undefined);
+      } else if (p?.startAt) {
+        // Media didn't change, but we have a specific start time (e.g. Watchdog restore)
+        this.initialStartAt.set(Number(p.startAt));
+        this.playerHasStarted.set(false);
+        this.lastKnownPlaybackTime.set(0);
+
+        // Force reload to apply new start time
+        this.reloading.set(true);
+        this.constructedPlayerUrl.set("about:blank");
+        setTimeout(() => {
+          this.reloading.set(false);
+        }, 100);
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -671,6 +694,37 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Get episode once for use in multiple places below
     const episode = this.currentEpisode();
 
+    // Watchdog Logic
+    const progressId = episode ? episode.id : media.id;
+
+    if (this.showWatchdog()) {
+      // Auto-dismiss if user keeps watching from start
+      if (currentTime > 30) {
+        this.dismissWatchdog();
+      } else {
+        // Prevent overwriting progress while watchdog is active
+        return;
+      }
+    }
+
+    // Only check if not already showing, not dismissed
+    if (!this.showWatchdog() && !this.watchdogDismissed) {
+      const savedProgress = untracked(() =>
+        this.playbackProgressService.getProgress(progressId)
+      );
+
+      if (savedProgress && savedProgress.progress < 95) {
+        const gap = Math.abs(savedProgress.timestamp - currentTime);
+        // If we are at the start (< 10s) but have significant saved progress (> 60s)
+        // and the gap is large (> 60s)
+        if (currentTime < 10 && savedProgress.timestamp > 60 && gap > 60) {
+          this.watchdogData.set({ timestamp: savedProgress.timestamp });
+          this.showWatchdog.set(true);
+          return; // Return immediately after triggering to avoid saving this 0-progress
+        }
+      }
+    }
+
     // Debounce progress updates to reduce excessive writes (max once per second)
     const now = Date.now();
     const shouldUpdateProgress = now - this.lastProgressUpdateTime >= 1000;
@@ -684,7 +738,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         duration: duration,
       };
 
-      const progressId = episode ? episode.id : media.id;
       this.playbackProgressService.updateProgress(progressId, playbackData);
     }
 
@@ -1461,6 +1514,33 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const target = event.target as HTMLElement;
     if (target.classList.contains("fixed")) {
       this.closeMaximize();
+    }
+  }
+
+  dismissWatchdog(): void {
+    this.showWatchdog.set(false);
+    this.watchdogDismissed = true;
+  }
+
+  restoreWatchdogProgress(): void {
+    const data = this.watchdogData();
+    if (data) {
+      const media = this.selectedMediaItem();
+      if (!media) return;
+
+      const currentParams = this.params();
+
+      this.navigationService.navigateTo("watch", {
+        mediaType: media.media_type,
+        id: media.id,
+        season: currentParams?.season,
+        episode: currentParams?.episode,
+        playlistId: this.playlist()?.id,
+        startAt: data.timestamp,
+        autoplay: true,
+      });
+
+      this.dismissWatchdog();
     }
   }
 
