@@ -8,13 +8,69 @@ import {
   computed,
   ViewChild,
   ElementRef,
+  effect,
 } from "@angular/core";
 import { CommonModule, NgOptimizedImage } from "@angular/common";
 import { MovieService } from "../../services/movie.service";
 import { NavigationService } from "../../services/navigation.service";
-import { DiscoverParams, MediaType } from "../../models/movie.model";
+import { WatchlistService } from "../../services/watchlist.service";
+import { PlaylistService } from "../../services/playlist.service";
+import { AddToPlaylistModalComponent } from "../add-to-playlist-modal/add-to-playlist-modal.component";
+import {
+  DiscoverParams,
+  MediaType,
+  MovieDetails,
+  TvShowDetails,
+  ProductionCompany,
+  Network,
+  SubscribableChannel,
+  Movie,
+} from "../../models/movie.model";
 import { UNIFIED_GENRES } from "../../models/genres.constant";
 import { forkJoin, map, of } from "rxjs";
+
+// Pure helper function moved outside component to avoid re-creation
+const getRelativeTime = (dateString?: string): string => {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 0) {
+      const days = Math.floor(-seconds / 86400);
+      if (days > 365)
+        return `Releasing in ${Math.floor(days / 365)} year${
+          days > 730 ? "s" : ""
+        }`;
+      if (days > 30)
+        return `Releasing in ${Math.floor(days / 30)} month${
+          days > 60 ? "s" : ""
+        }`;
+      if (days > 0) return `Releasing in ${days} day${days > 1 ? "s" : ""}`;
+      return "Releasing soon";
+    }
+
+    const intervals = [
+      { s: 31536000, label: "year" },
+      { s: 2592000, label: "month" },
+      { s: 86400, label: "day" },
+      { s: 3600, label: "hour" },
+      { s: 60, label: "minute" },
+    ];
+
+    for (const i of intervals) {
+      const count = Math.floor(seconds / i.s);
+      if (count >= 1) return `${count} ${i.label}${count > 1 ? "s" : ""} ago`;
+    }
+    return Math.floor(seconds) + " seconds ago";
+  } catch {
+    return "N/A";
+  }
+};
+
+const isMovie = (media: MediaType): media is Movie =>
+  media.media_type === "movie";
 
 interface GenreOption {
   id: number;
@@ -25,10 +81,24 @@ interface GenreOption {
   animeIds: number[];
 }
 
+const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "zh", name: "Chinese" },
+  { code: "fr", name: "French" },
+  { code: "es", name: "Spanish" },
+  { code: "de", name: "German" },
+  { code: "it", name: "Italian" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+  { code: "hi", name: "Hindi" },
+];
+
 @Component({
   selector: "app-random-button",
   standalone: true,
-  imports: [CommonModule, NgOptimizedImage],
+  imports: [CommonModule, NgOptimizedImage, AddToPlaylistModalComponent],
   templateUrl: "./random-button.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
@@ -45,6 +115,13 @@ interface GenreOption {
         align-items: center;
         justify-content: center;
         flex-direction: column;
+      }
+      .roulette-wrapper {
+        position: relative;
+        width: 100%;
+        max-width: 1200px;
+        display: flex;
+        justify-content: center;
       }
       .roulette-container {
         width: 100%;
@@ -163,6 +240,8 @@ interface GenreOption {
 export class RandomButtonComponent implements OnInit {
   private movieService = inject(MovieService);
   private navigationService = inject(NavigationService);
+  private watchlistService = inject(WatchlistService);
+  private playlistService = inject(PlaylistService);
 
   @ViewChild("rouletteContainer")
   rouletteContainer!: ElementRef<HTMLDivElement>;
@@ -173,12 +252,136 @@ export class RandomButtonComponent implements OnInit {
   randomMovie = signal(true);
   randomAnime = signal(true);
   randomMaxAge = signal(20);
+  minRating = signal(0);
+  showPlaylistModal = signal(false);
+  filtersExpanded = signal(false);
 
   // Genre state
   genres = signal<GenreOption[]>([]);
   selectedGenres = signal<Set<number>>(new Set());
   excludedGenres = signal<Set<number>>(new Set());
   genresExpanded = signal(false);
+
+  // Language state
+  languages = signal(LANGUAGES);
+  selectedLanguages = signal<Set<string>>(new Set());
+  excludedLanguages = signal<Set<string>>(new Set());
+  languagesExpanded = signal(false);
+
+  // Selected Item State
+  selectedItem = signal<MediaType | null>(null);
+  selectedItemDetails = signal<MovieDetails | TvShowDetails | null>(null);
+
+  // Computed properties for Selected Item (mimicking video-card)
+  thumbnailUrl = computed(() => {
+    const media = this.selectedItem();
+    if (!media) return "";
+    if (media.backdrop_path) {
+      return `https://image.tmdb.org/t/p/w780${media.backdrop_path}`;
+    }
+    return `https://picsum.photos/seed/${media.id}/480/270`; // Fallback
+  });
+
+  mediaTitle = computed(() => {
+    const media = this.selectedItem();
+    if (!media) return "";
+    return isMovie(media) ? media.title : media.name;
+  });
+
+  isMovie = computed(() => {
+    const media = this.selectedItem();
+    return media ? isMovie(media) : false;
+  });
+
+  subscribableChannel = computed<SubscribableChannel | null>(() => {
+    const details = this.selectedItemDetails();
+    if (!details) return null;
+
+    if (isMovie(details as any)) {
+      const d = details as MovieDetails;
+      if (d.production_companies && d.production_companies.length > 0) {
+        const company = d.production_companies[0];
+        return {
+          id: company.id,
+          name: company.name,
+          logo_path: company.logo_path,
+          origin_country: company.origin_country || "",
+          type: "company",
+          companyId: company.id,
+        } as SubscribableChannel;
+      }
+    } else {
+      const d = details as TvShowDetails;
+      if (d.networks && d.networks.length > 0) {
+        const network = d.networks[0];
+        return {
+          id: network.id,
+          name: network.name,
+          logo_path: network.logo_path,
+          origin_country: network.origin_country || "",
+          type: "network",
+          networkId: network.id,
+        } as SubscribableChannel;
+      }
+    }
+    return null;
+  });
+
+  channelName = computed(() => {
+    const channel = this.subscribableChannel();
+    return channel ? channel.name : "Unknown Channel";
+  });
+
+  channelLogoUrl = computed(() => {
+    const channel = this.subscribableChannel();
+    if (channel && channel.logo_path) {
+      return `https://image.tmdb.org/t/p/w92${channel.logo_path}`;
+    }
+    return null;
+  });
+
+  videoInfoLine = computed(() => {
+    const media = this.selectedItem();
+    if (!media) return "";
+    const date = isMovie(media) ? media.release_date : media.first_air_date;
+    const relativeTime = getRelativeTime(date);
+    const rating = media.vote_average
+      ? `${media.vote_average.toFixed(1)} ★`
+      : "No rating";
+    return `${rating} • ${relativeTime}`;
+  });
+
+  isOnWatchlist = computed(() => {
+    const media = this.selectedItem();
+    if (!media) return false;
+    return this.watchlistService.isOnWatchlist(media.id);
+  });
+
+  isInPlaylist = computed(() => {
+    const media = this.selectedItem();
+    if (!media) return false;
+    return this.playlistService.isMediaInAnyPlaylist(media.id);
+  });
+
+  constructor() {
+    // Effect to fetch details when selectedItem changes
+    effect(() => {
+      const media = this.selectedItem();
+      if (media) {
+        if (isMovie(media)) {
+          this.movieService.getMovieDetails(media.id).subscribe((details) => {
+            this.selectedItemDetails.set(details);
+          });
+        } else {
+          this.movieService.getTvShowDetails(media.id).subscribe((details) => {
+            this.selectedItemDetails.set(details);
+          });
+        }
+      } else {
+        this.selectedItemDetails.set(null);
+      }
+    });
+  }
 
   isSelectionValid = computed(() => {
     const types: ("movie" | "tv" | "anime")[] = [];
@@ -298,6 +501,8 @@ export class RandomButtonComponent implements OnInit {
 
   reroll() {
     this.clearTimers();
+    this.isWinnerRevealed.set(false);
+    this.selectedItem.set(null);
     this.onRandomSearch();
   }
 
@@ -309,6 +514,10 @@ export class RandomButtonComponent implements OnInit {
 
   toggleGenresExpanded() {
     this.genresExpanded.update((v) => !v);
+  }
+
+  toggleLanguagesExpanded() {
+    this.languagesExpanded.update((v) => !v);
   }
 
   toggleGenre(genreId: number) {
@@ -332,9 +541,35 @@ export class RandomButtonComponent implements OnInit {
     this.excludedGenres.set(excluded);
   }
 
+  toggleLanguage(code: string) {
+    // Cycle: Neutral -> Selected -> Excluded -> Neutral
+    const selected = new Set(this.selectedLanguages());
+    const excluded = new Set(this.excludedLanguages());
+
+    if (selected.has(code)) {
+      // Was selected, move to excluded
+      selected.delete(code);
+      excluded.add(code);
+    } else if (excluded.has(code)) {
+      // Was excluded, move to neutral
+      excluded.delete(code);
+    } else {
+      // Was neutral, move to selected
+      selected.add(code);
+    }
+
+    this.selectedLanguages.set(selected);
+    this.excludedLanguages.set(excluded);
+  }
+
   clearGenres() {
     this.selectedGenres.set(new Set());
     this.excludedGenres.set(new Set());
+  }
+
+  clearLanguages() {
+    this.selectedLanguages.set(new Set());
+    this.excludedLanguages.set(new Set());
   }
 
   toggleVisible(event: MouseEvent): void {
@@ -358,9 +593,18 @@ export class RandomButtonComponent implements OnInit {
     this.randomAnime.update((v) => !v);
   }
 
+  toggleFiltersExpanded(): void {
+    this.filtersExpanded.update((v) => !v);
+  }
+
   setRandomMaxAge(value: any): void {
     const num = Number(value);
     if (!isNaN(num)) this.randomMaxAge.set(num);
+  }
+
+  setMinRating(value: any): void {
+    const num = Number(value);
+    if (!isNaN(num)) this.minRating.set(num);
   }
 
   @HostListener("document:click", ["$event"])
@@ -414,6 +658,8 @@ export class RandomButtonComponent implements OnInit {
     // Filter types based on genre
     const selectedGenres = this.selectedGenres();
     const excludedGenres = this.excludedGenres();
+    const selectedLanguages = this.selectedLanguages();
+    const excludedLanguages = this.excludedLanguages();
     let validTypes = types;
 
     if (selectedGenres.size > 0) {
@@ -445,6 +691,8 @@ export class RandomButtonComponent implements OnInit {
     const currentYear = new Date().getFullYear();
     const minYear = currentYear - maxAge;
     const releaseDateGte = `${minYear}-01-01`;
+    const withOriginalLanguage = selectedLanguages.size > 0 ? Array.from(selectedLanguages).join('|') : undefined;
+    const minRating = this.minRating();
 
     validTypes.forEach((t) => {
       if (t === "movie") {
@@ -459,6 +707,8 @@ export class RandomButtonComponent implements OnInit {
             page: 1,
             with_genres: this.buildGenreQuery("movie", selectedGenres),
             without_genres: this.buildGenreQuery("movie", excludedGenres),
+            with_original_language: withOriginalLanguage,
+            vote_average_gte: minRating,
           },
         });
       } else if (t === "tv") {
@@ -473,6 +723,8 @@ export class RandomButtonComponent implements OnInit {
             page: 1,
             with_genres: this.buildGenreQuery("tv", selectedGenres),
             without_genres: this.buildGenreQuery("tv", excludedGenres),
+            with_original_language: withOriginalLanguage,
+            vote_average_gte: minRating,
           },
         });
       } else if (t === "anime") {
@@ -493,6 +745,7 @@ export class RandomButtonComponent implements OnInit {
               excludedGenres,
               true
             ),
+            vote_average_gte: minRating,
           },
         });
         requests.push({
@@ -511,6 +764,7 @@ export class RandomButtonComponent implements OnInit {
               excludedGenres,
               true
             ),
+            vote_average_gte: minRating,
           },
         });
       }
@@ -552,6 +806,11 @@ export class RandomButtonComponent implements OnInit {
             filtered = filtered.filter((m) => this.isAnime(m));
           } else {
             filtered = filtered.filter((m) => !this.isAnime(m));
+          }
+
+          // Client-side filtering for excluded languages
+          if (excludedLanguages.size > 0) {
+            filtered = filtered.filter(m => !excludedLanguages.has(m.original_language));
           }
 
           buckets[bucket] = buckets[bucket].concat(filtered);
@@ -696,8 +955,11 @@ export class RandomButtonComponent implements OnInit {
 
   onItemClick(item: MediaType) {
     if (this.hasDragged) return;
+    
+    // If interactive, clicking an item selects it instead of navigating
     if (this.isInteractive()) {
-      this.watchNow(item);
+      this.selectedItem.set(item);
+      this.cancelAutoNav();
     }
   }
 
@@ -709,11 +971,31 @@ export class RandomButtonComponent implements OnInit {
     });
   }
 
+  toggleWatchlist(event?: Event) {
+    event?.stopPropagation();
+    const media = this.selectedItem();
+    if (media) {
+      if (this.isOnWatchlist()) {
+        this.watchlistService.removeFromWatchlist(media.id);
+      } else {
+        this.watchlistService.addToWatchlist(media);
+      }
+    }
+  }
+
+  openPlaylistModal(event?: Event) {
+    event?.stopPropagation();
+    if (this.selectedItem()) {
+      this.showPlaylistModal.set(true);
+    }
+  }
+
   startRoulette(items: MediaType[], winnerIndex: number, winner: MediaType) {
     this.clearTimers(); // Ensure no previous timers are running
 
     this.rouletteItems.set(items);
     this.winnerItem.set(null);
+    this.selectedItem.set(null);
     this.showRoulette.set(true);
     this.visible.set(false); // Close the menu
     this.isAutoNavCancelled.set(false);
@@ -771,6 +1053,7 @@ export class RandomButtonComponent implements OnInit {
       // Wait for animation to finish
       this.spinTimeout = setTimeout(() => {
         this.winnerItem.set(winner);
+        this.selectedItem.set(winner); // Set initial selection to winner
 
         // Switch to interactive mode
         const finalTranslateX = targetX + jitter;
