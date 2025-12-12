@@ -6,17 +6,21 @@ import {
   HostListener,
   OnInit,
   computed,
+  ViewChild,
+  ElementRef,
 } from "@angular/core";
 import { CommonModule, NgOptimizedImage } from "@angular/common";
 import { MovieService } from "../../services/movie.service";
 import { NavigationService } from "../../services/navigation.service";
 import { DiscoverParams, MediaType } from "../../models/movie.model";
-import { forkJoin } from "rxjs";
+import { forkJoin, map, of } from "rxjs";
 
 interface GenreOption {
   id: number;
   name: string;
   types: ("movie" | "tv")[];
+  movieIds: number[];
+  tvIds: number[];
 }
 
 @Component({
@@ -46,7 +50,7 @@ interface GenreOption {
         height: 320px;
         background: transparent;
         position: relative;
-        overflow: hidden;
+        /* overflow: hidden; - Removed to allow scrolling when interactive */
       }
       .roulette-track {
         display: flex;
@@ -116,10 +120,40 @@ interface GenreOption {
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        height: 45px; /* Fixed height for 2 lines */
       }
       .item-meta {
         color: #aaa;
         font-size: 14px;
+      }
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.8s ease-out both;
+      }
+      .winner-reveal-container {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .winner-reveal-container.open {
+        grid-template-rows: 1fr;
+      }
+      .winner-reveal-inner {
+        overflow: hidden;
+      }
+      .progress-ring__circle {
+        transition: stroke-dashoffset 5s linear;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
       }
     `,
   ],
@@ -127,6 +161,8 @@ interface GenreOption {
 export class RandomButtonComponent implements OnInit {
   private movieService = inject(MovieService);
   private navigationService = inject(NavigationService);
+  
+  @ViewChild('rouletteContainer') rouletteContainer!: ElementRef<HTMLDivElement>;
 
   // UI state
   visible = signal(false);
@@ -155,15 +191,6 @@ export class RandomButtonComponent implements OnInit {
     if (types.includes("anime")) return true;
 
     // Check if ANY selected genre is compatible with ANY selected type
-    // Actually, we need to ensure that for the selected type, there is at least one valid genre if we are filtering by genre.
-    // But since we pick a random type first, we just need to ensure that the pool isn't empty.
-    // If I select "Action" (Movie) and "Comedy" (Movie/TV) and enable only "TV",
-    // then "Action" is invalid for TV, but "Comedy" is valid.
-    // So if we pick TV, we can filter by Comedy.
-    // If we pick Movie, we can filter by Action OR Comedy.
-
-    // So we need to check if there is at least one intersection between (Selected Types) and (Types supported by Selected Genres).
-    // Let's collect all types supported by the selected genres.
     const supportedTypes = new Set<string>();
     this.genres().forEach((g) => {
       if (selected.has(g.id)) {
@@ -171,8 +198,11 @@ export class RandomButtonComponent implements OnInit {
       }
     });
 
+    // If we have selected genres but none of them map to a supported type (shouldn't happen with correct data),
+    // then it's invalid.
+    if (supportedTypes.size === 0) return false;
+
     const validTypes = types.filter((t) => {
-      if (t === "anime") return true; // Anime is special
       return supportedTypes.has(t);
     });
 
@@ -185,32 +215,109 @@ export class RandomButtonComponent implements OnInit {
   rouletteTransform = signal("translateX(0px)");
   rouletteTransition = signal("none");
   winnerItem = signal<MediaType | null>(null);
+  autoNavTimer: any = null;
+  isAutoNavCancelled = signal(false);
+  isInteractive = signal(false);
+  isWinnerRevealed = signal(false);
+  uniqueResults = signal<MediaType[]>([]);
+
+  winnerGenres = computed(() => {
+    const winner = this.winnerItem();
+    if (!winner) return [];
+    const allGenres = this.genres();
+    return winner.genre_ids
+      .map((id) => allGenres.find((g) => g.id === id)?.name)
+      .filter((name): name is string => !!name);
+  });
+
+  // Drag-to-scroll properties
+  private isMouseDown = false;
+  private startX = 0;
+  private scrollLeft = 0;
+  private hasDragged = false;
+  isGrabbing = signal(false);
+
+  // Timers
+  private spinTimeout: any;
+  private startTimeout: any;
+  private revealTimeout: any;
 
   ngOnInit() {
     forkJoin([
       this.movieService.getMovieGenreMap(),
       this.movieService.getTvGenreMap(),
     ]).subscribe(([movieMap, tvMap]) => {
-      const options = new Map<number, GenreOption>();
+      const genreGroups = new Map<string, { name: string, movieIds: number[], tvIds: number[] }>();
 
-      movieMap.forEach((name, id) => {
-        options.set(id, { id, name, types: ["movie"] });
+      const process = (map: Map<number, string>, type: 'movie' | 'tv') => {
+        map.forEach((originalName, id) => {
+            let name = originalName;
+            // Normalization
+            if (name === "Action & Adventure") name = "Action";
+            if (name === "Science Fiction") name = "Sci-Fi";
+            if (name === "Sci-Fi & Fantasy") name = "Sci-Fi";
+            if (name === "War & Politics") name = "War";
+            if (name === "Kids") name = "Family"; 
+            
+            if (!genreGroups.has(name)) {
+                genreGroups.set(name, { name, movieIds: [], tvIds: [] });
+            }
+            const group = genreGroups.get(name)!;
+            if (type === 'movie') group.movieIds.push(id);
+            else group.tvIds.push(id);
+        });
+      };
+
+      process(movieMap, 'movie');
+      process(tvMap, 'tv');
+
+      const options: GenreOption[] = [];
+      genreGroups.forEach((group) => {
+          const types: ("movie" | "tv")[] = [];
+          if (group.movieIds.length > 0) types.push("movie");
+          if (group.tvIds.length > 0) types.push("tv");
+          
+          // Use the first available ID as the unique ID for the UI
+          const id = group.movieIds.length > 0 ? group.movieIds[0] : group.tvIds[0];
+          
+          options.push({
+              id,
+              name: group.name,
+              types,
+              movieIds: group.movieIds,
+              tvIds: group.tvIds
+          });
       });
 
-      tvMap.forEach((name, id) => {
-        if (options.has(id)) {
-          const existing = options.get(id)!;
-          existing.types.push("tv");
-        } else {
-          options.set(id, { id, name, types: ["tv"] });
-        }
-      });
-
-      const sorted = Array.from(options.values()).sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
+      const sorted = options.sort((a, b) => a.name.localeCompare(b.name));
       this.genres.set(sorted);
     });
+  }
+
+  clearTimers() {
+    if (this.spinTimeout) clearTimeout(this.spinTimeout);
+    if (this.startTimeout) clearTimeout(this.startTimeout);
+    if (this.revealTimeout) clearTimeout(this.revealTimeout);
+    this.cancelAutoNav();
+  }
+
+  cancelAutoNav() {
+    if (this.autoNavTimer) {
+      clearTimeout(this.autoNavTimer);
+      this.autoNavTimer = null;
+    }
+    this.isAutoNavCancelled.set(true);
+  }
+
+  reroll() {
+    this.clearTimers();
+    this.onRandomSearch();
+  }
+
+  closeRoulette() {
+    this.clearTimers();
+    this.showRoulette.set(false);
+    this.winnerItem.set(null);
   }
 
   toggleGenresExpanded() {
@@ -282,6 +389,25 @@ export class RandomButtonComponent implements OnInit {
     }
   }
 
+  private isAnime(item: MediaType): boolean {
+    return item.original_language === 'ja' && item.genre_ids.includes(16);
+  }
+
+  private shuffle<T>(arr: T[]) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  private sample<T>(arr: T[], count: number) {
+    if (arr.length <= count) return [...arr];
+    const copy = [...arr];
+    this.shuffle(copy);
+    return copy.slice(0, count);
+  }
+
   onRandomSearch(): void {
     const types: ("movie" | "tv" | "anime")[] = [];
     if (this.randomTvShow()) types.push("tv");
@@ -311,101 +437,263 @@ export class RandomButtonComponent implements OnInit {
 
     if (validTypes.length === 0) return;
 
-    const selectedType =
-      validTypes[Math.floor(Math.random() * validTypes.length)];
+    // Build requests
+    const requests: { type: 'movie' | 'tv', bucket?: 'movie' | 'tv' | 'anime', isAnime: boolean, params: DiscoverParams }[] = [];
     const maxAge = this.randomMaxAge();
     const currentYear = new Date().getFullYear();
     const minYear = currentYear - maxAge;
     const releaseDateGte = `${minYear}-01-01`;
 
-    const baseParams: DiscoverParams = {
-      type: selectedType,
-      release_date_gte: releaseDateGte,
-      sort_by: "popularity.desc",
-      page: 1,
-    };
+    validTypes.forEach(t => {
+        if (t === 'movie') {
+            requests.push({
+                type: 'movie',
+              bucket: 'movie',
+              isAnime: false,
+              params: {
+                  type: 'movie',
+                  release_date_gte: releaseDateGte,
+                  sort_by: 'popularity.desc',
+                  page: 1,
+                  with_genres: this.buildGenreQuery('movie', selectedGenres)
+              }
+          });
+      } else if (t === 'tv') {
+          requests.push({
+              type: 'tv',
+              bucket: 'tv',
+              isAnime: false,
+              params: {
+                  type: 'tv',
+                  release_date_gte: releaseDateGte,
+                  sort_by: 'popularity.desc',
+                  page: 1,
+                  with_genres: this.buildGenreQuery('tv', selectedGenres)
+              }
+          });
+      } else if (t === 'anime') {
+          // Add both Movie and TV for Anime to ensure mix, but mark both as 'anime' bucket
+          requests.push({
+              type: 'movie',
+              bucket: 'anime',
+              isAnime: true,
+              params: {
+                  type: 'movie',
+                  release_date_gte: releaseDateGte,
+                  sort_by: 'popularity.desc',
+                  page: 1,
+                  with_original_language: 'ja',
+                  with_genres: this.buildAnimeGenreQuery('movie', selectedGenres)
+              }
+          });
+          requests.push({
+              type: 'tv',
+              bucket: 'anime',
+              isAnime: true,
+              params: {
+                    type: 'tv',
+                    release_date_gte: releaseDateGte,
+                    sort_by: 'popularity.desc',
+                    page: 1,
+                    with_original_language: 'ja',
+                    with_genres: this.buildAnimeGenreQuery('tv', selectedGenres)
+                }
+            });
+        }
+    });
 
-    if (selectedGenres.size > 0) {
-      // Filter genres relevant to the selected type
-      const relevantGenres = Array.from(selectedGenres).filter((id) => {
-        const g = this.genres().find((gen) => gen.id === id);
-        if (!g) return false;
-        if (selectedType === "anime") return true; // Pass all to anime? Or just anime ones?
-        return g.types.includes(selectedType);
+    // Execute initial requests to get total pages
+    const initialCalls$ = requests.map(req => 
+        this.movieService.discoverMedia(req.params).pipe(
+            map(res => ({ req, total_pages: res.total_pages }))
+        )
+    );
+
+    forkJoin(initialCalls$).subscribe(initialResults => {
+        const validResults = initialResults.filter(r => r.total_pages > 0);
+        if (validResults.length === 0) return;
+
+        // Execute random page requests
+        const finalCalls$ = validResults.map(item => {
+            const maxPage = Math.min(item.total_pages, 20);
+            const randomPage = Math.floor(Math.random() * maxPage) + 1;
+            return this.movieService.discoverMedia({ ...item.req.params, page: randomPage }).pipe(
+                map(res => ({ req: item.req, results: res.results }))
+            );
+        });
+
+        forkJoin(finalCalls$).subscribe(finalResults => {
+            // Group results by logical bucket
+            const buckets: Record<string, MediaType[]> = { movie: [], tv: [], anime: [] };
+
+            finalResults.forEach(item => {
+                const bucket = item.req.bucket || item.req.type;
+                let filtered = item.results;
+                if (item.req.isAnime) {
+                    filtered = filtered.filter(m => this.isAnime(m));
+                } else {
+                    filtered = filtered.filter(m => !this.isAnime(m));
+                }
+
+                buckets[bucket] = buckets[bucket].concat(filtered);
+            });
+
+            // Determine active buckets
+            const activeBuckets = Object.keys(buckets).filter(k => buckets[k].length > 0);
+            if (activeBuckets.length === 0) return;
+
+            // Decide the desired pool size (before duplicating for longer spin)
+            const desiredPoolSize = 80; // will be duplicated later
+            const perBucket = Math.floor(desiredPoolSize / activeBuckets.length);
+
+            let pooled: MediaType[] = [];
+
+            // Sample evenly from each bucket
+            activeBuckets.forEach((bk) => {
+                const list = buckets[bk];
+                const sampleCount = Math.max(1, Math.min(perBucket, list.length));
+                pooled = pooled.concat(this.sample(list, sampleCount));
+            });
+
+            // If we are short, fill remaining slots from buckets with leftover
+            let remaining = desiredPoolSize - pooled.length;
+            if (remaining > 0) {
+                const poolLeftovers = activeBuckets.flatMap(bk => buckets[bk].filter(i => !pooled.find(p => p.id === i.id)));
+                if (poolLeftovers.length > 0) {
+                    pooled = pooled.concat(this.sample(poolLeftovers, remaining));
+                }
+            }
+
+            // Deduplicate by id
+            const dedup = new Map<number, MediaType>();
+            pooled.forEach(i => dedup.set(i.id, i));
+            pooled = Array.from(dedup.values());
+
+            if (pooled.length === 0) return;
+
+            // Store unique results for the "scroll through items" view
+            this.uniqueResults.set(pooled);
+
+            // Prepare roulette items (ensure plenty of items)
+            let items = [...pooled];
+            while (items.length < 80) {
+              items = items.concat(pooled);
+            }
+            this.shuffle(items);
+
+            // Pick a winner near the end (e.g., index 60-75)
+            const winnerIndex = Math.floor(Math.random() * 15) + 60;
+            const winner = items[winnerIndex];
+
+            this.startRoulette(items, winnerIndex, winner);
+        });
+    });
+  }
+
+  // Helper to build genre query
+  buildGenreQuery(type: 'movie' | 'tv', selectedGenres: Set<number>): string | undefined {
+      if (selectedGenres.size === 0) return undefined;
+      const ids: number[] = [];
+      selectedGenres.forEach(id => {
+          const g = this.genres().find(gen => gen.id === id);
+          if (g) {
+              if (type === 'movie') ids.push(...g.movieIds);
+              else ids.push(...g.tvIds);
+          }
       });
+      return ids.length > 0 ? ids.join('|') : undefined;
+  }
 
-      if (relevantGenres.length > 0) {
-        // Use pipe for OR logic
-        baseParams.with_genres = relevantGenres.join("|");
-      }
+  buildAnimeGenreQuery(type: 'movie' | 'tv', selectedGenres: Set<number>): string {
+      if (selectedGenres.size === 0) return '16';
+      const ids: number[] = [];
+      selectedGenres.forEach(id => {
+          const g = this.genres().find(gen => gen.id === id);
+          if (g) {
+              if (type === 'movie') ids.push(...g.movieIds);
+              else ids.push(...g.tvIds);
+          }
+      });
+      
+      if (ids.length === 0) return '16';
+      
+      // (16 AND ID1) OR (16 AND ID2) ...
+      return ids.map(id => `16,${id}`).join('|');
+  }
+
+  onMouseDown(e: MouseEvent): void {
+    if (!this.isInteractive()) return;
+    const element = this.rouletteContainer?.nativeElement;
+    if (!element) return;
+
+    e.preventDefault();
+    this.isMouseDown = true;
+    this.hasDragged = false;
+    this.isGrabbing.set(true);
+    this.startX = e.pageX - element.offsetLeft;
+    this.scrollLeft = element.scrollLeft;
+  }
+
+  onMouseLeave(): void {
+    this.isMouseDown = false;
+    this.isGrabbing.set(false);
+  }
+
+  onMouseUp(): void {
+    this.isMouseDown = false;
+    this.isGrabbing.set(false);
+  }
+
+  onMouseMove(e: MouseEvent): void {
+    if (!this.isMouseDown || !this.isInteractive()) return;
+    e.preventDefault();
+    const element = this.rouletteContainer?.nativeElement;
+    if (!element) return;
+
+    const x = e.pageX - element.offsetLeft;
+    const walk = x - this.startX;
+
+    if (Math.abs(walk) > 5) {
+      this.hasDragged = true;
     }
 
-    this.movieService.discoverMedia(baseParams).subscribe({
-      next: (initialRes) => {
-        if (initialRes.total_pages === 0 || initialRes.results.length === 0)
-          return;
+    element.scrollLeft = this.scrollLeft - walk;
+  }
 
-        const maxPage = Math.min(initialRes.total_pages, 50);
-        const randomPage = Math.floor(Math.random() * maxPage) + 1;
+  onItemClick(item: MediaType) {
+    if (this.hasDragged) return;
+    if (this.isInteractive()) {
+      this.watchNow(item);
+    }
+  }
 
-        const getPage$ =
-          randomPage === 1
-            ? this.movieService.discoverMedia({ ...baseParams, page: 1 })
-            : this.movieService.discoverMedia({
-                ...baseParams,
-                page: randomPage,
-              });
-
-        getPage$.subscribe((res) => {
-          if (res.results.length === 0) return;
-
-          let results = res.results;
-
-          // If we are not explicitly searching for Anime, filter out Anime from the results
-          // to ensure "TV Show" and "Movie" buckets don't contain Anime.
-          // We define Anime as Genre 16 (Animation) + Language 'ja' (Japanese).
-          if (selectedType !== "anime") {
-            results = results.filter(
-              (item) =>
-                !(
-                  item.original_language === "ja" &&
-                  item.genre_ids.includes(16)
-                )
-            );
-          }
-
-          if (results.length === 0) return;
-
-          // Prepare roulette items
-          // We need enough items for a long spin.
-          // Let's duplicate the results 5 times (20 * 5 = 100 items)
-          let items = [...results];
-          while (items.length < 80) {
-            items = [...items, ...results];
-          }
-          // Shuffle slightly to avoid obvious patterns if we just duplicated
-          items = items.sort(() => Math.random() - 0.5);
-
-          // Pick a winner near the end (e.g., index 60-75)
-          const winnerIndex = Math.floor(Math.random() * 15) + 60;
-          const winner = items[winnerIndex];
-
-          this.startRoulette(items, winnerIndex, winner);
-        });
-      },
-      error: (err) => console.error("Random search failed", err),
+  watchNow(item: MediaType) {
+    this.closeRoulette();
+    this.navigationService.navigateTo("watch", {
+      mediaType: item.media_type,
+      id: item.id,
     });
   }
 
   startRoulette(items: MediaType[], winnerIndex: number, winner: MediaType) {
+    this.clearTimers(); // Ensure no previous timers are running
+
     this.rouletteItems.set(items);
     this.winnerItem.set(null);
     this.showRoulette.set(true);
     this.visible.set(false); // Close the menu
+    this.isAutoNavCancelled.set(false);
+    this.isInteractive.set(false);
+    this.isWinnerRevealed.set(false);
 
     // Reset position
     this.rouletteTransition.set("none");
     this.rouletteTransform.set("translateX(0px)");
+
+    // Reset scroll position (critical for reroll to ensure track is aligned and red line visible)
+    if (this.rouletteContainer) {
+      this.rouletteContainer.nativeElement.scrollLeft = 0;
+    }
 
     // Item width is 160px.
     // We want the winner to be centered.
@@ -434,7 +722,7 @@ export class RandomButtonComponent implements OnInit {
     // Target X = - (winnerIndex * itemWidth) + (ContainerWidth / 2) - (ItemWidth / 2)
 
     // Let's trigger the animation after a brief delay to ensure DOM render
-    setTimeout(() => {
+    this.startTimeout = setTimeout(() => {
       const containerWidth = Math.min(window.innerWidth, 1000);
       const centerOffset = containerWidth / 2 - itemWidth / 2;
       const targetX = -(winnerIndex * itemWidth) + centerOffset;
@@ -447,16 +735,37 @@ export class RandomButtonComponent implements OnInit {
       this.rouletteTransform.set(`translateX(${targetX + jitter}px)`);
 
       // Wait for animation to finish
-      setTimeout(() => {
+      this.spinTimeout = setTimeout(() => {
         this.winnerItem.set(winner);
+        
+        // Switch to interactive mode
+        const finalTranslateX = targetX + jitter;
+        this.isInteractive.set(true);
+        
+        // Apply scroll position to match the transform
+        // Use requestAnimationFrame to ensure DOM is updated
+        requestAnimationFrame(() => {
+          if (this.rouletteContainer) {
+            // translateX is negative (moving left), so scrollLeft is positive (scrolling right)
+            this.rouletteContainer.nativeElement.scrollLeft = -finalTranslateX;
+          }
+        });
+
         // Wait a bit showing the winner then navigate
-        setTimeout(() => {
-          this.navigationService.navigateTo("watch", {
-            mediaType: winner.media_type,
-            id: winner.id,
-          });
-          this.showRoulette.set(false);
-        }, 2000);
+        // Use a small delay to trigger the height animation
+        this.revealTimeout = setTimeout(() => {
+           this.isWinnerRevealed.set(true);
+        }, 50);
+
+        this.autoNavTimer = setTimeout(() => {
+          if (!this.isAutoNavCancelled()) {
+            this.navigationService.navigateTo("watch", {
+              mediaType: winner.media_type,
+              id: winner.id,
+            });
+            this.showRoulette.set(false);
+          }
+        }, 5000); // Increased to 5s
       }, 6000);
     }, 100);
   }

@@ -173,15 +173,29 @@
 
   @if (showRoulette()) {
   <div class="roulette-overlay" (click)="$event.stopPropagation()">
-    <div class="roulette-container">
+    <div 
+      class="roulette-container" 
+      #rouletteContainer
+      [class.overflow-x-auto]="isInteractive()"
+      [class.overflow-hidden]="!isInteractive()"
+      [class.cursor-grab]="isInteractive()"
+      [class.cursor-grabbing]="isGrabbing()"
+      [class.select-none]="isGrabbing()"
+      style="scrollbar-width: none; -ms-overflow-style: none;"
+      (mousedown)="onMouseDown($event)"
+      (mouseleave)="onMouseLeave()"
+      (mouseup)="onMouseUp()"
+      (mousemove)="onMouseMove($event)"
+      (dragstart)="$event.preventDefault()"
+    >
       <div class="center-line"></div>
       <div
         class="roulette-track"
-        [style.transform]="rouletteTransform()"
-        [style.transition]="rouletteTransition()"
+        [style.transform]="isInteractive() ? 'none' : rouletteTransform()"
+        [style.transition]="isInteractive() ? 'none' : rouletteTransition()"
       >
         @for (item of rouletteItems(); track $index) {
-        <div class="roulette-item">
+        <div class="roulette-item" (click)="onItemClick(item)">
           @if (item.backdrop_path) {
           <img
             [ngSrc]="'https://image.tmdb.org/t/p/w500' + item.backdrop_path"
@@ -217,16 +231,122 @@
         }
       </div>
     </div>
-    @if (winnerItem()) {
-    <div class="mt-8 text-center duration-300animate-fade-in">
-      <p class="text-red-600 text-xl font-bold mb-2">Winner!</p>
-      <h2 class="text-3xl text-white font-bold">
-        {{
-          winnerItem()?.media_type === "movie"
-            ? winnerItem()?.title
-            : winnerItem()?.name
-        }}
-      </h2>
+    @if (winnerItem(); as winner) {
+    <div 
+      class="mt-8 text-center flex flex-col items-center z-50 relative w-full max-w-4xl px-4 winner-reveal-container"
+      [class.open]="isWinnerRevealed()"
+    >
+      <div class="winner-reveal-inner flex flex-col items-center w-full">
+        
+        <!-- Winner Badge -->
+        <div class="mb-4 animate-fade-in-up">
+            <span class="px-3 py-1 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 rounded-full text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(234,179,8,0.3)]">
+                Winner
+            </span>
+        </div>
+
+        <!-- Title -->
+        <h2 class="text-4xl md:text-5xl text-white font-bold mb-4 animate-fade-in-up text-center leading-tight drop-shadow-lg" style="animation-delay: 0.1s">
+          {{ winner.media_type === "movie" ? winner.title : winner.name }}
+        </h2>
+
+        <!-- Metadata Row -->
+        <div class="flex flex-wrap items-center justify-center gap-3 text-sm md:text-base text-zinc-300 mb-6 animate-fade-in-up" style="animation-delay: 0.15s">
+            <span class="font-medium text-white">
+                {{ winner.media_type === 'movie' ? (winner.release_date | date:'yyyy') : (winner.first_air_date | date:'yyyy') }}
+            </span>
+            <span class="w-1 h-1 bg-zinc-500 rounded-full"></span>
+            <span class="capitalize">{{ winner.media_type === 'movie' ? 'Movie' : 'TV Series' }}</span>
+            
+            @if (winner.vote_average) {
+                <span class="w-1 h-1 bg-zinc-500 rounded-full"></span>
+                <div class="flex items-center gap-1 text-green-400">
+                    <span class="material-symbols-outlined text-sm">star</span>
+                    <span>{{ winner.vote_average | number:'1.1-1' }}</span>
+                </div>
+            }
+
+            @if (winnerGenres().length > 0) {
+                <span class="w-1 h-1 bg-zinc-500 rounded-full"></span>
+                <div class="flex gap-2 flex-wrap justify-center">
+                    @for (genre of winnerGenres(); track genre) {
+                        <span class="px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-400">
+                            {{ genre }}
+                        </span>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Overview -->
+        <p class="text-zinc-300 text-base md:text-lg max-w-2xl mb-8 leading-relaxed drop-shadow-md animate-fade-in-up line-clamp-3 text-center" style="animation-delay: 0.2s">
+          {{ winner.overview }}
+        </p>
+
+        <!-- Actions / Timer -->
+        @if (!isAutoNavCancelled()) {
+          <div class="flex flex-col items-center gap-4 animate-fade-in-up" style="animation-delay: 0.3s">
+            <div class="relative w-16 h-16 flex items-center justify-center group cursor-pointer" (click)="cancelAutoNav()">
+              <!-- Progress Ring -->
+              <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
+                <circle
+                  class="text-zinc-800"
+                  stroke-width="6"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="44"
+                  cx="50"
+                  cy="50"
+                />
+                <circle
+                  class="text-red-600 progress-ring__circle"
+                  stroke-width="6"
+                  stroke-linecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="44"
+                  cx="50"
+                  cy="50"
+                  stroke-dasharray="276.46"
+                  [attr.stroke-dashoffset]="isWinnerRevealed() ? '0' : '276.46'"
+                />
+              </svg>
+              <!-- Play Icon (Default) / Cancel Icon (Hover) -->
+              <div class="relative z-10 w-12 h-12 bg-white rounded-full flex items-center justify-center transition-transform group-hover:scale-90 shadow-lg">
+                 <span class="material-symbols-outlined text-black text-2xl group-hover:hidden">play_arrow</span>
+                 <span class="material-symbols-outlined text-red-600 text-2xl hidden group-hover:block">close</span>
+              </div>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-zinc-400 text-sm font-medium">Playing in 5s...</span>
+                <button (click)="cancelAutoNav()" class="text-xs text-zinc-500 hover:text-zinc-300 mt-1">Cancel Auto-play</button>
+            </div>
+          </div>
+        } @else {
+          <div class="flex gap-4 mb-8 animate-fade-in-up">
+            <button 
+                (click)="watchNow(winner)"
+                class="px-8 py-3 bg-white hover:bg-zinc-200 text-black rounded-full font-bold transition-colors flex items-center gap-2 shadow-lg shadow-white/10"
+            >
+                <span class="material-symbols-outlined">play_arrow</span>
+                Watch Now
+            </button>
+            <button 
+              (click)="reroll()" 
+              class="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full font-medium transition-colors flex items-center gap-2 border border-zinc-700"
+            >
+              <span class="material-symbols-outlined">refresh</span>
+              Reroll
+            </button>
+            <button 
+              (click)="closeRoulette()" 
+              class="px-6 py-3 bg-transparent hover:bg-zinc-800 text-zinc-300 rounded-full font-medium transition-colors border border-zinc-700"
+            >
+              Close
+            </button>
+          </div>
+        }
+      </div>
     </div>
     }
   </div>

@@ -154,10 +154,15 @@ export class MovieService {
       first_air_date_year,
       vote_average_gte,
       release_date_gte,
+      with_original_language,
     } = params;
 
     const sortByQuery = `&sort_by=${sort_by || "popularity.desc"}`;
     let baseQueryParams = `api_key=${this.API_KEY}&page=${page}${sortByQuery}`;
+
+    if (with_original_language) {
+      baseQueryParams += `&with_original_language=${with_original_language}`;
+    }
 
     if (vote_average_gte) {
       baseQueryParams += `&vote_average.gte=${vote_average_gte}`;
