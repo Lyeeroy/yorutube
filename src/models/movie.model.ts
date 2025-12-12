@@ -196,7 +196,7 @@ export interface DiscoverParams {
   page?: number;
   with_genres?: number[] | string;
   without_genres?: number[] | string;
-  with_network?: number;
+  with_network?: number | string;
   // FIX: Allow string for pipe-separated company IDs to enable OR queries.
   with_company?: number | string;
   with_watch_providers?: number | string;

@@ -24,6 +24,50 @@ const LANGUAGES = [
 
 type DiscoverType = 'movie' | 'tv' | 'anime';
 
+type StudioOption = {
+  id: number | string;
+  name: string;
+  logo_path: string | null;
+};
+
+const normalizeStudioName = (name: string): string =>
+  name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const hasValidPath = (p: any): p is string =>
+  typeof p === 'string' && 
+  p.trim() !== '' && 
+  !['null', 'undefined'].includes(p.trim().toLowerCase());
+
+const mergeStudiosByName = (studios: Array<{ id: number; name: string; logo_path: string | null }>): StudioOption[] => {
+  const merged = new Map<string, { name: string; ids: number[]; logo_path: string | null }>();
+
+  for (const studio of studios) {
+    const key = normalizeStudioName(studio.name);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, {
+        name: studio.name.trim(),
+        ids: [studio.id],
+        logo_path: studio.logo_path ?? null,
+      });
+      continue;
+    }
+
+    existing.ids.push(studio.id);
+    if (!existing.logo_path && studio.logo_path) {
+      existing.logo_path = studio.logo_path;
+    }
+  }
+
+  return Array.from(merged.values())
+    .map((entry) => ({
+      id: entry.ids.length === 1 ? entry.ids[0] : entry.ids.join('|'),
+      name: entry.name,
+      logo_path: entry.logo_path,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
+
 @Component({
   selector: 'app-discover',
   standalone: true,
@@ -60,7 +104,7 @@ export class DiscoverComponent implements OnInit {
   // Selected filters
   selectedGenres = signal<number[]>([]);
   excludedGenres = signal<number[]>([]);
-  selectedNetwork = signal<number | null>(null);
+  selectedNetwork = signal<number | string | null>(null);
   selectedCompany = signal<number | string | null>(null);
   selectedSortBy = signal<string>('popularity.desc');
   selectedYear = signal<number | null>(null);
@@ -80,23 +124,7 @@ export class DiscoverComponent implements OnInit {
       switchMap(query => {
         if (!query || query.length < 2) return of(null);
         return this.movieService.searchCompanies(query, 1).pipe(
-          map(r => {
-            // Deduplicate by name and merge IDs
-            const unique = new Map<string, { id: string, name: string, logo_path: string | null }>();
-            for (const company of r.results) {
-              if (!unique.has(company.name)) {
-                unique.set(company.name, { 
-                    id: company.id.toString(), 
-                    name: company.name, 
-                    logo_path: company.logo_path 
-                });
-              } else {
-                const entry = unique.get(company.name)!;
-                entry.id = `${entry.id}|${company.id}`;
-              }
-            }
-            return Array.from(unique.values()) as any[]; // Cast to any[] to satisfy template expecting ProductionCompany-like objects
-          })
+          map(r => mergeStudiosByName(r.results))
         );
       })
     ),
@@ -107,17 +135,30 @@ export class DiscoverComponent implements OnInit {
 
   availableNetworks = computed(() => {
     const networks = this._allAvailableNetworks();
-    const popular = networks.filter(n => this.popularNetworkIds.has(n.id));
-    const other = networks.filter(n => !this.popularNetworkIds.has(n.id));
+    const merged = mergeStudiosByName(networks);
+    
+    const popular: StudioOption[] = [];
+    const other: StudioOption[] = [];
+
+    for (const m of merged) {
+        const ids = m.id.toString().split('|').map(Number);
+        if (ids.some(id => this.popularNetworkIds.has(id))) {
+            popular.push(m);
+        } else {
+            other.push(m);
+        }
+    }
     return { popular, other };
   });
 
-  private availableMovieStudios = computed(() => {
-    return { popular: this._allAvailableMovieStudios(), other: [] };
+  private availableMovieStudios = computed<{ popular: StudioOption[]; other: StudioOption[] }>(() => {
+    const merged = mergeStudiosByName(this._allAvailableMovieStudios());
+    return { popular: merged, other: [] };
   });
 
-  private availableAnimeStudios = computed(() => {
-    return { popular: this._allAvailableAnimeStudios(), other: [] };
+  private availableAnimeStudios = computed<{ popular: StudioOption[]; other: StudioOption[] }>(() => {
+    const merged = mergeStudiosByName(this._allAvailableAnimeStudios());
+    return { popular: merged, other: [] };
   });
 
   filteredNetworks = computed(() => {
@@ -226,26 +267,20 @@ export class DiscoverComponent implements OnInit {
         return [...networks.popular, ...networks.other].find(n => n.id === networkId)?.name;
     }
     if (companyId) {
-        // If it's a merged ID string (e.g. "123|456"), we might not find it in the standard lists easily
-        // unless we look at the search results or just parse it.
-        // For now, let's try to find it in the available studios.
         const studios = this.availableStudios();
-        if (!studios) return null;
-        
-        // Check if it's a simple number ID
-        if (typeof companyId === 'number') {
-             return [...studios.popular, ...studios.other].find(c => c.id === companyId)?.name;
+        if (studios) {
+          const combined = [...studios.popular, ...studios.other];
+          const found = combined.find(c => c.id.toString() === companyId.toString());
+          if (found) return found.name;
         }
-        
-        // If it's a string, it might be from search results.
-        // We can try to find the name from the searchedStudios$ if available
+
+        // If it's from search results (or not in local list), try there.
         const searchResults = this.searchedStudios$();
         if (searchResults) {
-             const found = searchResults.find(c => c.id.toString() === companyId.toString());
-             if (found) return found.name;
+          const found = searchResults.find(c => c.id.toString() === companyId.toString());
+          if (found) return found.name;
         }
-        
-        // Fallback: if we can't find the name, maybe just show "Selected Studio" or try to find one of the IDs
+
         return "Selected Studio";
     }
     return null;
@@ -324,7 +359,8 @@ export class DiscoverComponent implements OnInit {
 
     this.movieService.discoverMedia(params).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: (data) => {
-            this.mediaItems.update(current => loadMore ? [...current, ...data.results] : data.results);
+        const withBackdrops = data.results.filter(m => hasValidPath(m.backdrop_path));
+        this.mediaItems.update(current => loadMore ? [...current, ...withBackdrops] : withBackdrops);
             this.totalPages.set(data.total_pages);
         },
         complete: () => {
@@ -426,7 +462,7 @@ export class DiscoverComponent implements OnInit {
     this.applyFilters();
   }
 
-  selectNetwork(id: number | null): void {
+  selectNetwork(id: number | string | null): void {
     this.selectedNetwork.set(id);
     this.selectedCompany.set(null); // Ensure only one is active
     this.applyFilters();
