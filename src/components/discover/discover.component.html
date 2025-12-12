@@ -111,6 +111,64 @@
           </div>
         }
       </div>
+
+      <!-- Language Filter -->
+      <div class="relative">
+        <button (click)="toggleDropdown('language', $event)"
+          class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+          [class.bg-white]="selectedLanguage() !== null"
+          [class.text-black]="selectedLanguage() !== null"
+          [class.bg-zinc-800]="selectedLanguage() === null"
+          [class.text-white]="selectedLanguage() === null"
+          [class.hover:bg-zinc-700]="selectedLanguage() === null">
+          <span>Language @if(selectedLanguage()) {({{ selectedLanguage() }})}</span>
+          <span class="material-symbols-outlined text-base transition-transform" [class.rotate-180]="activeDropdown() === 'language'">expand_more</span>
+        </button>
+        @if (activeDropdown() === 'language') {
+          <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 py-1 max-h-60 overflow-y-auto">
+            <button (click)="selectLanguage(null)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700" [class.text-red-500]="selectedLanguage() === null">All Languages</button>
+            @for(lang of languages(); track lang.code) {
+              <button (click)="selectLanguage(lang.code)" class="w-full text-left px-4 py-2 text-sm hover:bg-zinc-700" [class.text-red-500]="selectedLanguage() === lang.code">{{ lang.name }}</button>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Max Age Filter -->
+      <div class="relative">
+        <button (click)="toggleDropdown('age', $event)"
+          class="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+          [class.bg-white]="maxAge() !== null"
+          [class.text-black]="maxAge() !== null"
+          [class.bg-zinc-800]="maxAge() === null"
+          [class.text-white]="maxAge() === null"
+          [class.hover:bg-zinc-700]="maxAge() === null">
+          <span>Max Age @if(maxAge()) {({{ maxAge() }}y)}</span>
+          <span class="material-symbols-outlined text-base transition-transform" [class.rotate-180]="activeDropdown() === 'age'">expand_more</span>
+        </button>
+        @if (activeDropdown() === 'age') {
+          <div (click)="$event.stopPropagation()" class="absolute top-full left-0 mt-2 w-64 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-zinc-400">Max Age (Years)</span>
+              <span class="text-xs text-zinc-200">{{ maxAge() ?? 'Any' }}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="maxAge() ?? 100"
+              (input)="setMaxAge($any($event.target).value)"
+              class="w-full h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer mb-4"
+              style="accent-color: #dc2626"
+            />
+            <div class="flex justify-end items-center gap-2">
+               <button (click)="setMaxAge(null); applyFilters()" class="text-sm font-semibold py-1.5 px-3 rounded-full hover:bg-zinc-700">Clear</button>
+               <button (click)="applyFilters()" class="text-sm font-semibold py-1.5 px-3 rounded-full bg-white text-black hover:bg-zinc-200">Apply</button>
+            </div>
+          </div>
+        }
+      </div>
       
       <!-- Channel Filter (Network/Studio) -->
       @if (activeType() !== 'movie' || availableStudios()) {

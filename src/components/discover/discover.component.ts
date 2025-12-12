@@ -7,6 +7,20 @@ import { InfiniteScrollTriggerComponent } from '../infinite-scroll-trigger/infin
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationService } from '../../services/navigation.service';
 
+const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "zh", name: "Chinese" },
+  { code: "fr", name: "French" },
+  { code: "es", name: "Spanish" },
+  { code: "de", name: "German" },
+  { code: "it", name: "Italian" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+  { code: "hi", name: "Hindi" },
+];
+
 type DiscoverType = 'movie' | 'tv' | 'anime';
 
 @Component({
@@ -26,7 +40,7 @@ export class DiscoverComponent implements OnInit {
   
   // View state
   activeType = signal<DiscoverType>('movie');
-  activeDropdown = signal<'sort' | 'genre' | 'year' | 'channel' | null>(null);
+  activeDropdown = signal<'sort' | 'genre' | 'year' | 'channel' | 'language' | 'age' | null>(null);
   
   // Data & Pagination
   mediaItems = signal<MediaType[]>([]);
@@ -48,6 +62,10 @@ export class DiscoverComponent implements OnInit {
   selectedCompany = signal<number | null>(null);
   selectedSortBy = signal<string>('popularity.desc');
   selectedYear = signal<number | null>(null);
+  selectedLanguage = signal<string | null>(null);
+  maxAge = signal<number | null>(null);
+  
+  languages = signal(LANGUAGES);
 
   // Channel search filter
   channelSearchQuery = signal('');
@@ -140,7 +158,9 @@ export class DiscoverComponent implements OnInit {
            this.selectedNetwork() !== null ||
            this.selectedCompany() !== null ||
            this.selectedSortBy() !== 'popularity.desc' ||
-           this.selectedYear() !== null;
+           this.selectedYear() !== null ||
+           this.selectedLanguage() !== null ||
+           this.maxAge() !== null;
   });
 
   selectedSortByLabel = computed(() => {
@@ -183,6 +203,8 @@ export class DiscoverComponent implements OnInit {
     this.selectedCompany.set(null);
     this.selectedSortBy.set('popularity.desc');
     this.selectedYear.set(null);
+    this.selectedLanguage.set(null);
+    this.maxAge.set(null);
 
     this.activeType.set(type);
     this.resetAndLoad();
@@ -213,6 +235,14 @@ export class DiscoverComponent implements OnInit {
         }
     }
 
+    const maxAge = this.maxAge();
+    let releaseDateGte: string | undefined;
+    if (maxAge !== null) {
+        const currentYear = new Date().getFullYear();
+        const minYear = currentYear - maxAge;
+        releaseDateGte = `${minYear}-01-01`;
+    }
+
     const params: DiscoverParams = {
         type: this.activeType(),
         page: this.page(),
@@ -222,6 +252,8 @@ export class DiscoverComponent implements OnInit {
         sort_by: sortBy,
         primary_release_year: this.activeType() !== 'tv' ? this.selectedYear() ?? undefined : undefined,
         first_air_date_year: this.activeType() !== 'movie' ? this.selectedYear() ?? undefined : undefined,
+        with_original_language: this.selectedLanguage() ?? undefined,
+        release_date_gte: releaseDateGte,
     };
 
     this.movieService.discoverMedia(params).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -255,10 +287,12 @@ export class DiscoverComponent implements OnInit {
     this.selectedCompany.set(null);
     this.selectedSortBy.set('popularity.desc');
     this.selectedYear.set(null);
+    this.selectedLanguage.set(null);
+    this.maxAge.set(null);
     this.applyFilters();
   }
   
-  toggleDropdown(dropdown: 'sort' | 'genre' | 'year' | 'channel', event: MouseEvent): void {
+  toggleDropdown(dropdown: 'sort' | 'genre' | 'year' | 'channel' | 'language' | 'age', event: MouseEvent): void {
     event.stopPropagation();
     if (this.activeDropdown() === 'genre' && this.activeDropdown() !== dropdown) {
       this.applyFilters();
@@ -295,6 +329,20 @@ export class DiscoverComponent implements OnInit {
   selectSort(sortBy: string): void {
     this.selectedSortBy.set(sortBy);
     this.applyFilters();
+  }
+
+  selectLanguage(code: string | null): void {
+    this.selectedLanguage.set(code);
+    this.applyFilters();
+  }
+
+  setMaxAge(age: any): void {
+    const num = Number(age);
+    if (!isNaN(num)) {
+        this.maxAge.set(num);
+    } else {
+        this.maxAge.set(null);
+    }
   }
 
   selectYear(year: number | null): void {
