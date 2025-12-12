@@ -13,7 +13,12 @@ export const UNIFIED_GENRES: UnifiedGenre[] = [
   { name: "Crime", movieIds: [80], tvIds: [80], animeIds: [80] },
   { name: "Documentary", movieIds: [99], tvIds: [99], animeIds: [99] },
   { name: "Drama", movieIds: [18], tvIds: [18], animeIds: [18] },
-  { name: "Family", movieIds: [10751], tvIds: [10751, 10762], animeIds: [10751, 10751, 10762] }, // 10762 is Kids
+  {
+    name: "Family",
+    movieIds: [10751],
+    tvIds: [10751, 10762],
+    animeIds: [10751, 10751, 10762],
+  }, // 10762 is Kids
   { name: "Fantasy", movieIds: [14], tvIds: [10765], animeIds: [14, 10765] },
   { name: "History", movieIds: [36], tvIds: [36], animeIds: [36] },
   { name: "Horror", movieIds: [27], tvIds: [27], animeIds: [27] },

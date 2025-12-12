@@ -145,6 +145,7 @@ export class MovieService {
       type,
       page = 1,
       with_genres,
+      without_genres,
       with_network,
       with_company,
       with_watch_providers,
@@ -166,6 +167,10 @@ export class MovieService {
 
     if (vote_average_gte) {
       baseQueryParams += `&vote_average.gte=${vote_average_gte}`;
+    }
+
+    if (without_genres) {
+      baseQueryParams += `&without_genres=${without_genres}`;
     }
 
     if (release_date_gte) {
@@ -954,13 +959,13 @@ export class MovieService {
 
     this.watchProvidersCache$ = forkJoin([
       this.http.get<{ results: any[] }>(movieProvidersUrl),
-      this.http.get<{ results: any[] }>(tvProvidersUrl)
+      this.http.get<{ results: any[] }>(tvProvidersUrl),
     ]).pipe(
       map(([movieRes, tvRes]) => {
         const allProviders = [...movieRes.results, ...tvRes.results];
         // Deduplicate by provider_id
         const unique = new Map();
-        allProviders.forEach(p => unique.set(p.provider_id, p));
+        allProviders.forEach((p) => unique.set(p.provider_id, p));
         return Array.from(unique.values());
       }),
       shareReplay(1)
@@ -971,14 +976,18 @@ export class MovieService {
 
   searchWatchProvider(query: string): Observable<number | null> {
     return this.getWatchProviders().pipe(
-      map(providers => {
+      map((providers) => {
         const normalizedQuery = query.toLowerCase().trim();
         // Exact match first
-        const exact = providers.find(p => p.provider_name.toLowerCase() === normalizedQuery);
+        const exact = providers.find(
+          (p) => p.provider_name.toLowerCase() === normalizedQuery
+        );
         if (exact) return exact.provider_id;
-        
+
         // Then contains match
-        const match = providers.find(p => p.provider_name.toLowerCase().includes(normalizedQuery));
+        const match = providers.find((p) =>
+          p.provider_name.toLowerCase().includes(normalizedQuery)
+        );
         return match ? match.provider_id : null;
       }),
       catchError(() => of(null))

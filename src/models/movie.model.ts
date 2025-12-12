@@ -195,6 +195,7 @@ export interface DiscoverParams {
   type: "movie" | "tv" | "anime";
   page?: number;
   with_genres?: number[] | string;
+  without_genres?: number[] | string;
   with_network?: number;
   // FIX: Allow string for pipe-separated company IDs to enable OR queries.
   with_company?: number | string;
