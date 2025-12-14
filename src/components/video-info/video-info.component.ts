@@ -171,6 +171,16 @@ export class VideoInfoComponent {
   genres = computed(() => {
     const media = this.media();
     const genreMap = this.genreMap();
+    // Prefer the detailed `genres` array returned by the details endpoints
+    // (TMDB returns `genres: {id,name}[]` on detail calls). Fall back to
+    // `genre_ids` + `genreMap` for list responses.
+    const maybeGenres = (media as any).genres;
+    if (Array.isArray(maybeGenres) && maybeGenres.length > 0) {
+      return maybeGenres
+        .map((g: { id: number; name: string }) => g.name)
+        .filter((n: any): n is string => !!n);
+    }
+
     if (!media.genre_ids || !genreMap) return [];
     return media.genre_ids
       .map((id) => genreMap.get(id))
