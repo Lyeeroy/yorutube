@@ -346,12 +346,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private navigationStartTime = 0;
 
   constructor() {
-    // Update navigation start time when isNavigating becomes true
-    effect(() => {
-      if (this.isNavigating()) {
-        this.navigationStartTime = Date.now();
-      }
-    });
+    this.playerMessageRouter.start(); // Helper to start router if needed, but mostly Effects here.
+
 
     // Update the player URL, but only if we're not skipping the update
     effect(() => {
@@ -420,7 +416,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.playerService.unlockAutoNext();
 
         // Mark that we're navigating to prevent stale player messages from interfering
-        this.isNavigating.set(true);
+        this.startNavigation();
 
         // Capture any `startAt` param from navigation so we can apply it as a one-time
         // resume time for the newly-opened media. We'll clear it once the player
@@ -812,6 +808,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     return false;
   }
 
+  private startNavigation(): void {
+    this.isNavigating.set(true);
+    this.navigationStartTime = Date.now();
+  }
+
   /**
    * Checks conditions and triggers auto-next if met.
    */
@@ -976,7 +977,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.lastPlayerEpisodeState.set(playerEpisode);
 
       // Mark that we're starting a navigation
-      this.isNavigating.set(true);
+      this.startNavigation();
 
       // Tell the component not to reload the iframe since the player did it internally.
       this.skipNextPlayerUpdate.set(true);
@@ -1375,7 +1376,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     episode: number
   ): void {
     this.skipNextPlayerUpdate.set(false);
-    this.isNavigating.set(true);
+    this.startNavigation();
 
     this.navigationService.navigateTo("watch", {
       mediaType: "tv",
@@ -1449,7 +1450,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (tvShow?.media_type !== "tv") return;
 
     this.skipNextPlayerUpdate.set(false);
-    this.isNavigating.set(true);
+    this.startNavigation();
 
     this.navigationService.navigateTo("watch", {
       mediaType: "tv",
@@ -1462,7 +1463,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   onSelectMedia(media: MediaType): void {
     this.skipNextPlayerUpdate.set(false);
-    this.isNavigating.set(true);
+    this.startNavigation();
 
     this.navigationService.navigateTo("watch", {
       mediaType: media.media_type,
