@@ -5,6 +5,9 @@ import {
   computed,
   signal,
   OnDestroy,
+  ViewChild,
+  ElementRef,
+  AfterViewInit,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { HistoryService } from "../../services/history.service";
@@ -23,7 +26,7 @@ import { PlaybackProgressService } from "../../services/playback-progress.servic
   templateUrl: "./history.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HistoryComponent implements OnDestroy {
+export class HistoryComponent implements OnDestroy, AfterViewInit {
   private historyService = inject(HistoryService);
   private navigationService = inject(NavigationService);
   private continueWatchingService = inject(ContinueWatchingService);
@@ -32,12 +35,16 @@ export class HistoryComponent implements OnDestroy {
   private clearHistoryTimeout: ReturnType<typeof setTimeout> | null = null;
   private clearContinueWatchingTimeout: ReturnType<typeof setTimeout> | null =
     null;
+  private observer: IntersectionObserver | null = null;
+
+  @ViewChild("sentinel") sentinel!: ElementRef<HTMLElement>;
 
   history = this.historyService.history;
   confirmingClear = signal(false);
   confirmingClearContinueWatching = signal(false);
   searchQuery = signal("");
   isHistoryPaused = this.historyService.isPaused;
+  displayLimit = signal(20);
 
   filteredHistory = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
@@ -57,8 +64,12 @@ export class HistoryComponent implements OnDestroy {
     });
   });
 
+  visibleHistory = computed(() => {
+    return this.filteredHistory().slice(0, this.displayLimit());
+  });
+
   groupedHistory = computed(() => {
-    const history = this.filteredHistory();
+    const history = this.visibleHistory();
     if (history.length === 0) {
       return [];
     }
@@ -98,6 +109,38 @@ export class HistoryComponent implements OnDestroy {
     }
     return groups;
   });
+
+  ngAfterViewInit() {
+    this.setupObserver();
+  }
+
+  private setupObserver() {
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          this.loadMore();
+        }
+      },
+      { rootMargin: "200px" } // Load more before reaching the very bottom
+    );
+
+    if (this.sentinel) {
+      this.observer.observe(this.sentinel.nativeElement);
+    }
+  }
+
+  loadMore() {
+    const currentLimit = this.displayLimit();
+    const totalItems = this.filteredHistory().length;
+
+    if (currentLimit < totalItems) {
+      this.displayLimit.update((limit) => limit + 20);
+    }
+  }
 
   onRemoveItem(id: string): void {
     const item = this.history().find((h) => h.id === id);
@@ -146,10 +189,12 @@ export class HistoryComponent implements OnDestroy {
 
   updateSearchQuery(event: Event): void {
     this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.displayLimit.set(20);
   }
 
   clearSearch(): void {
     this.searchQuery.set("");
+    this.displayLimit.set(20);
   }
 
   togglePauseHistory(): void {
@@ -181,6 +226,9 @@ export class HistoryComponent implements OnDestroy {
     }
     if (this.clearContinueWatchingTimeout) {
       clearTimeout(this.clearContinueWatchingTimeout);
+    }
+    if (this.observer) {
+      this.observer.disconnect();
     }
   }
 }
