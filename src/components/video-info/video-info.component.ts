@@ -426,4 +426,29 @@ export class VideoInfoComponent {
     this.maximizePlayerOutput.emit();
     this.showMoreOptionsMenu.set(false);
   }
+
+  @HostListener("window:keydown", ["$event"])
+  handleKeyboardEvent(event: KeyboardEvent) {
+    const target = event.target as HTMLElement;
+    // Ignore if typing in an input or textarea
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
+    // Shift + R: Refresh Player
+    if (event.shiftKey && event.code === "KeyR") {
+      event.preventDefault();
+      this.onRefreshPlayerClick();
+    }
+
+    // Shift + F: Maximize Player
+    if (event.shiftKey && event.code === "KeyF") {
+      event.preventDefault();
+      this.maximizePlayer();
+    }
+  }
 }
