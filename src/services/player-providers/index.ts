@@ -24,6 +24,7 @@ import { VidsrcPlayerProvider } from "./vidsrc.provider";
 import { VidfastPlayerProvider } from "./vidfast.provider";
 
 import { VidUpPlayerProvider } from "./vidup.provider";
+import { Movies111PlayerProvider } from "./movies111.provider";
 
 /**
  * Central registry of all player providers.
@@ -38,6 +39,7 @@ export const REGISTERED_PROVIDERS: IPlayerProvider[] = [
   new VidfastPlayerProvider(),
   new VidsrcPlayerProvider(),
   new VidUpPlayerProvider(),
+  new Movies111PlayerProvider(),
 ];
 
 // Optional: Export individual providers for direct access if needed
@@ -47,3 +49,4 @@ export { VidlinkPlayerProvider } from "./vidlink.provider";
 export { VidsrcPlayerProvider } from "./vidsrc.provider";
 export { VidfastPlayerProvider } from "./vidfast.provider";
 export { VidUpPlayerProvider } from "./vidup.provider";
+export { Movies111PlayerProvider } from "./movies111.provider";
