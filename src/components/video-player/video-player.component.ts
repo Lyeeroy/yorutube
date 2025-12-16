@@ -359,6 +359,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       if (url && !this.skipNextPlayerUpdate()) {
         this.iframeLoading.set(true);
         this.constructedPlayerUrl.set(url);
+
+        // Reset player state when URL changes (source change, quality change, etc)
+        // This ensures the watchdog can trigger again if the new source starts from 0
+        this.watchdogDismissed = false;
+        this.showWatchdog.set(false);
+        this.playerHasStarted.set(false);
+        this.lastKnownPlaybackTime.set(0);
       } else if (this.skipNextPlayerUpdate()) {
         this.skipNextPlayerUpdate.set(false);
       }
