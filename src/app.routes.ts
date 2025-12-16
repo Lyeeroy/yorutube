@@ -6,6 +6,7 @@ import { ChannelDetailComponent } from './components/channel-detail/channel-deta
 import { DiscoverComponent } from './components/discover/discover.component';
 import { WatchlistComponent } from './components/watchlist/watchlist.component';
 import { HomeComponent } from './components/home/home.component';
+import { ProviderDevToolComponent } from './components/provider-dev-tool/provider-dev-tool.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'YoruTube' },
@@ -16,5 +17,6 @@ export const routes: Routes = [
   { path: 'channels', component: ChannelsComponent, title: 'Channels' },
   { path: 'channel/:id', component: ChannelDetailComponent, title: 'Channel' },
   { path: 'watchlist', component: WatchlistComponent, title: 'Watchlist' },
+  { path: 'dev', component: ProviderDevToolComponent, title: 'Provider Dev Tool' },
   { path: '**', redirectTo: '' }
 ];

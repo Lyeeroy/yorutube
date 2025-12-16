@@ -1,0 +1,212 @@
+<div class="container mx-auto p-6 max-w-7xl animate-fade-in text-zinc-100">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-8 border-b border-zinc-800 pb-4">
+    <div>
+      <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Provider Workbench</h1>
+      <p class="text-zinc-400 text-sm mt-1">Provider integration testing & reverse engineering tool</p>
+    </div>
+    
+    <!-- AI Copy Button -->
+    <button 
+      (click)="copySummaryToClipboard()" 
+      class="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium py-2 px-4 rounded-lg shadow-lg transform transition-all active:scale-95 group"
+    >
+      <span class="material-symbols-outlined text-[20px]">content_copy</span>
+      <span>Copy AI Integration Prompt</span>
+      <div class="absolute inset-0 rounded-lg bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left Column: Configuration (4 cols) -->
+    <div class="lg:col-span-4 space-y-6">
+      <div class="bg-zinc-900 border border-zinc-800 p-5 rounded-xl shadow-xl">
+        <h2 class="text-lg font-semibold mb-4 text-zinc-200 flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-400">tune</span>
+          Provider Configuration
+        </h2>
+
+        <!-- Mode Selection -->
+        <div class="flex p-1 bg-zinc-950 rounded-lg mb-5 border border-zinc-800">
+            <button 
+                (click)="setMediaMode('movie')" 
+                class="flex-1 py-1.5 text-xs font-medium rounded-md transition-all text-center"
+                [class.bg-zinc-800]="mediaType === 'movie'"
+                [class.text-white]="mediaType === 'movie'"
+                [class.text-zinc-500]="mediaType !== 'movie'"
+            >
+                Movie Config
+            </button>
+            <button 
+                (click)="setMediaMode('tv')" 
+                class="flex-1 py-1.5 text-xs font-medium rounded-md transition-all text-center"
+                [class.bg-zinc-800]="mediaType === 'tv'"
+                [class.text-white]="mediaType === 'tv'"
+                [class.text-zinc-500]="mediaType !== 'tv'"
+            >
+                TV Show Config
+            </button>
+        </div>
+        
+        <!-- MOVIE CONFIG -->
+        <div *ngIf="mediaType === 'movie'" class="animate-fade-in block space-y-4">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Movie URL Template</label>
+                <textarea 
+                  rows="2"
+                  [(ngModel)]="movieUrlTemplate" 
+                  placeholder="https://example.com/embed/movie/{id}"
+                  class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-zinc-200 transition-colors font-mono resize-none"
+                ></textarea>
+                <div class="flex gap-1 mt-1">
+                    <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono border border-zinc-700">&#123;id&#125;</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Test Movie ID (TMDB)</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="tmdbId" 
+                  class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-zinc-200 font-mono"
+                >
+            </div>
+        </div>
+
+        <!-- TV CONFIG -->
+        <div *ngIf="mediaType === 'tv'" class="animate-fade-in block space-y-4">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">TV URL Template</label>
+                <textarea 
+                  rows="2"
+                  [(ngModel)]="tvUrlTemplate" 
+                  placeholder="https://example.com/embed/tv/{id}/{season}/{episode}"
+                  class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-zinc-200 transition-colors font-mono resize-none"
+                ></textarea>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono border border-zinc-700">&#123;id&#125;</span>
+                    <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono border border-zinc-700">&#123;season&#125;</span>
+                    <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono border border-zinc-700">&#123;episode&#125;</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Test TV Show ID (TMDB)</label>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="tmdbId" 
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-zinc-200 font-mono"
+                    >
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Season</label>
+                    <input 
+                      type="number" 
+                      [(ngModel)]="season" 
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-zinc-200 font-mono"
+                    >
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Episode</label>
+                    <input 
+                      type="number" 
+                      [(ngModel)]="episode" 
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-zinc-200 font-mono"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Button -->
+        <button 
+          (click)="loadIframe()" 
+          class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition-colors flex justify-center items-center gap-2 mt-6"
+        >
+          <span class="material-symbols-outlined text-[18px]">play_circle</span>
+          Load {{ mediaType === 'movie' ? 'Movie' : 'Episode' }}
+        </button>
+
+        <!-- Presets -->
+        <div class="mt-6 pt-4 border-t border-zinc-800">
+          <p class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">Quick Presets</p>
+          <div class="flex flex-col gap-2">
+            <button (click)="loadPreset('vidsrc')" class="text-left px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors flex justify-between">
+              <span>Vidsrc</span>
+              <span class="text-zinc-500">Movie & TV</span>
+            </button>
+            <button (click)="loadPreset('vidlink')" class="text-left px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors flex justify-between">
+              <span>Vidlink</span>
+              <span class="text-zinc-500">Movie Only</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Preview & Logs (8 cols) -->
+    <div class="lg:col-span-8 flex flex-col gap-6">
+      
+      <!-- Preview Area -->
+      <div class="bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-zinc-800">
+        <div class="bg-zinc-900 px-4 py-2 flex justify-between items-center border-b border-zinc-800">
+          <div class="flex items-center gap-2 overflow-hidden max-w-[70%]">
+             <div class="w-3 h-3 rounded-full bg-red-500"></div>
+             <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+             <div class="w-3 h-3 rounded-full bg-green-500"></div>
+             <span class="ml-2 text-xs text-zinc-400 font-mono truncate" *ngIf="generatedUrl">{{ generatedUrl }}</span>
+             <span class="ml-2 text-xs text-zinc-600 italic" *ngIf="!generatedUrl">Ready to load...</span>
+          </div>
+        </div>
+        
+        <div class="relative w-full pb-[56.25%] bg-black">
+          <iframe 
+            *ngIf="safeUrl" 
+            [src]="safeUrl" 
+            allowfullscreen 
+            allow="autoplay; encrypted-media"
+            class="absolute inset-0 w-full h-full"
+          ></iframe>
+          <div *ngIf="!safeUrl" class="absolute inset-0 flex flex-col items-center justify-center text-zinc-700">
+            <span class="material-symbols-outlined text-6xl mb-2 opacity-20">smart_display</span>
+            <span class="text-sm font-medium opacity-40">Player Preview Area</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Event Logs -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl flex flex-col flex-grow min-h-[400px]">
+        <div class="px-5 py-3 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 rounded-t-xl">
+          <h2 class="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+            <span class="material-symbols-outlined text-green-400 text-[18px]">terminal</span>
+            Event Stream
+          </h2>
+          <div class="flex items-center gap-3">
+             <div class="flex items-center gap-2">
+                <input type="checkbox" id="autoScroll" [(ngModel)]="autoScroll" class="rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-0 w-3 h-3">
+                <label for="autoScroll" class="text-xs text-zinc-400 cursor-pointer select-none">Auto-scroll</label>
+             </div>
+             <button (click)="clearLogs()" class="text-xs text-zinc-400 hover:text-white px-2 py-1 hover:bg-zinc-800 rounded transition-colors">Clear</button>
+          </div>
+        </div>
+        
+        <div class="log-container p-4 bg-[#0d0d10] flex-grow font-mono text-xs rounded-b-xl" #logContainer>
+          <div *ngIf="logs.length === 0" class="h-full flex flex-col items-center justify-center text-zinc-700 space-y-2">
+            <span class="material-symbols-outlined text-4xl opacity-30">satellite_alt</span>
+            <p>Waiting for postMessage events...</p>
+          </div>
+
+          <div *ngFor="let log of logs" class="mb-3 group relative pl-3 border-l-2 border-zinc-800 hover:border-blue-500 transition-colors">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-zinc-500 text-[10px]">{{ log.timestamp | date:'HH:mm:ss.SSS' }}</span>
+              <span class="text-yellow-600 font-bold opacity-80" [title]="log.origin">{{ log.origin | slice:0:30 }}<span *ngIf="log.origin.length > 30">...</span></span>
+              <span class="ml-auto text-zinc-600 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-blue-400" (click)="copyLogData(log.data)">Copy Data</span>
+            </div>
+            <pre class="text-zinc-300 whitespace-pre-wrap break-all bg-zinc-900/50 p-2 rounded border border-zinc-800/50">{{ log.data | json }}</pre>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>

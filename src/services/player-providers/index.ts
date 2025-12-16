@@ -23,6 +23,8 @@ import { VidlinkPlayerProvider } from "./vidlink.provider";
 import { VidsrcPlayerProvider } from "./vidsrc.provider";
 import { VidfastPlayerProvider } from "./vidfast.provider";
 
+import { VidUpPlayerProvider } from "./vidup.provider";
+
 /**
  * Central registry of all player providers.
  * Add new provider instances here to make them available app-wide.
@@ -35,6 +37,7 @@ export const REGISTERED_PROVIDERS: IPlayerProvider[] = [
   new VideasyPlayerProvider(),
   new VidfastPlayerProvider(),
   new VidsrcPlayerProvider(),
+  new VidUpPlayerProvider(),
 ];
 
 // Optional: Export individual providers for direct access if needed
@@ -43,3 +46,4 @@ export { VideasyPlayerProvider } from "./videasy.provider";
 export { VidlinkPlayerProvider } from "./vidlink.provider";
 export { VidsrcPlayerProvider } from "./vidsrc.provider";
 export { VidfastPlayerProvider } from "./vidfast.provider";
+export { VidUpPlayerProvider } from "./vidup.provider";

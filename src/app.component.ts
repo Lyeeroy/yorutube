@@ -24,6 +24,7 @@ import { PlaylistDetailComponent } from './components/playlist-detail/playlist-d
 import { LoginModalComponent } from './components/login-modal/login-modal.component';
 import { CalendarComponent } from './components/calendar/calendar.component';
 import { HelpComponent } from './components/help/help.component';
+import { ProviderDevToolComponent } from './components/provider-dev-tool/provider-dev-tool.component';
 
 @Component({
   selector: 'app-root',
@@ -47,7 +48,8 @@ import { HelpComponent } from './components/help/help.component';
     PlaylistDetailComponent,
     LoginModalComponent,
     CalendarComponent,
-    HelpComponent
+    HelpComponent,
+    ProviderDevToolComponent
   ],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
