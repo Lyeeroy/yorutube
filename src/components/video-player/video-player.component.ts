@@ -230,7 +230,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       nextButtonEnabled &&
       hasNext &&
       !isNavigating &&
-      (progress >= 90 || isCountingDown)
+      (progress >= 80 || isCountingDown)
     );
   });
 
