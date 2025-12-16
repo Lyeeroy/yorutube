@@ -730,8 +730,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }
     }
 
-    // Only check if not already showing, not dismissed
-    if (!this.showWatchdog() && !this.watchdogDismissed) {
+    // Only check if not already showing, not dismissed, and we're not currently
+    // trying to resume via initialStartAt (which guards against the watchdog loop
+    // if resume fails and player starts at 0).
+    const initialStart = this.initialStartAt();
+    if (
+      !this.showWatchdog() &&
+      !this.watchdogDismissed &&
+      initialStart === undefined
+    ) {
       const savedProgress = untracked(() =>
         this.playbackProgressService.getProgress(progressId)
       );
