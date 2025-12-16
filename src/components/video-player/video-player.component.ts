@@ -367,11 +367,31 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Clear initialStartAt once the player has a meaningful playback time so
     // that switching providers will respect the true user progress instead of
     // the shared 'startAt'. We also clear when the player starts.
+    // Clear initialStartAt once the player has a meaningful playback time so
+    // that switching providers will respect the true user progress instead of
+    // the shared 'startAt'. We also clear when the player starts.
     effect(() => {
-      // When the player starts or we have last known playback time > 5s, clear
-      // the initialStartAt so it's not re-applied when the user changes players.
-      if (this.playerHasStarted() || this.lastKnownPlaybackTime() > 5) {
-        this.initialStartAt.set(undefined);
+      const startAt = this.initialStartAt();
+      const currentTime = this.lastKnownPlaybackTime();
+      const playerStarted = this.playerHasStarted();
+
+      // "Safe Resume" Logic:
+      // If we have a large startAt target (>60s), we should be careful about clearing it.
+      // If the player starts at 0s (failed resume), we want to KEEP startAt so we can
+      // use it as a guard to prevent overwriting saved progress.
+      if (typeof startAt === "number" && startAt > 60) {
+        // Only clear if we have successfully reached the target (or close to it)
+        // or if we've played past it.
+        // We use a 60s buffer to consider it "reached" or if the player is just
+        // normally playing well past it.
+        if (currentTime >= startAt - 60) {
+          this.initialStartAt.set(undefined);
+        }
+      } else {
+        // Standard behavior for small/no startAt (or if undefined)
+        if (playerStarted || currentTime > 5) {
+          this.initialStartAt.set(undefined);
+        }
       }
     });
 
@@ -725,7 +745,16 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const now = Date.now();
     const shouldUpdateProgress = now - this.lastProgressUpdateTime >= 1000;
 
-    if (shouldUpdateProgress) {
+    // Safe Resume Guard: Prevent overwriting progress if resume failed
+    // If we expected to start late (e.g. > 60s) but are playing from the start,
+    // assume the player ignored the startAt param and DO NOT save this progress.
+    const expectedStart = untracked(() => this.initialStartAt());
+    const isFailedResume =
+      typeof expectedStart === "number" &&
+      expectedStart > 60 &&
+      currentTime < expectedStart - 60;
+
+    if (shouldUpdateProgress && !isFailedResume) {
       this.lastProgressUpdateTime = now;
 
       const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
