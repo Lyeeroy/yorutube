@@ -21,11 +21,12 @@ export class VidUpPlayerProvider implements IPlayerProvider {
     const { media, episode, autoplay, resumeTime } = config;
 
     if (media.media_type === "movie") {
-      // Movie URL: https://vidsrc.cc/v2/embed/movie/{id}
-      let url = `https://vidsrc.cc/v2/embed/movie/${media.id}`;
+      // Movie URL: https://vidup.to/movie/{id}?autoPlay=true
+      const funcAutoPlay = autoplay ? "true" : "false"; 
+      let url = `https://vidup.to/movie/${media.id}?autoPlay=${funcAutoPlay}`;
       // Append startAt if provided
       if (resumeTime && resumeTime > 5) {
-        url += `?startAt=${Math.floor(resumeTime)}`;
+        url += `&startAt=${Math.floor(resumeTime)}`;
       }
       return url;
     } else if (media.media_type === "tv" && episode) {
