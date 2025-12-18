@@ -452,10 +452,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.initialStartAt.set(startAtVal);
         this.lastProcessedStartAt.set(startAtVal);
       } else if (p?.startAt) {
-          // Disabled to prevent loops.
-          // If the user manually changes the URL to seek, they should probably
-          // just reload the page or we can handle it via a different mechanism if really needed.
-          // For now, stability is priority.
+        // Explicitly ignoring repeat startAt parameters to prevent reload loops.
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -746,6 +743,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       // Feed the safeguard service
       this.safeguardService.updateProgress(currentTime);
+
+      // Auto-dismiss safeguard recovery if we are playing near the recovered time
+      // This handles cases where the player eventually seeks correctly on its own
+      const recovery = this.safeguardService.recoveryAvailable();
+      if (recovery && Math.abs(currentTime - recovery.timestamp) < 10) {
+        this.dismissSafeguardRecovery();
+      }
 
     }
 
@@ -1490,6 +1494,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (currentUrl) {
       // Instead of just blindly reloading the iframe, we want to reload with
       // the CURRENT timestamp. We do this by navigating to the same route
+      // but with an updated startAt parameter.
+      // This is safe because onRefreshPlayer is a user-initiated action.
       // but with an updated startAt parameter.
       const media = this.selectedMediaItem();
       if (!media) return;
