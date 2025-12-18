@@ -48,6 +48,7 @@ import { ContinueWatchingItem } from "../../models/continue-watching.model";
 import { PlayerProviderService } from "../../services/player-provider.service";
 import { PlayerMessageRouterService } from "../../services/player-message-router.service";
 import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
+import { VideoSafeguardService } from "../../services/video-safeguard.service";
 import { PlayerUrlConfig } from "../../models/player-provider.model";
 
 
@@ -101,6 +102,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private playerMessageRouter = inject(PlayerMessageRouterService);
   private continueWatchingManager = inject(ContinueWatchingManagerService);
   private destroyRef = inject(DestroyRef);
+  private safeguardService = inject(VideoSafeguardService);
 
 
   params = input.required<any>();
@@ -124,6 +126,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   });
 
   historyAdded = signal(false);
+
+  // Safeguard state
+  showSafeguardRecovery = computed(() => !!this.safeguardService.recoveryAvailable());
 
 
 
@@ -428,6 +433,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
 
+        // Initialize safeguard for this new media
+        this.safeguardService.start(currentMediaKey);
+
         // Reset auto-next state
         this.currentProgressPercent.set(0);
         this.clearAutoNextTimer();
@@ -444,24 +452,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.initialStartAt.set(startAtVal);
         this.lastProcessedStartAt.set(startAtVal);
       } else if (p?.startAt) {
-        // Media didn't change, but we have a specific start time
-        // Only trigger if startAt has actually changed from what we last processed
-        // to avoid infinite reload loops if other params change but startAt remains.
-        const newStartAt = Number(p.startAt);
-        if (newStartAt !== this.lastProcessedStartAt()) {
-          this.initialStartAt.set(newStartAt);
-          this.lastProcessedStartAt.set(newStartAt);
-
-          this.playerHasStarted.set(false);
-          this.lastKnownPlaybackTime.set(0);
-
-          // Force reload to apply new start time
-          this.reloading.set(true);
-          this.constructedPlayerUrl.set("about:blank");
-          setTimeout(() => {
-            this.reloading.set(false);
-          }, 100);
-        }
+          // Disabled to prevent loops.
+          // If the user manually changes the URL to seek, they should probably
+          // just reload the page or we can handle it via a different mechanism if really needed.
+          // For now, stability is priority.
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -750,6 +744,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       this.playbackProgressService.updateProgress(progressId, playbackData);
 
+      // Feed the safeguard service
+      this.safeguardService.updateProgress(currentTime);
 
     }
 
@@ -1530,6 +1526,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   onPlayerIframeLoad(): void {
     this.iframeLoading.set(false);
+    
+    // Check if we need to rescue progress (safeguard)
+    // Delay slightly to ensure "currentTime" from player is accurate (not 0 initially)
+    setTimeout(() => {
+        // We use the lastKnownPlaybackTime because accessing the player directly here is hard/async
+        // If the player started at 0 despite us having progress, this will trigger.
+        this.safeguardService.checkRecovery(this.lastKnownPlaybackTime());
+    }, 2000);
   }
 
   onMaximizePlayer(): void {
@@ -1549,6 +1553,34 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
 
+
+  dismissSafeguardRecovery(): void {
+    this.safeguardService.clearRecovery(true); // True = delete saved data too, user rejected it
+  }
+
+  restoreSafeguardProgress(): void {
+    const data = this.safeguardService.recoveryAvailable();
+    if (data) {
+      const media = this.selectedMediaItem();
+      if (!media) return;
+
+      const currentParams = this.params();
+
+      // IMPORTANT: Update safeguard first so we don't re-trigger it
+      this.safeguardService.setCurrentProgress(data.timestamp);
+      this.safeguardService.clearRecovery(false);
+
+      this.navigationService.navigateTo("watch", {
+        mediaType: media.media_type,
+        id: media.id,
+        season: currentParams?.season,
+        episode: currentParams?.episode,
+        playlistId: this.playlist()?.id,
+        startAt: data.timestamp,
+        autoplay: true,
+      });
+    }
+  }
 
   @HostListener("document:keydown.escape", ["$event"])
   onEscapeKey(event: KeyboardEvent): void {
