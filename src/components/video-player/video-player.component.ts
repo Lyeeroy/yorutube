@@ -50,6 +50,7 @@ import { PlayerMessageRouterService } from "../../services/player-message-router
 import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
 import { PlayerUrlConfig } from "../../models/player-provider.model";
 
+
 const isMovie = (media: MediaType | TvShowDetails): media is Movie =>
   media.media_type === "movie";
 
@@ -101,6 +102,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private continueWatchingManager = inject(ContinueWatchingManagerService);
   private destroyRef = inject(DestroyRef);
 
+
   params = input.required<any>();
   genreMap = toSignal(this.movieService.getCombinedGenreMap(), {
     initialValue: new Map<number, string>(),
@@ -123,10 +125,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   historyAdded = signal(false);
 
-  // Watchdog state
-  showWatchdog = signal(false);
-  watchdogData = signal<{ timestamp: number } | null>(null);
-  private watchdogDismissed = false;
+
 
   // provider messages are routed through PlayerMessageRouterService
 
@@ -311,13 +310,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const initialStart = untracked(() => this.initialStartAt());
 
     let resumeTime = 0;
+    const currentTime = untracked(() => this.lastKnownPlaybackTime());
+
     if (
       typeof initialStart === "number" &&
       initialStart > 0 &&
       !this.playerHasStarted() &&
-      this.lastKnownPlaybackTime() <= 5
+      currentTime <= 5
     ) {
       resumeTime = initialStart;
+    } else if (currentTime > 5) {
+      // If we have an active playback time (e.g. switching sources or refreshing), use it
+      resumeTime = currentTime;
     } else if (progress && progress.progress > 5 && progress.progress < 100) {
       resumeTime = progress.timestamp;
     }
@@ -361,9 +365,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.constructedPlayerUrl.set(url);
 
         // Reset player state when URL changes (source change, quality change, etc)
-        // This ensures the watchdog can trigger again if the new source starts from 0
-        this.watchdogDismissed = false;
-        this.showWatchdog.set(false);
+
         this.playerHasStarted.set(false);
         this.lastKnownPlaybackTime.set(0);
       } else if (this.skipNextPlayerUpdate()) {
@@ -371,9 +373,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Clear initialStartAt once the player has a meaningful playback time so
-    // that switching providers will respect the true user progress instead of
-    // the shared 'startAt'. We also clear when the player starts.
     // Clear initialStartAt once the player has a meaningful playback time so
     // that switching providers will respect the true user progress instead of
     // the shared 'startAt'. We also clear when the player starts.
@@ -429,11 +428,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
 
-        // Reset watchdog state
-        this.watchdogDismissed = false;
-        this.showWatchdog.set(false);
-        this.watchdogData.set(null);
-
         // Reset auto-next state
         this.currentProgressPercent.set(0);
         this.clearAutoNextTimer();
@@ -445,23 +439,29 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         // Mark that we're navigating to prevent stale player messages from interfering
         this.startNavigation();
 
-        // Capture any `startAt` param from navigation so we can apply it as a one-time
-        // resume time for the newly-opened media. We'll clear it once the player
-        // has started or we have meaningful playback progress to avoid reusing
-        // the shared startAt if the user switches player sources.
-        this.initialStartAt.set(p?.startAt ? Number(p.startAt) : undefined);
+        // reused the shared startAt if the user switches player sources.
+        const startAtVal = p?.startAt ? Number(p.startAt) : undefined;
+        this.initialStartAt.set(startAtVal);
+        this.lastProcessedStartAt.set(startAtVal);
       } else if (p?.startAt) {
-        // Media didn't change, but we have a specific start time (e.g. Watchdog restore)
-        this.initialStartAt.set(Number(p.startAt));
-        this.playerHasStarted.set(false);
-        this.lastKnownPlaybackTime.set(0);
+        // Media didn't change, but we have a specific start time
+        // Only trigger if startAt has actually changed from what we last processed
+        // to avoid infinite reload loops if other params change but startAt remains.
+        const newStartAt = Number(p.startAt);
+        if (newStartAt !== this.lastProcessedStartAt()) {
+          this.initialStartAt.set(newStartAt);
+          this.lastProcessedStartAt.set(newStartAt);
 
-        // Force reload to apply new start time
-        this.reloading.set(true);
-        this.constructedPlayerUrl.set("about:blank");
-        setTimeout(() => {
-          this.reloading.set(false);
-        }, 100);
+          this.playerHasStarted.set(false);
+          this.lastKnownPlaybackTime.set(0);
+
+          // Force reload to apply new start time
+          this.reloading.set(true);
+          this.constructedPlayerUrl.set("about:blank");
+          setTimeout(() => {
+            this.reloading.set(false);
+          }, 100);
+        }
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -584,6 +584,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         const routedEventName =
           routed.raw?.event ?? (routed.raw?.data && routed.raw?.data.event);
 
+
+
         // Check if the message corresponds to a different episode than what we expect.
         // This prevents processing stale messages from the previous episode during navigation.
         const isMessageForDifferentEpisode =
@@ -674,11 +676,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Public signal for components that need current playback time (e.g., share modal)
   currentPlaybackTime = computed(() => this.lastKnownPlaybackTime());
 
-  // Hold any startAt param from the URL for the first load. This should only
   // be applied once when the user navigates to a new media. After meaningful
   // playback or the player starts, this value will be cleared so it isn't
   // reapplied when the user switches providers.
   private initialStartAt = signal<number | undefined>(undefined);
+
+  // Track the last `startAt` param we successfully processed to prevent
+  // spurious reloads when unrelated params change (preventing reload loops).
+  private lastProcessedStartAt = signal<number | undefined>(undefined);
 
   // Constants for auto-next logic
   private readonly PLAYBACK_THRESHOLD_SECONDS = 30;
@@ -717,43 +722,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     // Get episode once for use in multiple places below
     const episode = this.currentEpisode();
 
-    // Watchdog Logic
     const progressId = episode ? episode.id : media.id;
 
-    if (this.showWatchdog()) {
-      // Auto-dismiss if user keeps watching from start
-      if (currentTime > 30) {
-        this.dismissWatchdog();
-      } else {
-        // Prevent overwriting progress while watchdog is active
-        return;
-      }
-    }
 
-    // Only check if not already showing, not dismissed, and we're not currently
-    // trying to resume via initialStartAt (which guards against the watchdog loop
-    // if resume fails and player starts at 0).
-    const initialStart = this.initialStartAt();
-    if (
-      !this.showWatchdog() &&
-      !this.watchdogDismissed &&
-      initialStart === undefined
-    ) {
-      const savedProgress = untracked(() =>
-        this.playbackProgressService.getProgress(progressId)
-      );
-
-      if (savedProgress && savedProgress.progress < 95) {
-        const gap = Math.abs(savedProgress.timestamp - currentTime);
-        // If we are at the start (< 10s) but have significant saved progress (> 60s)
-        // and the gap is large (> 60s)
-        if (currentTime < 10 && savedProgress.timestamp > 60 && gap > 60) {
-          this.watchdogData.set({ timestamp: savedProgress.timestamp });
-          this.showWatchdog.set(true);
-          return; // Return immediately after triggering to avoid saving this 0-progress
-        }
-      }
-    }
 
     // Debounce progress updates to reduce excessive writes (max once per second)
     const now = Date.now();
@@ -778,6 +749,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       };
 
       this.playbackProgressService.updateProgress(progressId, playbackData);
+
+
     }
 
     // Add to history after significant playback
@@ -1519,10 +1492,24 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   onRefreshPlayer(): void {
     const currentUrl = this.playerUrl();
     if (currentUrl) {
-      this.constructedPlayerUrl.set("about:blank");
-      setTimeout(() => {
-        this.constructedPlayerUrl.set(currentUrl);
-      }, 50);
+      // Instead of just blindly reloading the iframe, we want to reload with
+      // the CURRENT timestamp. We do this by navigating to the same route
+      // but with an updated startAt parameter.
+      const media = this.selectedMediaItem();
+      if (!media) return;
+
+      const currentParams = this.params();
+      const currentTime = this.lastKnownPlaybackTime();
+
+      this.navigationService.navigateTo("watch", {
+        mediaType: media.media_type,
+        id: media.id,
+        season: currentParams?.season,
+        episode: currentParams?.episode,
+        playlistId: this.playlist()?.id,
+        startAt: currentTime > 5 ? currentTime : 0,
+        autoplay: true,
+      });
     }
   }
 
@@ -1561,32 +1548,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
   }
 
-  dismissWatchdog(): void {
-    this.showWatchdog.set(false);
-    this.watchdogDismissed = true;
-  }
 
-  restoreWatchdogProgress(): void {
-    const data = this.watchdogData();
-    if (data) {
-      const media = this.selectedMediaItem();
-      if (!media) return;
-
-      const currentParams = this.params();
-
-      this.navigationService.navigateTo("watch", {
-        mediaType: media.media_type,
-        id: media.id,
-        season: currentParams?.season,
-        episode: currentParams?.episode,
-        playlistId: this.playlist()?.id,
-        startAt: data.timestamp,
-        autoplay: true,
-      });
-
-      this.dismissWatchdog();
-    }
-  }
 
   @HostListener("document:keydown.escape", ["$event"])
   onEscapeKey(event: KeyboardEvent): void {
