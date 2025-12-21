@@ -160,6 +160,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Track the previous media key to avoid blanking iframe on no-op param syncs
   private previousMediaKey = signal<string | null>(null);
 
+  // Track if we are waiting to verify if the player correctly resumed progress
+  private initialSafeguardCheckPending = false;
+
   selectedPlayer = this.playerService.selectedPlayer;
 
   // Autoplay state
@@ -167,11 +170,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   currentMediaId = computed(() => this.selectedMediaItem()?.id);
 
-  // Cache for season details to avoid repeated API calls during auto-next
-  private seasonDetailsCache = new Map<string, any>();
-
   // Debounce counter for progress updates
   private lastProgressUpdateTime = 0;
+
 
   // Auto-next visualization signals
   autoNextState = signal<"idle" | "counting_down">("idle");
@@ -429,8 +430,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       const currentMediaKey = `${mediaType}:${id}:${season ?? ""}:${
         episode ?? ""
       }`;
-      const prevKey = this.previousMediaKey();
+      const prevKey = untracked(() => this.previousMediaKey());
       const isActualMediaChange = prevKey !== currentMediaKey;
+      let isForcedRefresh = false;
 
       if (isActualMediaChange) {
         // Reset player state tracking only when media actually changes
@@ -464,19 +466,20 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         // Not a media change, but startAt param is present (e.g. from refresh or safeguard recovery)
         // Update initialStartAt to match the new startAt so playerUrl doesn't regenerate with different values
         const startAtVal = Number(p.startAt);
-        const lastProcessed = this.lastProcessedStartAt();
+        const lastProcessed = untracked(() => this.lastProcessedStartAt());
         
         // Only update if this is a NEW startAt value (prevents loops)
         if (lastProcessed !== startAtVal) {
           this.initialStartAt.set(startAtVal);
           this.lastProcessedStartAt.set(startAtVal);
+          isForcedRefresh = true;
         }
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
 
-      // Only blank the iframe when we're actually changing media content
-      if (shouldReloadPlayer && isActualMediaChange) {
+      // Only blank the iframe when we're actually changing media content or forcing a refresh
+      if (shouldReloadPlayer && (isActualMediaChange || isForcedRefresh)) {
         this.reloading.set(true);
         // Set to empty string (not 'about:blank') to immediately stop all media/audio
         this.constructedPlayerUrl.set("");
@@ -729,6 +732,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (typeof currentTime === "number" && currentTime > 0) {
       this.lastKnownPlaybackTime.set(currentTime);
 
+      // Perform initial safeguard check once we have a real time reported from the player
+      // This prevents the "flashing modal" issue where it appears at 0s then disappears at 1s.
+      if (this.initialSafeguardCheckPending && currentTime > 0) {
+        this.initialSafeguardCheckPending = false;
+        this.safeguardService.checkRecovery(currentTime);
+      }
+
       // Once we have meaningful playback (>5s), clear the navigation flag
       // This allows episode change detection to work for auto-next
       if (currentTime >= this.MIN_PLAYBACK_FOR_RESET && this.isNavigating()) {
@@ -853,6 +863,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private startNavigation(): void {
     this.isNavigating.set(true);
     this.navigationStartTime = Date.now();
+    
+    // Set flag to perform initial safeguard check on first player message
+    this.initialSafeguardCheckPending = true;
+
+    // CRITICAL: Clear any active auto-next timer when navigation starts
+    // This prevents orphaned timers from triggering navigation to wrong content
+    this.clearAutoNextTimer();
+    this.autoNextState.set("idle");
   }
 
   /**
@@ -1546,19 +1564,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   onRefreshPlayer(): void {
     const currentUrl = this.playerUrl();
     if (currentUrl) {
-      // Show loading state immediately for visual feedback
+      // Show loading state and IMMEDIATELY clear the iframe to stop audio
       this.iframeLoading.set(true);
+      this.reloading.set(true);
+      this.constructedPlayerUrl.set("");
       
-      // Instead of just blindly reloading the iframe, we want to reload with
-      // the CURRENT timestamp. We do this by navigating to the same route
-      // but with an updated startAt parameter.
-      // This is safe because onRefreshPlayer is a user-initiated action.
       const media = this.selectedMediaItem();
       if (!media) return;
 
       const currentParams = this.params();
       const currentTime = this.lastKnownPlaybackTime();
 
+      // Navigate with updated startAt. This usually triggers the effect which
+      // will eventually set reloading to false.
       this.navigationService.navigateTo("watch", {
         mediaType: media.media_type,
         id: media.id,
@@ -1568,6 +1586,20 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         startAt: currentTime > 5 ? currentTime : 0,
         autoplay: true,
       });
+
+      // Safety: In case navigation is a no-op (params identical), 
+      // ensure we reset reloading and restore the URL after a short delay.
+      setTimeout(() => {
+        if (this.reloading()) {
+          this.reloading.set(false);
+          this.iframeLoading.set(false);
+          // If the effect didn't set the URL (because it was a no-op), set it now
+          if (this.constructedPlayerUrl() === "") {
+            const url = this.playerUrl();
+            if (url) this.constructedPlayerUrl.set(url);
+          }
+        }
+      }, 300);
     }
   }
 
@@ -1590,18 +1622,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     this.iframeLoading.set(false);
     
     // Check if we need to rescue progress (safeguard)
-    // Skip if this was a user-initiated refresh with startAt (we already have the right time)
-    const params = this.params();
-    const hasStartAt = params?.startAt && params.startAt > 0;
-    
-    if (!hasStartAt) {
-      // Delay slightly to ensure "currentTime" from player is accurate (not 0 initially)
-      setTimeout(() => {
-        // We use the lastKnownPlaybackTime because accessing the player directly here is hard/async
-        // If the player started at 0 despite us having progress, this will trigger.
+    // We prefer to wait for the first player message to verify if resume worked (in handlePlaybackProgress).
+    // Но we set a timeout as a fallback in case the player never sends messages or is stuck.
+    // We check even if navigation had a startAt, as players sometimes ignore it.
+    setTimeout(() => {
+      if (this.initialSafeguardCheckPending) {
+        this.initialSafeguardCheckPending = false;
         this.safeguardService.checkRecovery(this.lastKnownPlaybackTime());
-      }, 2000);
-    }
+      }
+    }, 4000);
   }
 
   onMaximizePlayer(): void {

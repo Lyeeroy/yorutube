@@ -48,6 +48,7 @@ export class MovieService {
   private popularAnimeStudiosCache$: Observable<ProductionCompany[]> | null =
     null;
   private watchProvidersCache$: Observable<any[]> | null = null;
+  private seasonDetailsCache = new Map<string, Observable<SeasonDetails>>();
 
   private createGenreMapObservable(
     url: string
@@ -703,8 +704,15 @@ export class MovieService {
     tvId: number,
     seasonNumber: number
   ): Observable<SeasonDetails> {
+    const cacheKey = `${tvId}_${seasonNumber}`;
+    if (this.seasonDetailsCache.has(cacheKey)) {
+      return this.seasonDetailsCache.get(cacheKey)!;
+    }
+
     const url = `${this.BASE_URL}/tv/${tvId}/season/${seasonNumber}?api_key=${this.API_KEY}`;
-    return this.http.get<SeasonDetails>(url);
+    const details$ = this.http.get<SeasonDetails>(url).pipe(shareReplay(1));
+    this.seasonDetailsCache.set(cacheKey, details$);
+    return details$;
   }
 
   getMovieRecommendations(movieId: number): Observable<MediaType[]> {
