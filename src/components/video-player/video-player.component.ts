@@ -378,6 +378,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }
     });
 
+
     // Clear initialStartAt once the player has a meaningful playback time so
     // that switching providers will respect the true user progress instead of
     // the shared 'startAt'. We also clear when the player starts.
@@ -385,6 +386,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       const startAt = this.initialStartAt();
       const currentTime = this.lastKnownPlaybackTime();
       const playerStarted = this.playerHasStarted();
+      const params = this.params();
 
       // "Safe Resume" Logic:
       // If we have a large startAt target (>60s), we should be careful about clearing it.
@@ -397,14 +399,21 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         // normally playing well past it.
         if (currentTime >= startAt - 60) {
           this.initialStartAt.set(undefined);
+          // Remove startAt from URL to prevent it from overriding future saved progress
+          this.removeStartAtFromUrl();
         }
       } else {
         // Standard behavior for small/no startAt (or if undefined)
         if (playerStarted || currentTime > 5) {
           this.initialStartAt.set(undefined);
+          // Remove startAt from URL if it exists
+          if (params?.startAt) {
+            this.removeStartAtFromUrl();
+          }
         }
       }
     });
+
 
     effect((onCleanup) => {
       const p = this.params();
@@ -452,7 +461,16 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.initialStartAt.set(startAtVal);
         this.lastProcessedStartAt.set(startAtVal);
       } else if (p?.startAt) {
-        // Explicitly ignoring repeat startAt parameters to prevent reload loops.
+        // Not a media change, but startAt param is present (e.g. from refresh or safeguard recovery)
+        // Update initialStartAt to match the new startAt so playerUrl doesn't regenerate with different values
+        const startAtVal = Number(p.startAt);
+        const lastProcessed = this.lastProcessedStartAt();
+        
+        // Only update if this is a NEW startAt value (prevents loops)
+        if (lastProcessed !== startAtVal) {
+          this.initialStartAt.set(startAtVal);
+          this.lastProcessedStartAt.set(startAtVal);
+        }
       }
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
@@ -460,7 +478,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       // Only blank the iframe when we're actually changing media content
       if (shouldReloadPlayer && isActualMediaChange) {
         this.reloading.set(true);
-        this.constructedPlayerUrl.set("about:blank");
+        // Set to empty string (not 'about:blank') to immediately stop all media/audio
+        this.constructedPlayerUrl.set("");
         // Force a small delay to ensure the iframe actually unloads/resets on all devices (especially iPad)
         setTimeout(() => {
           this.reloading.set(false);
@@ -1468,6 +1487,34 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       });
   }
 
+  private removeStartAtFromUrl(): void {
+    const media = this.selectedMediaItem();
+    if (!media) return;
+
+    const currentParams = this.params();
+    if (!currentParams?.startAt) return; // Nothing to remove
+
+    // Navigate without startAt, using replaceState (no browser history entry)
+    // This silently updates the URL without triggering a reload
+    const cleanParams: any = {
+      mediaType: media.media_type,
+      id: media.id,
+      playlistId: currentParams.playlistId,
+    };
+
+    if (media.media_type === "tv" && currentParams.season && currentParams.episode) {
+      cleanParams.season = currentParams.season;
+      cleanParams.episode = currentParams.episode;
+    }
+
+    // Use NavigationService but we need to update it to support replaceState
+    // For now, construct the URL manually and use window.history.replaceState
+    const path = this.navigationService.getPath("watch", cleanParams);
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", path);
+    }
+  }
+
   onEpisodeSelected(data: { episode: Episode; seasonNumber: number }): void {
     const tvShow = this.selectedMediaItem();
     if (tvShow?.media_type !== "tv") return;
@@ -1499,11 +1546,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   onRefreshPlayer(): void {
     const currentUrl = this.playerUrl();
     if (currentUrl) {
+      // Show loading state immediately for visual feedback
+      this.iframeLoading.set(true);
+      
       // Instead of just blindly reloading the iframe, we want to reload with
       // the CURRENT timestamp. We do this by navigating to the same route
       // but with an updated startAt parameter.
       // This is safe because onRefreshPlayer is a user-initiated action.
-      // but with an updated startAt parameter.
       const media = this.selectedMediaItem();
       if (!media) return;
 
@@ -1541,12 +1590,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     this.iframeLoading.set(false);
     
     // Check if we need to rescue progress (safeguard)
-    // Delay slightly to ensure "currentTime" from player is accurate (not 0 initially)
-    setTimeout(() => {
+    // Skip if this was a user-initiated refresh with startAt (we already have the right time)
+    const params = this.params();
+    const hasStartAt = params?.startAt && params.startAt > 0;
+    
+    if (!hasStartAt) {
+      // Delay slightly to ensure "currentTime" from player is accurate (not 0 initially)
+      setTimeout(() => {
         // We use the lastKnownPlaybackTime because accessing the player directly here is hard/async
         // If the player started at 0 despite us having progress, this will trigger.
         this.safeguardService.checkRecovery(this.lastKnownPlaybackTime());
-    }, 2000);
+      }, 2000);
+    }
   }
 
   onMaximizePlayer(): void {
