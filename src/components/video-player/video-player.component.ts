@@ -489,6 +489,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           this.initialStartAt.set(startAtVal);
           this.lastProcessedStartAt.set(startAtVal);
           isForcedRefresh = true;
+          
+          // CRITICAL: Reset player state on refresh to avoid using stale state from before reload
+          this.playerHasStarted.set(false);
+          this.lastKnownPlaybackTime.set(0);
+          this.startNavigation();
         }
       }
 
@@ -783,7 +788,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const isFailedResume =
       typeof expectedStart === "number" &&
       expectedStart > 60 &&
-      currentTime < expectedStart - 60;
+      currentTime < expectedStart - 60 &&
+      currentTime < 15; // Timeout: if we played 15s from the start, assume resume failed and accept reality
 
     if (shouldUpdateProgress && !isFailedResume) {
       this.lastProgressUpdateTime = now;
@@ -1467,6 +1473,22 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Vidsrc mirror list
+  private readonly VIDSRC_MIRRORS = [
+    "https://v3.vidsrc.cc",
+    "https://vidsrc.xyz",
+    "https://vidsrc.me",
+    "https://vidsrc.to",
+    "https://vidsrc.in",
+    "https://vidsrc.net",
+    "https://vidsrc.pm",
+    "https://vidsrc.pro",
+    "https://vidsrc.stream",
+    "https://vidsrc.online",
+    "https://v3.embed.su",
+    "https://embed.su",
+  ];
+
   private loadMainTrailer(media: MediaType): void {
     this.loadingTrailer.set(true);
 
@@ -1606,6 +1628,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         autoplay: true,
       });
 
+      // Mark as navigating to block stale progress from the old iframe instance
+      this.startNavigation();
+
       // Safety: In case navigation is a no-op (params identical), 
       // ensure we reset reloading and restore the URL after a short delay.
       setTimeout(() => {
@@ -1672,6 +1697,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   dismissSafeguardRecovery(): void {
     this.safeguardService.clearRecovery(true); // True = delete saved data too, user rejected it
+    this.initialStartAt.set(undefined); // Clear guard so we can start saving current progress
   }
 
   restoreSafeguardProgress(): void {

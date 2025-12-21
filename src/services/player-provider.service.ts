@@ -41,6 +41,13 @@ export class PlayerProviderService {
   private registerProvider(provider: IPlayerProvider): void {
     this.providers.set(provider.id, provider);
     this.providersByOrigin.set(provider.origin, provider);
+
+    // Register any additional origins (e.g. subdomains or mirrors)
+    if (provider.additionalOrigins) {
+      provider.additionalOrigins.forEach((origin) => {
+        this.providersByOrigin.set(origin, provider);
+      });
+    }
   }
 
   /**

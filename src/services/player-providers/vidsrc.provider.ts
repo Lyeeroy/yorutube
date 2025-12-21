@@ -15,7 +15,21 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
   readonly id = "VIDSRC";
   readonly name = "Vidsrc";
   readonly origin = "https://vidsrc.cc";
-  readonly supportsAutoNext = false; // V3 doesn't send episode change events
+  readonly additionalOrigins = [
+    "https://v3.vidsrc.cc",
+    "https://vidsrc.xyz",
+    "https://vidsrc.me",
+    "https://vidsrc.to",
+    "https://vidsrc.in",
+    "https://vidsrc.net",
+    "https://vidsrc.pm",
+    "https://vidsrc.pro",
+    "https://vidsrc.stream",
+    "https://vidsrc.online",
+    "https://v3.embed.su",
+    "https://embed.su",
+  ];
+  readonly supportsAutoNext = true;
   readonly note = "Selecting episodes within the embedded player will not sync with the main site. Use native episode selector!";
 
   generateUrl(config: PlayerUrlConfig): string | null {
@@ -44,7 +58,7 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
 
     const params = new URLSearchParams();
     params.set("color", "ff0000"); // Default accent color
-    params.set("episodes", "false"); // Default accent color
+    
 
     if (typeof autoplay === "boolean") {
         params.set("autoPlay", autoplay ? "true" : "false");
@@ -66,27 +80,40 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
 
     if (!input) return result;
 
-    // VideoPlayerComponent might have already unwrapped 'data'.
-    // We handle both cases: input IS the data, or input.data IS the data.
-    const data = input.data || input;
+    // Normalize data structure. Some events are in {type: "PLAYER_EVENT", data: {...}}
+    // VideoPlayerComponent might have already unwrapped 'data', but we handle both for robustness.
+    let data = input.data || input;
+    
+    // If we have a nested type wrapper we didn't catch
+    if (data.type === "PLAYER_EVENT" && data.data) {
+        data = data.data;
+    }
+
+    // Safety: ignore events about different media if IDs are provided
+    // V3 includes tmdbId and mediaType in its messages
+    // const tmdbId = data.tmdbId || data.id;
+    // const mediaType = data.mediaType;
+    // if (tmdbId && currentMediaItem && String(tmdbId) !== String(currentMediaItem.id)) return result;
 
     // Handle playback progress
-    if (
-      (data.event === "timeupdate" || data.event === "time") &&
-      typeof data.currentTime === "number" &&
-      typeof data.duration === "number" &&
-      data.duration > 0
-    ) {
-        let finalTime = data.currentTime;
+    // V3 uses 'time' event, but we keep 'timeupdate' for compatibility
+    const isProgressEvent = data.event === "timeupdate" || data.event === "time";
+    
+    // Coerce to numbers as some players might send strings
+    const currentTime = data.currentTime !== undefined ? parseFloat(String(data.currentTime)) : NaN;
+    const duration = data.duration !== undefined ? parseFloat(String(data.duration)) : NaN;
+
+    if (isProgressEvent && !isNaN(currentTime) && !isNaN(duration) && duration > 0) {
+        let finalTime = currentTime;
         // Fix floating point issues near the end
-        if (data.duration - finalTime < 0.5) {
-            finalTime = data.duration;
+        if (duration - finalTime < 0.5) {
+            finalTime = duration;
         }
 
       result.playbackProgress = {
         currentTime: finalTime,
-        duration: data.duration,
-        progressPercent: (finalTime / data.duration) * 100,
+        duration: duration,
+        progressPercent: (finalTime / duration) * 100,
       };
 
       // Mark player as started if we have meaningful playback
@@ -96,33 +123,33 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
     }
 
     // Handle play event
-    if (data.event === "play") {
+    if (data.event === "play" || data.playing === true) {
       result.playerStarted = true;
     }
 
     // Handle episode changes
-    if (
-      typeof data.season === "number" &&
-      typeof data.episode === "number" &&
-      !isNaN(data.season) &&
-      !isNaN(data.episode)
-    ) {
+    // V3 sends season and episode as numbers or strings
+    const season = this.normalizeEpisode(data.season);
+    const episode = this.normalizeEpisode(data.episode);
+
+    if (!isNaN(season) && !isNaN(episode)) {
       const episodeDiffers =
         !currentEpisode ||
-        currentEpisode.season_number !== data.season ||
-        currentEpisode.episode_number !== data.episode;
+        currentEpisode.season_number !== season ||
+        currentEpisode.episode_number !== episode;
 
       if (episodeDiffers) {
-        const hasPlaybackTime = typeof data.currentTime === "number";
+        const hasPlaybackTime = !isNaN(currentTime);
         const isNonRoutineEvent =
           data.event &&
           !["timeupdate", "time", "seeking", "seeked"].includes(data.event);
 
-        // Report episode change if we have playback data or non-routine event
+        // Report episode change if we have playback data (meaning we are actually playing that episode)
+        // or a non-routine event (like an explicit navigation)
         if (hasPlaybackTime || isNonRoutineEvent) {
           result.episodeChange = {
-            season: data.season,
-            episode: data.episode,
+            season: season,
+            episode: episode,
           };
         }
       }
