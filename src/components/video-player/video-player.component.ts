@@ -320,7 +320,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (
       typeof initialStart === "number" &&
       initialStart > 0 &&
-      !this.playerHasStarted() &&
+      !untracked(() => this.playerHasStarted()) &&
       currentTime <= 5
     ) {
       resumeTime = initialStart;
@@ -618,6 +618,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           ) {
             season = routed.raw.season;
             episode = routed.raw.episode;
+          } else if (
+            typeof routed.raw?.data?.season === "number" &&
+            typeof routed.raw?.data?.episode === "number"
+          ) {
+            // Some providers wrap season/episode in a nested data object
+            season = routed.raw.data.season;
+            episode = routed.raw.data.episode;
           }
 
           if (

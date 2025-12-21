@@ -87,17 +87,34 @@
           class="sources-dropdown absolute top-full left-0 xl:right-0 mt-2 w-48 bg-zinc-800 rounded-lg shadow-lg z-[100] border border-zinc-700 py-1"
         >
           @for (player of availablePlayers(); track player) {
-          <button
-            (click)="selectPlayer(player)"
-            class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700"
-          >
-            <span>{{ player }}</span>
-            @if (selectedPlayer() === player) {
-            <span class="material-symbols-outlined text-xl text-red-500"
-              >check</span
+          <div class="w-full">
+            <button
+              (click)="selectPlayer(player)"
+              class="w-full flex items-center justify-between px-3 py-2 text-sm text-left text-zinc-200 hover:bg-zinc-700 group"
             >
+              <div class="flex items-center gap-2">
+                <span>{{ player }}</span>
+                @if (getProviderNote(player)) {
+                <span
+                  (click)="toggleProviderInfo($event, player)"
+                  class="material-symbols-outlined text-base text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+                  [class.text-red-400]="showProviderInfo() === player"
+                  >info</span
+                >
+                }
+              </div>
+              @if (selectedPlayer() === player) {
+              <span class="material-symbols-outlined text-xl text-red-500"
+                >check</span
+              >
+              }
+            </button>
+            @if (showProviderInfo() === player && getProviderNote(player)) {
+            <div class="px-3 py-2 text-xs text-zinc-400 bg-zinc-900/50 border-t border-zinc-700">
+              {{ getProviderNote(player) }}
+            </div>
             }
-          </button>
+          </div>
           }
         </div>
         }

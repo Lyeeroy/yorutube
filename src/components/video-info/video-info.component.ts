@@ -31,6 +31,7 @@ import { ShareModalComponent } from "../share-modal/share-modal.component";
 import { MediaDetailModalComponent } from "../media-detail-modal/media-detail-modal.component";
 import { PlaylistService } from "../../services/playlist.service";
 import { PlayerService, PlayerType } from "../../services/player.service";
+import { PlayerProviderService } from "../../services/player-provider.service";
 import { EpisodeSelectorComponent } from "../episode-selector/episode-selector.component";
 
 const isMovie = (
@@ -72,6 +73,7 @@ export class VideoInfoComponent {
   private playlistService = inject(PlaylistService);
   private navigationService = inject(NavigationService);
   private playerService = inject(PlayerService);
+  private playerProviderService = inject(PlayerProviderService);
   private elementRef = inject(ElementRef);
 
   // UI State Signals
@@ -82,6 +84,7 @@ export class VideoInfoComponent {
   showMoreOptionsMenu = signal(false);
   showSourcesDropdown = signal(false);
   showAutoNextThreshold = signal(false);
+  showProviderInfo = signal<string | null>(null); // Track which provider's info is shown
 
   // --- DERIVED & ASYNC STATE ---
   selectedPlayer = this.playerService.selectedPlayer;
@@ -90,6 +93,12 @@ export class VideoInfoComponent {
   autoplayEnabled = this.playerService.autoplayEnabled;
   nextButtonEnabled = this.playerService.nextButtonEnabled;
   availablePlayers = this.playerService.players;
+
+  // Get provider note for a given player ID
+  getProviderNote = (playerId: string): string | undefined => {
+    const provider = this.playerProviderService.getProvider(playerId);
+    return provider?.note;
+  };
 
   // Media type-specific details derived from input
   movieDetails = computed(() =>
@@ -375,6 +384,11 @@ export class VideoInfoComponent {
   selectPlayer(player: PlayerType): void {
     this.playerService.selectPlayer(player);
     this.showSourcesDropdown.set(false);
+  }
+
+  toggleProviderInfo(event: MouseEvent, provider: string): void {
+    event.stopPropagation();
+    this.showProviderInfo.update(current => current === provider ? null : provider);
   }
 
   onWatchTrailerClick(): void {

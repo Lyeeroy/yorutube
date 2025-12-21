@@ -15,40 +15,26 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
   readonly id = "VIDSRC";
   readonly name = "Vidsrc";
   readonly origin = "https://vidsrc.cc";
-  readonly supportsAutoNext = true;
+  readonly supportsAutoNext = false; // V3 doesn't send episode change events
+  readonly note = "Selecting episodes within the embedded player will not sync with the main site. Use native episode selector!";
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, resumeTime } = config;
 
-    const queryParams: string[] = ["color=ff0000"];
-
-    // If autoplay is explicitly controlled, pass explicit value. This avoids
-    // relying on provider defaults and makes behavior deterministic.
-    if (autoplay) {
-      queryParams.push("autoPlay=true");
-    } else {
-      queryParams.push("autoPlay=false");
-    }
-
-    // Support resuming playback from a specific time (seconds) for Vidsrc
-    if (resumeTime && resumeTime > 5) {
-      queryParams.push(`startAt=${Math.floor(resumeTime)}`);
-    }
-
-    const queryString = queryParams.join("&");
-
+    // Base URL construction
     let baseUrl: string;
     if (media.media_type === "movie") {
-      baseUrl = `${this.origin}/v2/embed/movie/${media.id}`;
+      baseUrl = `${this.origin}/v3/embed/movie/${media.id}`;
     } else if (media.media_type === "tv" && episode) {
-      baseUrl = `${this.origin}/v2/embed/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
+      baseUrl = `${this.origin}/v3/embed/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
     } else if (media.media_type === "tv") {
+      // Fallback to first season/episode if specific episode not provided
       const tvDetails = media as TvShowDetails;
       const firstSeason =
         tvDetails.seasons.find((s) => s.season_number > 0) ||
         tvDetails.seasons[0];
       if (firstSeason) {
-        baseUrl = `${this.origin}/v2/embed/tv/${media.id}/${firstSeason.season_number}/1`;
+        baseUrl = `${this.origin}/v3/embed/tv/${media.id}/${firstSeason.season_number}/1`;
       } else {
         return null;
       }
@@ -56,14 +42,33 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
       return null;
     }
 
-    return `${baseUrl}?${queryString}`;
+    const params = new URLSearchParams();
+    params.set("color", "ff0000"); // Default accent color
+    params.set("episodes", "false"); // Default accent color
+
+    if (typeof autoplay === "boolean") {
+        params.set("autoPlay", autoplay ? "true" : "false");
+    }
+
+    if (resumeTime && resumeTime > 0) {
+        params.set("startAt", Math.floor(resumeTime).toString());
+    }
+
+    const queryString = params.toString();
+    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
   }
 
   handleMessage(
-    data: PlayerEventData,
+    input: any,
     currentEpisode: Episode | null
   ): PlayerMessageResult {
     const result: PlayerMessageResult = {};
+
+    if (!input) return result;
+
+    // VideoPlayerComponent might have already unwrapped 'data'.
+    // We handle both cases: input IS the data, or input.data IS the data.
+    const data = input.data || input;
 
     // Handle playback progress
     if (
@@ -72,14 +77,20 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
       typeof data.duration === "number" &&
       data.duration > 0
     ) {
+        let finalTime = data.currentTime;
+        // Fix floating point issues near the end
+        if (data.duration - finalTime < 0.5) {
+            finalTime = data.duration;
+        }
+
       result.playbackProgress = {
-        currentTime: data.currentTime,
+        currentTime: finalTime,
         duration: data.duration,
-        progressPercent: (data.currentTime / data.duration) * 100,
+        progressPercent: (finalTime / data.duration) * 100,
       };
 
       // Mark player as started if we have meaningful playback
-      if (data.currentTime > 0) {
+      if (finalTime > 0.5) {
         result.playerStarted = true;
       }
     }
@@ -89,8 +100,7 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
       result.playerStarted = true;
     }
 
-    // Handle episode changes - detect when player navigates internally
-    // Allow changes when episode differs (catches both manual navigation and auto-next)
+    // Handle episode changes
     if (
       typeof data.season === "number" &&
       typeof data.episode === "number" &&

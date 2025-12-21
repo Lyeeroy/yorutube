@@ -10,7 +10,8 @@ export class Movies111PlayerProvider implements IPlayerProvider {
   readonly id = "MOVIES111";
   readonly name = "Movies111";
   readonly origin = "https://111movies.com";
-  readonly supportsAutoNext = true;
+  readonly supportsAutoNext = false; // Doesn't reliably send episode change events
+  readonly note = "Selecting episodes within the embedded player will not sync with the main site. Use native episode selector!";
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, resumeTime } = config;
@@ -20,7 +21,7 @@ export class Movies111PlayerProvider implements IPlayerProvider {
     if (media.media_type === "movie") {
       baseUrl = `https://111movies.com/movie/${media.id}`;
     } else if (media.media_type === "tv" && episode) {
-      baseUrl = `https://111movies.com/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;
+      baseUrl = `https://111movies.com/tv/${media.id}/${episode.season_number}/${episode.episode_number}`;  
     } else {
       return null;
     }

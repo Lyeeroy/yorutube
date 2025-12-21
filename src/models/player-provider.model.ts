@@ -100,4 +100,9 @@ export interface IPlayerProvider {
    * behavior. Use this instead of comparing provider IDs in UI code.
    */
   supportsAutoNext?: boolean;
+
+  /** Optional user-facing note/message about this provider's limitations or features
+   * If present, an info icon will be shown in the UI to display this note.
+   */
+  note?: string;
 }
