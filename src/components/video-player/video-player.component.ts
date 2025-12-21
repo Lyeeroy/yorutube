@@ -162,6 +162,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   // Track if we are waiting to verify if the player correctly resumed progress
   private initialSafeguardCheckPending = false;
+  private previousPlayer = signal<string | null>(null);
 
   selectedPlayer = this.playerService.selectedPlayer;
 
@@ -369,11 +370,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       if (url && !this.skipNextPlayerUpdate()) {
         this.iframeLoading.set(true);
         this.constructedPlayerUrl.set(url);
-
-        // Reset player state when URL changes (source change, quality change, etc)
-
-        this.playerHasStarted.set(false);
-        this.lastKnownPlaybackTime.set(0);
       } else if (this.skipNextPlayerUpdate()) {
         this.skipNextPlayerUpdate.set(false);
       }
@@ -418,6 +414,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     effect((onCleanup) => {
       const p = this.params();
+      const currentPlayer = this.selectedPlayer();
+
       if (!p) {
         this.selectedMediaItem.set(null);
         return;
@@ -432,10 +430,24 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }`;
       const prevKey = untracked(() => this.previousMediaKey());
       const isActualMediaChange = prevKey !== currentMediaKey;
+
+      const prevPlayer = untracked(() => this.previousPlayer());
+      const isPlayerChange =
+        prevPlayer !== null && prevPlayer !== currentPlayer;
+
       let isForcedRefresh = false;
 
-      if (isActualMediaChange) {
-        // Reset player state tracking only when media actually changes
+      if (isActualMediaChange || isPlayerChange) {
+        // If switching players for the same media, carry over the current time
+        if (isPlayerChange && !isActualMediaChange) {
+          const currentTime = untracked(() => this.lastKnownPlaybackTime());
+          if (currentTime > 5) {
+            this.initialStartAt.set(currentTime);
+            this.lastProcessedStartAt.set(currentTime);
+          }
+        }
+
+        // Reset player state tracking when source or media changes
         this.playerHasStarted.set(false);
         this.lastPlayerEpisodeState.set(null);
         this.autoPlayNextTriggered.set(false);
@@ -443,6 +455,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.lastKnownPlaybackTime.set(0);
         this.lastProgressUpdateTime = 0; // Reset debounce timer
         this.previousMediaKey.set(currentMediaKey);
+        this.previousPlayer.set(currentPlayer);
 
         // Initialize safeguard for this new media
         this.safeguardService.start(currentMediaKey);
@@ -452,16 +465,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.clearAutoNextTimer();
         this.autoNextState.set("idle");
 
-        // Unlock any auto-next if we just navigated to a different media
+        // Unlock any auto-next
         this.playerService.unlockAutoNext();
 
         // Mark that we're navigating to prevent stale player messages from interfering
+        // This shield is active until 5 seconds of playback are reported
         this.startNavigation();
 
-        // reused the shared startAt if the user switches player sources.
-        const startAtVal = p?.startAt ? Number(p.startAt) : undefined;
-        this.initialStartAt.set(startAtVal);
-        this.lastProcessedStartAt.set(startAtVal);
+        if (isActualMediaChange) {
+          // shared startAt if the user switches player sources.
+          const startAtVal = p?.startAt ? Number(p.startAt) : undefined;
+          this.initialStartAt.set(startAtVal);
+          this.lastProcessedStartAt.set(startAtVal);
+        }
       } else if (p?.startAt) {
         // Not a media change, but startAt param is present (e.g. from refresh or safeguard recovery)
         // Update initialStartAt to match the new startAt so playerUrl doesn't regenerate with different values
@@ -478,8 +494,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       const shouldReloadPlayer = !this.skipNextPlayerUpdate();
 
-      // Only blank the iframe when we're actually changing media content or forcing a refresh
-      if (shouldReloadPlayer && (isActualMediaChange || isForcedRefresh)) {
+      // Only blank the iframe when we're actually changing media content, player or forcing a refresh
+      if (
+        shouldReloadPlayer &&
+        (isActualMediaChange || isForcedRefresh || isPlayerChange)
+      ) {
         this.reloading.set(true);
         // Set to empty string (not 'about:blank') to immediately stop all media/audio
         this.constructedPlayerUrl.set("");
