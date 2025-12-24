@@ -63,6 +63,9 @@ export interface IPlayerProvider {
   /** Origin URL for postMessage security validation */
   readonly origin: string;
 
+  /** Optional additional origins to allow for postMessage events (e.g. subdomains) */
+  readonly additionalOrigins?: string[];
+
   /**
    * Generate the embed URL for this player
    * @param config Configuration including media, episode, and playback settings
