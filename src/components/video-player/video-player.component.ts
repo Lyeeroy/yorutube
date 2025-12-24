@@ -367,11 +367,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       if (reloading) return;
 
-      if (url && !this.skipNextPlayerUpdate()) {
+      if (url) {
+        // Use untracked to check and consume the skip flag.
+        // This prevents the effect from re-triggering itself or the params effect in a loop.
+        const skip = untracked(() => this.skipNextPlayerUpdate());
+        if (skip) {
+          untracked(() => this.skipNextPlayerUpdate.set(false));
+          console.log("[Player] Skipping iframe URL update (player navigated internally)");
+          return;
+        }
+        
         this.iframeLoading.set(true);
         this.constructedPlayerUrl.set(url);
-      } else if (this.skipNextPlayerUpdate()) {
-        this.skipNextPlayerUpdate.set(false);
       }
     });
 
@@ -489,11 +496,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           this.initialStartAt.set(startAtVal);
           this.lastProcessedStartAt.set(startAtVal);
           isForcedRefresh = true;
+          
+          // CRITICAL: Reset player state on refresh to avoid using stale state from before reload
+          this.playerHasStarted.set(false);
+          this.lastKnownPlaybackTime.set(0);
+          this.startNavigation();
         }
       }
 
-      const shouldReloadPlayer = !this.skipNextPlayerUpdate();
-
+      // Use untracked check for skip flag to avoid triggering the entire param 
+      // sync logic again when the skip flag is eventually cleared.
+      const shouldReloadPlayer = !untracked(() => this.skipNextPlayerUpdate());
+      
       // Only blank the iframe when we're actually changing media content, player or forcing a refresh
       if (
         shouldReloadPlayer &&
@@ -728,10 +742,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private readonly PLAYBACK_THRESHOLD_SECONDS = 30;
   private readonly AUTO_NEXT_PRELOAD_PERCENT = 90;
   private readonly AUTO_NEXT_COMPLETE_PERCENT = 95;
-  private readonly STALE_EVENT_THRESHOLD_MS = 3000;
+  private readonly STALE_EVENT_THRESHOLD_MS = 10000; // Increased to 10s for slow iFrames
   private readonly STALE_EVENT_TIME_DIFF = 10;
   private readonly SEEK_RESET_THRESHOLD_PERCENT = 10;
   private readonly MIN_PLAYBACK_FOR_RESET = 5;
+  private readonly RECENT_NAVIGATION_COOLDOWN_MS = 15000; // 15s cooldown for back-nav
 
   private handlePlaybackProgress(
     progressData: {
@@ -741,14 +756,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     },
     media: MovieDetails | TvShowDetails
   ): void {
+    // VideoPlayerComponent handles the routing/metadata check before calling this
     const { currentTime, duration, progressPercent } = progressData;
 
+    // Hard guard: during navigation, only accept progress that is reasonably
+    // near our intended start point to avoid clearing the lock with stale data.
     if (this.isStalePlaybackEvent(currentTime)) {
       return;
     }
 
     // Update last known playback time
-    if (typeof currentTime === "number" && currentTime > 0) {
+    if (typeof currentTime === "number" && currentTime >= 0) {
       this.lastKnownPlaybackTime.set(currentTime);
 
       // Perform initial safeguard check once we have a real time reported from the player
@@ -759,7 +777,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       }
 
       // Once we have meaningful playback (>5s), clear the navigation flag
-      // This allows episode change detection to work for auto-next
+      // This allows episode change detection to work for auto-next.
+      // We are confident this is NOT a stale event because of isStalePlaybackEvent check.
       if (currentTime >= this.MIN_PLAYBACK_FOR_RESET && this.isNavigating()) {
         this.isNavigating.set(false);
       }
@@ -783,7 +802,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const isFailedResume =
       typeof expectedStart === "number" &&
       expectedStart > 60 &&
-      currentTime < expectedStart - 60;
+      currentTime < expectedStart - 60 &&
+      currentTime < 15; // Timeout: if we played 15s from the start, assume resume failed and accept reality
 
     if (shouldUpdateProgress && !isFailedResume) {
       this.lastProgressUpdateTime = now;
@@ -1025,6 +1045,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.selectedPlayer()
       );
 
+      // Hard Cooldown: If we just navigated FORWARD, ignore any BACKWARDS navigation 
+      // requests from the player for 15 seconds. This prevents "flicker loops" where 
+      // stale metadata from the previous episode forces a navigation back.
+      const timeSinceNav = Date.now() - this.navigationStartTime;
+      if (
+        isSequentialPrevious && 
+        timeSinceNav < this.RECENT_NAVIGATION_COOLDOWN_MS
+      ) {
+        console.warn("[Player] Blocking likely stale back-navigation from player");
+        this.lastPlayerEpisodeState.set(playerEpisode);
+        return;
+      }
+
       // If auto-next is disabled, ignore sequential forward episode changes (auto-next behavior)
       // but allow backwards navigation and non-sequential changes (manual episode selection)
       if (isSequentialNext && !this.playerService.autoNextEnabled()) {
@@ -1055,11 +1088,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
       this.lastPlayerEpisodeState.set(playerEpisode);
 
+      // Tell the component not to reload the iframe since the player did it internally.
+      // We set this BEFORE navigation starts.
+      this.skipNextPlayerUpdate.set(true);
+
       // Mark that we're starting a navigation
       this.startNavigation();
-
-      // Tell the component not to reload the iframe since the player did it internally.
-      this.skipNextPlayerUpdate.set(true);
 
       // Update the URL and app state to match the player.
       this.navigationService.navigateTo("watch", {
@@ -1467,6 +1501,22 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Vidsrc mirror list
+  private readonly VIDSRC_MIRRORS = [
+    "https://v3.vidsrc.cc",
+    "https://vidsrc.xyz",
+    "https://vidsrc.me",
+    "https://vidsrc.to",
+    "https://vidsrc.in",
+    "https://vidsrc.net",
+    "https://vidsrc.pm",
+    "https://vidsrc.pro",
+    "https://vidsrc.stream",
+    "https://vidsrc.online",
+    "https://v3.embed.su",
+    "https://embed.su",
+  ];
+
   private loadMainTrailer(media: MediaType): void {
     this.loadingTrailer.set(true);
 
@@ -1606,6 +1656,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         autoplay: true,
       });
 
+      // Mark as navigating to block stale progress from the old iframe instance
+      this.startNavigation();
+
       // Safety: In case navigation is a no-op (params identical), 
       // ensure we reset reloading and restore the URL after a short delay.
       setTimeout(() => {
@@ -1672,6 +1725,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   dismissSafeguardRecovery(): void {
     this.safeguardService.clearRecovery(true); // True = delete saved data too, user rejected it
+    this.initialStartAt.set(undefined); // Clear guard so we can start saving current progress
   }
 
   restoreSafeguardProgress(): void {
