@@ -15,20 +15,7 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
   readonly id = "VIDSRC";
   readonly name = "Vidsrc";
   readonly origin = "https://vidsrc.cc";
-  readonly additionalOrigins = [
-    "https://v3.vidsrc.cc",
-    "https://vidsrc.xyz",
-    "https://vidsrc.me",
-    "https://vidsrc.to",
-    "https://vidsrc.in",
-    "https://vidsrc.net",
-    "https://vidsrc.pm",
-    "https://vidsrc.pro",
-    "https://vidsrc.stream",
-    "https://vidsrc.online",
-    "https://v3.embed.su",
-    "https://embed.su",
-  ];
+
   readonly supportsAutoNext = true;
   readonly note = "Selecting episodes within the embedded player will not sync with the main site. Use native episode selector!";
 
