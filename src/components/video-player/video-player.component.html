@@ -65,38 +65,7 @@
       </div>
       } }
 
-      <!-- Safeguard Recovery Overlay -->
-      @if (showSafeguardRecovery()) {
-      <div
-        class="absolute inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in"
-      >
-        <div
-          class="bg-zinc-900 border border-white/10 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl text-center"
-        >
-          <span class="material-symbols-outlined text-4xl text-yellow-500 mb-4"
-            >history_toggle_off</span
-          >
-          <h3 class="text-xl font-bold text-white mb-2">Resume playback?</h3>
-          <p class="text-zinc-400 mb-6">
-            We found a saved progress point. Would you like to resume from there?
-          </p>
-          <div class="flex gap-3 justify-center">
-            <button
-              (click)="dismissSafeguardRecovery()"
-              class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-medium transition-colors"
-            >
-              No, thanks
-            </button>
-            <button
-              (click)="restoreSafeguardProgress()"
-              class="px-4 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 font-bold transition-colors"
-            >
-              Resume playback
-            </button>
-          </div>
-        </div>
-      </div>
-      }
+
       <!-- Next Episode Overlay -->
       @if (showNextEpisodeButton()) {
       <div
