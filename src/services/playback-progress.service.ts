@@ -11,38 +11,87 @@ export class PlaybackProgressService {
   // Store progress as a map of mediaId -> PlaybackProgress
   progressData = signal<Record<number, PlaybackProgress>>({});
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingSave = false;
+  private lastSavedData: Record<number, PlaybackProgress> = {};
 
   constructor() {
     this.loadFromStorage();
     effect(() => {
       const data = this.progressData();
-      // Throttle saves to localStorage
+      
       if (this.saveTimeout) {
         clearTimeout(this.saveTimeout);
       }
+      
+      // Store reference for save and mark as pending
+      this.pendingSave = true;
+      
       this.saveTimeout = setTimeout(() => {
-        untracked(() => this.saveToStorage(data));
+        if (this.pendingSave) {
+          this.lastSavedData = { ...data };
+          untracked(() => this.saveToStorage(data));
+          this.pendingSave = false;
+        }
       }, SAVE_THROTTLE_MS);
     });
   }
 
   private loadFromStorage(): void {
-    if (typeof window !== "undefined" && window.localStorage) {
-      const stored = localStorage.getItem(STORAGE_KEY);
+    if (!this.isLocalStorageAvailable()) return;
+
+    try {
+      const stored = this.safeStorageGet(STORAGE_KEY);
       if (stored) {
-        try {
-          this.progressData.set(JSON.parse(stored));
-        } catch (e) {
-          console.error("Error parsing playback progress from localStorage", e);
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          this.progressData.set(parsed);
+        } else {
           this.progressData.set({});
         }
       }
+    } catch (e) {
+      console.error("Error parsing playback progress from localStorage", e);
+      this.progressData.set({});
     }
   }
 
   private saveToStorage(data: Record<number, PlaybackProgress>): void {
-    if (typeof window !== "undefined" && window.localStorage) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    this.safeStorageSet(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  /** Comprehensive localStorage availability check */
+  private isLocalStorageAvailable(): boolean {
+    try {
+      const test = '__localStorage_test__';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Safe localStorage read with error handling */
+  private safeStorageGet(key: string): string | null {
+    try {
+      if (this.isLocalStorageAvailable()) {
+        return localStorage.getItem(key);
+      }
+      return null;
+    } catch (error) {
+      console.warn(`Failed to read localStorage key "${key}":`, error);
+      return null;
+    }
+  }
+
+  /** Safe localStorage write with error handling */
+  private safeStorageSet(key: string, value: string): void {
+    try {
+      if (this.isLocalStorageAvailable()) {
+        localStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.warn(`Failed to save localStorage key "${key}":`, error);
     }
   }
 

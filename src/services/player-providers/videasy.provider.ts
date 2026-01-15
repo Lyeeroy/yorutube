@@ -76,7 +76,7 @@ export class VideasyPlayerProvider implements IPlayerProvider {
     ) {
       const timeRemaining = data.duration - data.currentTime;
       // If within 0.5s of end, report 100% to ensure auto-next triggers
-      const progressPercent = timeRemaining < 0.5 ? 100 : (data.currentTime / data.duration) * 100;
+      const progressPercent = this.calculateProgressPercent(data.currentTime, data.duration);
 
       result.playbackProgress = {
         currentTime: data.currentTime,
@@ -139,5 +139,22 @@ export class VideasyPlayerProvider implements IPlayerProvider {
   normalizeEpisode(rawEpisode: any): number {
     const parsed = parseInt(String(rawEpisode), 10);
     return isNaN(parsed) ? NaN : parsed;
+  }
+
+  /** Safe progress calculation with division by zero protection */
+  private calculateProgressPercent(currentTime: number, duration: number): number {
+    if (typeof duration !== 'number' || duration <= 0) return 0;
+    if (typeof currentTime !== 'number' || currentTime < 0) return 0;
+    
+    const timeRemaining = duration - currentTime;
+    const progress = (currentTime / duration) * 100;
+    
+    // Handle edge cases
+    if (isNaN(progress) || !isFinite(progress)) return 0;
+    if (timeRemaining < 0.5) return 100; // Near end
+    if (progress > 100) return 100;
+    if (progress < 0) return 0;
+    
+    return progress;
   }
 }

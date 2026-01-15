@@ -92,7 +92,7 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
     ) {
       const timeRemaining = data.duration - data.currentTime;
       // If within 0.5s of end, report 100% to ensure auto-next triggers
-      const progressPercent = timeRemaining < 0.5 ? 100 : (data.currentTime / data.duration) * 100;
+      const progressPercent = this.calculateProgressPercent(data.currentTime, data.duration);
 
       result.playbackProgress = {
         currentTime: data.currentTime,
@@ -177,11 +177,46 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
     return candidate + 1;
   }
 
+  /** Safe progress calculation with division by zero protection */
+  private calculateProgressPercent(currentTime: number, duration: number): number {
+    if (typeof duration !== 'number' || duration <= 0) return 0;
+    if (typeof currentTime !== 'number' || currentTime < 0) return 0;
+    
+    const timeRemaining = duration - currentTime;
+    const progress = (currentTime / duration) * 100;
+    
+    // Handle edge cases
+    if (isNaN(progress) || !isFinite(progress)) return 0;
+    if (timeRemaining < 0.5) return 100; // Near end
+    if (progress > 100) return 100;
+    if (progress < 0) return 0;
+    
+    return progress;
+  }
+
   onMediaData(rawData: any): void {
     try {
-      localStorage.setItem("vidLinkProgress", JSON.stringify(rawData));
+      const sanitizedData = this.sanitizeStorageData(rawData);
+      localStorage.setItem("vidLinkProgress", JSON.stringify(sanitizedData));
     } catch (e) {
       console.error("Failed to store Vidlink progress (provider):", e);
     }
+  }
+
+  /** Sanitize storage data to prevent injection attacks */
+  private sanitizeStorageData(data: any): any {
+    if (!data || typeof data !== 'object') return {};
+    
+    // Only allow known safe properties
+    const sanitized: any = {};
+    const allowedKeys = ['currentTime', 'duration', 'episode', 'season', 'progressPercent'];
+    
+    for (const key of allowedKeys) {
+      if (key in data && typeof data[key] === 'number') {
+        sanitized[key] = data[key];
+      }
+    }
+    
+    return sanitized;
   }
 }

@@ -22,19 +22,90 @@ export class PlayerMessageRouterService {
 
   constructor() {}
 
+  /** Enhanced origin validation for security */
+  private validateOrigin(origin: string): boolean {
+    if (!origin || typeof origin !== 'string') return false;
+    
+    try {
+      const originUrl = new URL(origin);
+      const allowedOrigins = this.playerProviderService.getAllowedOrigins();
+      
+      return allowedOrigins.some(allowed => {
+        const allowedUrl = new URL(allowed);
+        // Exact match of protocol, hostname, and port
+        return originUrl.protocol === allowedUrl.protocol &&
+               originUrl.hostname === allowedUrl.hostname &&
+               originUrl.port === allowedUrl.port;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /** Safe parsing of postMessage data with validation */
+  private safeParseMessageData(data: any): any | null {
+    try {
+      if (typeof data === 'string') {
+        // Validate JSON structure before parsing
+        const trimmed = data.trim();
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          return null;
+        }
+        const parsed = JSON.parse(data);
+        // Basic sanitization - only allow known safe properties
+        return this.sanitizeMessageData(parsed);
+      }
+      return this.sanitizeMessageData(data);
+    } catch (error) {
+      console.warn('Failed to parse postMessage data:', error);
+      return null;
+    }
+  }
+
+  /** Sanitize message data to prevent injection attacks */
+  private sanitizeMessageData(data: any): any {
+    if (!data || typeof data !== 'object') return {};
+    
+    // Only allow known safe properties
+    const sanitized: any = {};
+    const allowedKeys = [
+      'event', 'currentTime', 'duration', 'progressPercent', 
+      'season', 'episode', 'type', 'data'
+    ];
+    
+    for (const key of allowedKeys) {
+      if (key in data) {
+        const value = data[key];
+        // Only allow primitive types
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          sanitized[key] = value;
+        } else if (typeof value === 'object' && value !== null) {
+          // Recursively sanitize nested objects
+          sanitized[key] = this.sanitizeMessageData(value);
+        }
+      }
+    }
+    
+    return sanitized;
+  }
+
   /** Start listening to window messages. Call from components when active. */
   start(): void {
-    if (typeof window === "undefined" || this.handler) return;
+    // Always clear existing handler first to prevent memory leaks
+    this.stop();
+    
+    if (typeof window === "undefined") return;
 
     this.handler = (event: MessageEvent) => {
-      const allowed = this.playerProviderService.getAllowedOrigins();
-      if (!allowed.includes(event.origin)) return;
+      // Enhanced origin validation for security
+      if (!this.validateOrigin(event.origin)) return;
 
       let data: any;
       try {
-        data =
-          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        data = this.safeParseMessageData(event.data);
+        if (data === null) return;
       } catch (e) {
+        console.warn('Failed to parse postMessage data:', e);
         return;
       }
 
