@@ -17,7 +17,8 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
   readonly origin = "https://vidsrc.cc";
 
   readonly supportsAutoNext = true;
-  readonly note = "Selecting episodes within the embedded player will not sync with the main site. Use native episode selector!";
+  readonly note =
+    "Selecting episodes within the embedded player will not sync with the main site. Use native episode selector!";
 
   generateUrl(config: PlayerUrlConfig): string | null {
     const { media, episode, autoplay, resumeTime } = config;
@@ -45,14 +46,13 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
 
     const params = new URLSearchParams();
     params.set("color", "ff0000"); // Default accent color
-    
 
     if (typeof autoplay === "boolean") {
-        params.set("autoPlay", autoplay ? "true" : "false");
+      params.set("autoPlay", autoplay ? "true" : "false");
     }
 
     if (resumeTime && resumeTime > 0) {
-        params.set("startAt", Math.floor(resumeTime).toString());
+      params.set("startAt", Math.floor(resumeTime).toString());
     }
 
     const queryString = params.toString();
@@ -61,7 +61,7 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
 
   handleMessage(
     input: any,
-    currentEpisode: Episode | null
+    currentEpisode: Episode | null,
   ): PlayerMessageResult {
     const result: PlayerMessageResult = {};
 
@@ -70,10 +70,10 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
     // Normalize data structure. Some events are in {type: "PLAYER_EVENT", data: {...}}
     // VideoPlayerComponent might have already unwrapped 'data', but we handle both for robustness.
     let data = input.data || input;
-    
+
     // If we have a nested type wrapper we didn't catch
     if (data.type === "PLAYER_EVENT" && data.data) {
-        data = data.data;
+      data = data.data;
     }
 
     // Safety: ignore events about different media if IDs are provided
@@ -84,23 +84,35 @@ export class VidsrcPlayerProvider implements IPlayerProvider {
 
     // Handle playback progress
     // V3 uses 'time' event, but we keep 'timeupdate' for compatibility
-    const isProgressEvent = data.event === "timeupdate" || data.event === "time";
-    
-    // Coerce to numbers as some players might send strings
-    const currentTime = data.currentTime !== undefined ? parseFloat(String(data.currentTime)) : NaN;
-    const duration = data.duration !== undefined ? parseFloat(String(data.duration)) : NaN;
+    const isProgressEvent =
+      data.event === "timeupdate" || data.event === "time";
 
-    if (isProgressEvent && !isNaN(currentTime) && !isNaN(duration) && duration > 0) {
-        let finalTime = currentTime;
-        // Fix floating point issues near the end
-        if (duration - finalTime < 0.5) {
-            finalTime = duration;
-        }
+    // Coerce to numbers as some players might send strings
+    const currentTime =
+      data.currentTime !== undefined
+        ? parseFloat(String(data.currentTime))
+        : NaN;
+    const duration =
+      data.duration !== undefined ? parseFloat(String(data.duration)) : NaN;
+
+    if (
+      isProgressEvent &&
+      !isNaN(currentTime) &&
+      !isNaN(duration) &&
+      duration > 0
+    ) {
+      let finalTime = currentTime;
+      // Fix floating point issues near the end
+      if (duration - finalTime < 0.5) {
+        finalTime = duration;
+      }
+
+      const rawProgress = (finalTime / duration) * 100;
 
       result.playbackProgress = {
         currentTime: finalTime,
         duration: duration,
-        progressPercent: (finalTime / duration) * 100,
+        progressPercent: Math.min(Math.max(rawProgress, 0), 100),
       };
 
       // Mark player as started if we have meaningful playback

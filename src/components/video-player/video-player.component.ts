@@ -1,7 +1,6 @@
 import {
   Component,
   ChangeDetectionStrategy,
-  output,
   effect,
   signal,
   inject,
@@ -16,10 +15,8 @@ import {
 import {
   MediaType,
   Movie,
-  TvShow,
   TvShowDetails,
   Episode,
-  SubscribableChannel,
   MovieDetails,
   Video,
 } from "../../models/movie.model";
@@ -38,25 +35,64 @@ import { Observable, of } from "rxjs";
 import { map, switchMap } from "rxjs/operators";
 import { HistoryService } from "../../services/history.service";
 import { PlaylistService } from "../../services/playlist.service";
-import { Playlist } from "../../models/playlist.model";
 import { VideoPlayerPlaylistComponent } from "../video-player-playlist/video-player-playlist.component";
-import { PlayerService, PlayerType } from "../../services/player.service";
+import { PlayerService } from "../../services/player.service";
 import { PlaybackProgressService } from "../../services/playback-progress.service";
-import { PlaybackProgress } from "../../models/playback-progress.model";
 import { ContinueWatchingService } from "../../services/continue-watching.service";
-import { ContinueWatchingItem } from "../../models/continue-watching.model";
 import { PlayerProviderService } from "../../services/player-provider.service";
 import { PlayerMessageRouterService } from "../../services/player-message-router.service";
 import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
 import { PlayerUrlConfig } from "../../models/player-provider.model";
 
+// ============ Constants ============
+const THRESHOLDS = {
+  PLAYBACK_SECONDS: 30,
+  AUTO_NEXT_PRELOAD: 90,
+  AUTO_NEXT_COMPLETE: 95,
+  STALE_EVENT_MS: 10000,
+  STALE_TIME_DIFF: 10,
+  SEEK_RESET_PERCENT: 10,
+  MIN_PLAYBACK_RESET: 5,
+  SIGNAL_UPDATE_MS: 1000,
+  AUTO_NEXT_COUNTDOWN: 5,
+} as const;
+
+// ============ Type Guards ============
 const isMovie = (media: MediaType | TvShowDetails): media is Movie =>
   media.media_type === "movie";
 
-interface PlayerEpisodeState {
+const isTvShow = (
+  media: MovieDetails | TvShowDetails | null,
+): media is TvShowDetails => media?.media_type === "tv";
+
+// ============ Interfaces ============
+interface EpisodeState {
   season: number;
   episode: number;
 }
+
+interface NavigationState {
+  active: boolean;
+  startTime: number;
+  skipMediaKey: string | null;
+}
+
+interface PlaybackState {
+  currentTime: number;
+  progressPercent: number;
+  lastUpdateTime: number;
+  playerStarted: boolean;
+  historyAdded: boolean;
+}
+
+interface AutoNextState {
+  phase: "idle" | "counting_down";
+  countdown: number;
+  triggered: boolean;
+  recommendedSent: boolean;
+  minimized: boolean;
+}
+
 @Component({
   selector: "app-video-player",
   standalone: true,
@@ -88,558 +124,164 @@ interface PlayerEpisodeState {
   ],
 })
 export class VideoPlayerComponent implements OnInit, OnDestroy {
-  private movieService = inject(MovieService);
-  private sanitizer: DomSanitizer = inject(DomSanitizer);
-  private navigationService = inject(NavigationService);
-  private historyService = inject(HistoryService);
-  private playlistService = inject(PlaylistService);
-  private playerService = inject(PlayerService);
-  private playbackProgressService = inject(PlaybackProgressService);
-  private continueWatchingService = inject(ContinueWatchingService);
-  private playerProviderService = inject(PlayerProviderService);
-  private playerMessageRouter = inject(PlayerMessageRouterService);
-  private continueWatchingManager = inject(ContinueWatchingManagerService);
-  private destroyRef = inject(DestroyRef);
+  // ============ Injected Services ============
+  private readonly movieService = inject(MovieService);
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly navigationService = inject(NavigationService);
+  private readonly historyService = inject(HistoryService);
+  private readonly playlistService = inject(PlaylistService);
+  private readonly playerService = inject(PlayerService);
+  private readonly playbackProgressService = inject(PlaybackProgressService);
+  private readonly continueWatchingService = inject(ContinueWatchingService);
+  private readonly playerProviderService = inject(PlayerProviderService);
+  private readonly playerMessageRouter = inject(PlayerMessageRouterService);
+  private readonly continueWatchingManager = inject(
+    ContinueWatchingManagerService,
+  );
+  private readonly destroyRef = inject(DestroyRef);
 
-  params = input.required<any>();
-  genreMap = toSignal(this.movieService.getCombinedGenreMap(), {
+  // ============ Inputs ============
+  readonly params = input.required<any>();
+
+  // ============ Core State Signals ============
+  readonly selectedMediaItem = signal<MovieDetails | TvShowDetails | null>(
+    null,
+  );
+  readonly currentEpisode = signal<Episode | null>(null);
+  readonly nextEpisode = signal<Episode | null>(null);
+  readonly videoDetails = signal<Video | null>(null);
+
+  // ============ UI State ============
+  readonly loadingTrailer = signal(true);
+  readonly iframeLoading = signal(false);
+  readonly isMaximized = signal(false);
+
+  // ============ Consolidated State Objects ============
+  private readonly navState = signal<NavigationState>({
+    active: false,
+    startTime: 0,
+    skipMediaKey: null,
+  });
+
+  private readonly playback = signal<PlaybackState>({
+    currentTime: 0,
+    progressPercent: 0,
+    lastUpdateTime: 0,
+    playerStarted: false,
+    historyAdded: false,
+  });
+
+  private readonly autoNext = signal<AutoNextState>({
+    phase: "idle",
+    countdown: THRESHOLDS.AUTO_NEXT_COUNTDOWN,
+    triggered: false,
+    recommendedSent: false,
+    minimized: false,
+  });
+
+  // ============ Private Tracking ============
+  private readonly constructedUrl = signal("about:blank");
+  private readonly reloading = signal(false);
+  private readonly autoplay = signal(false);
+  private readonly initialStartAt = signal<number | undefined>(undefined);
+  private readonly lastProcessedStartAt = signal<number | undefined>(undefined);
+  private readonly lastPlayerEpisode = signal<EpisodeState | null>(null);
+  private readonly prevMediaKey = signal<string | null>(null);
+  private readonly prevPlayer = signal<string | null>(null);
+
+  private autoNextTimer: ReturnType<typeof setInterval> | null = null;
+
+  // ============ External Signals ============
+  readonly selectedPlayer = this.playerService.selectedPlayer;
+  readonly genreMap = toSignal(this.movieService.getCombinedGenreMap(), {
     initialValue: new Map<number, string>(),
   });
 
-  selectedMediaItem = signal<MovieDetails | TvShowDetails | null>(null);
-  videoDetails = signal<Video | null>(null);
-  loadingTrailer = signal(true);
-  iframeLoading = signal(false);
-  isMaximized = signal(false);
-  currentEpisode = signal<Episode | null>(null);
-  nextEpisode = signal<Episode | null>(null);
-
-  playlist = computed(() => {
-    const p = this.params();
-    const id = p?.playlistId;
-    if (!id) return null;
-    return this.playlistService.getPlaylistById(id) || null;
+  // ============ Computed Values ============
+  readonly playlist = computed(() => {
+    const id = this.params()?.playlistId;
+    return id ? (this.playlistService.getPlaylistById(id) ?? null) : null;
   });
 
-  historyAdded = signal(false);
+  readonly currentMediaId = computed(() => this.selectedMediaItem()?.id);
 
-  // provider messages are routed through PlayerMessageRouterService
+  readonly backdropUrl = computed(() => {
+    const path = this.selectedMediaItem()?.backdrop_path;
+    return path ? `https://image.tmdb.org/t/p/w1280${path}` : null;
+  });
 
-  // Track the last episode state reported by the player
-  private lastPlayerEpisodeState = signal<PlayerEpisodeState | null>(null);
+  // Template-exposed computed from consolidated state
+  readonly currentPlaybackTime = computed(() => this.playback().currentTime);
+  readonly currentProgressPercent = computed(
+    () => this.playback().progressPercent,
+  );
+  readonly autoNextState = computed(() => this.autoNext().phase);
+  readonly autoNextCountdown = computed(() => this.autoNext().countdown);
+  readonly nextEpisodeMinimized = computed(() => this.autoNext().minimized);
+  readonly isNavigating = computed(() => this.navState().active);
 
-  // Track if we should skip iframe updates for a specific media key (avoids reload loops on auto-nav)
-  private skipUpdateForMediaKey = signal<string | null>(null);
-
-  // Track if player has started playing (to avoid false episode detection on initial load)
-  private playerHasStarted = signal(false);
-
-  // Track if we're in the middle of a user-initiated navigation (to ignore stale player messages)
-  private isNavigating = signal(false);
-
-  private constructedPlayerUrl = signal<string>("about:blank");
-
-  // Track if we are currently reloading the player (forcing a blank state)
-  private reloading = signal(false);
-
-  // Track if auto-play next has been triggered for current episode
-  private autoPlayNextTriggered = signal(false);
-
-  // Track if we've recommended the next episode (at 90% watched)
-  private recommendedNextEpisodeSent = signal(false);
-
-  // Track the previous media key to avoid blanking iframe on no-op param syncs
-  private previousMediaKey = signal<string | null>(null);
-
-  private previousPlayer = signal<string | null>(null);
-
-  selectedPlayer = this.playerService.selectedPlayer;
-
-  // Autoplay state
-  private autoplay = signal(false);
-
-  currentMediaId = computed(() => this.selectedMediaItem()?.id);
-
-  // Debounce counter for progress updates
-  private lastProgressUpdateTime = 0;
-
-  // Auto-next visualization signals
-  autoNextState = signal<"idle" | "counting_down">("idle");
-  autoNextCountdown = signal(5); // 5 seconds countdown
-  currentProgressPercent = signal(0);
-  nextEpisodeMinimized = signal(false);
-  private autoNextTimer: any = null;
-
-  // Computed signal to check if there is a next item available
-  hasNextItem = computed(() => {
+  readonly hasNextItem = computed(() => {
     const media = this.selectedMediaItem();
     if (!media) return false;
+    if (isTvShow(media)) return true;
 
-    if (media.media_type === "tv") {
-      // For TV shows, we assume there's always a potential next episode unless known otherwise
-      return true;
-    } else if (media.media_type === "movie") {
-      // For movies, only if in a playlist and not the last item
-      const playlist = this.playlist();
-      if (!playlist || !playlist.items || playlist.items.length === 0)
-        return false;
-
-      const currentIndex = playlist.items.findIndex(
-        (item) => item.id === media.id,
-      );
-      return currentIndex !== -1 && currentIndex < playlist.items.length - 1;
-    }
-
-    return false;
+    const playlist = this.playlist();
+    if (!playlist?.items?.length) return false;
+    const idx = playlist.items.findIndex((i) => i.id === media.id);
+    return idx >= 0 && idx < playlist.items.length - 1;
   });
 
-  showNextEpisodeButton = computed(() => {
-    const progress = this.currentProgressPercent();
-    const isCountingDown = this.autoNextState() === "counting_down";
-    const hasNext = this.hasNextItem();
-    const isNavigating = this.isNavigating();
-    const nextButtonEnabled = this.playerService.nextButtonEnabled();
-
-    // Show if:
-    // 1. Next button setting is ENABLED
-    // 2. We have a next item
-    // 3. We are NOT currently navigating
-    // 4. AND either:
-    //    a. Progress is > 90% (pre-show button)
-    //    b. OR we are actively counting down (auto-next triggered)
+  readonly showNextEpisodeButton = computed(() => {
+    const { progressPercent } = this.playback();
     return (
-      nextButtonEnabled &&
-      hasNext &&
-      !isNavigating &&
-      (progress >= 80 || isCountingDown)
+      this.playerService.nextButtonEnabled() &&
+      this.hasNextItem() &&
+      !this.navState().active &&
+      (progressPercent >= 80 || this.autoNext().phase === "counting_down")
     );
   });
 
-  backdropUrl = computed(() => {
-    const media = this.selectedMediaItem();
-    return media?.backdrop_path
-      ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
-      : null;
-  });
+  readonly safeConstructedPlayerUrl = computed<SafeResourceUrl>(() =>
+    this.sanitizer.bypassSecurityTrustResourceUrl(this.constructedUrl()),
+  );
 
-  youtubeUrl = computed<string | null>(() => {
+  private readonly youtubeUrl = computed(() => {
     const video = this.videoDetails();
     if (!video) return null;
     const autoplayParam =
-      this.autoplay() || this.playerService.autoplayEnabled()
-        ? "?autoplay=1"
-        : "?autoplay=0";
-    return `https://www.youtube.com/embed/${video.key}${autoplayParam}`;
+      this.autoplay() || this.playerService.autoplayEnabled() ? 1 : 0;
+    return `https://www.youtube.com/embed/${video.key}?autoplay=${autoplayParam}`;
   });
 
-  playerUrl = computed<string | null>(() => {
-    const selectedPlayerId = this.selectedPlayer();
-
-    // YouTube uses trailer, handle separately
-    if (selectedPlayerId === "YouTube") {
-      return this.youtubeUrl();
-    }
+  private readonly playerUrl = computed(() => {
+    const playerId = this.selectedPlayer();
+    if (playerId === "YouTube") return this.youtubeUrl();
 
     const media = this.selectedMediaItem();
-    if (!media) return null;
+    const provider = this.playerProviderService.getProvider(playerId);
+    if (!media || !provider) return null;
 
-    const provider = this.playerProviderService.getProvider(selectedPlayerId);
-    if (!provider) return null;
-
-    // Use params to determine the episode we're navigating to, not currentEpisode()
-    const params = untracked(() => this.params());
     const episode = this.currentEpisode();
-
-    // Determine progressId based on params (source of truth) rather than currentEpisode
-    let progressId: number;
-    if (
-      media.media_type === "tv" &&
-      params?.season &&
-      params?.episode &&
-      episode
-    ) {
-      if (
-        episode.season_number === +params.season &&
-        episode.episode_number === +params.episode
-      ) {
-        progressId = episode.id;
-      } else {
-        progressId = media.id;
-      }
-    } else {
-      progressId = episode ? episode.id : media.id;
-    }
-
-    const progress = untracked(() =>
-      this.playbackProgressService.getProgress(progressId),
-    );
-
-    const initialStart = untracked(() => this.initialStartAt());
-
-    let resumeTime = 0;
-    const currentTime = untracked(() => this.lastKnownPlaybackTime());
-
-    if (
-      typeof initialStart === "number" &&
-      initialStart > 0 &&
-      !untracked(() => this.playerHasStarted()) &&
-      currentTime <= 5
-    ) {
-      resumeTime = initialStart;
-    } else if (currentTime > 5) {
-      resumeTime = currentTime;
-    } else if (progress && progress.progress > 5 && progress.progress < 100) {
-      resumeTime = progress.timestamp;
-    }
-
     const config: PlayerUrlConfig = {
       media,
-      episode: episode || undefined,
+      episode: episode ?? undefined,
       autoplay: this.autoplay() || this.playerService.autoplayEnabled(),
       autoNext: this.playerService.autoNextEnabled(),
-      resumeTime,
+      resumeTime: this.calculateResumeTime(media, episode),
     };
 
     return provider.generateUrl(config);
   });
 
-  safeConstructedPlayerUrl = computed<SafeResourceUrl>(() => {
-    const url = this.constructedPlayerUrl();
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
-  });
-
-  // Timestamp when navigation started, used to filter stale events
-  private navigationStartTime = 0;
-
   constructor() {
     this.playerMessageRouter.start();
-
-    // Update the player URL, filtering out unnecessary reloads
-    effect(() => {
-      const url = this.playerUrl();
-      const reloading = this.reloading();
-
-      if (reloading) return;
-
-      const currentUrl = this.constructedPlayerUrl();
-
-      // Calculate current media key for skip check
-      const params = untracked(() => this.params());
-      const key = this.getMediaKey(params);
-      const skipKey = this.skipUpdateForMediaKey();
-
-      if (skipKey && skipKey === key) {
-        // We are intentionally skipping updates for this media state (e.g. auto-navigated)
-        return;
-      } else if (skipKey) {
-        // We moved to a different state, clear the skip flag
-        this.skipUpdateForMediaKey.set(null);
-      }
-
-      if (url) {
-        if (this.shouldUpdatePlayerUrl(currentUrl, url)) {
-          this.iframeLoading.set(true);
-          this.constructedPlayerUrl.set(url);
-        }
-      }
-    });
-
-    // Clear initialStartAt logic (prevent resume loops)
-    effect(() => {
-      const startAt = this.initialStartAt();
-      const currentTime = this.lastKnownPlaybackTime();
-      const playerStarted = this.playerHasStarted();
-      const params = this.params();
-
-      if (typeof startAt === "number" && startAt > 60) {
-        if (currentTime >= startAt - 60) {
-          this.initialStartAt.set(undefined);
-          this.removeStartAtFromUrl();
-        }
-      } else {
-        if (playerStarted || currentTime > 5) {
-          this.initialStartAt.set(undefined);
-          if (params?.startAt) {
-            this.removeStartAtFromUrl();
-          }
-        }
-      }
-    });
-
-    effect((onCleanup) => {
-      const p = this.params();
-      const currentPlayer = this.selectedPlayer();
-
-      if (!p) {
-        this.selectedMediaItem.set(null);
-        return;
-      }
-      const { mediaType, id, season, episode, autoplay } = p;
-
-      this.autoplay.set(!!autoplay);
-
-      const currentMediaKey = this.getMediaKey(p);
-      const prevKey = untracked(() => this.previousMediaKey());
-      const isActualMediaChange = prevKey !== currentMediaKey;
-
-      const prevPlayer = untracked(() => this.previousPlayer());
-      const isPlayerChange =
-        prevPlayer !== null && prevPlayer !== currentPlayer;
-
-      let isForcedRefresh = false;
-
-      if (isActualMediaChange || isPlayerChange) {
-        if (isPlayerChange && !isActualMediaChange) {
-          const currentTime = untracked(() => this.lastKnownPlaybackTime());
-          if (currentTime > 5) {
-            this.initialStartAt.set(currentTime);
-            this.lastProcessedStartAt.set(currentTime);
-          }
-        }
-
-        this.playerHasStarted.set(false);
-        this.lastPlayerEpisodeState.set(null);
-        this.autoPlayNextTriggered.set(false);
-        this.recommendedNextEpisodeSent.set(false);
-        this.lastKnownPlaybackTime.set(0);
-        this.lastProgressUpdateTime = 0;
-        this.previousMediaKey.set(currentMediaKey);
-        this.previousPlayer.set(currentPlayer);
-
-        this.currentProgressPercent.set(0);
-        this.clearAutoNextTimer();
-        this.autoNextState.set("idle");
-
-        this.playerService.unlockAutoNext();
-        this.startNavigation();
-
-        if (isActualMediaChange) {
-          const startAtVal = p?.startAt ? Number(p.startAt) : undefined;
-          this.initialStartAt.set(startAtVal);
-          this.lastProcessedStartAt.set(startAtVal);
-        }
-      } else if (p?.startAt) {
-        const startAtVal = Number(p.startAt);
-        const lastProcessed = untracked(() => this.lastProcessedStartAt());
-
-        if (lastProcessed !== startAtVal) {
-          this.initialStartAt.set(startAtVal);
-          this.lastProcessedStartAt.set(startAtVal);
-          isForcedRefresh = true;
-          this.playerHasStarted.set(false);
-          this.lastKnownPlaybackTime.set(0);
-          this.startNavigation();
-        }
-      }
-
-      // Check skip key to avoid reload if we just auto-navigated
-      const skipKey = this.skipUpdateForMediaKey();
-      const shouldReloadPlayer = skipKey !== currentMediaKey;
-
-      if (
-        shouldReloadPlayer &&
-        (isActualMediaChange || isForcedRefresh || isPlayerChange)
-      ) {
-        this.reloading.set(true);
-        this.constructedPlayerUrl.set("");
-        setTimeout(() => {
-          this.reloading.set(false);
-        }, 100);
-      }
-
-      this.videoDetails.set(null);
-      this.historyAdded.set(false);
-
-      if (!id || !mediaType) {
-        this.selectedMediaItem.set(null);
-        return;
-      }
-
-      if (mediaType === "tv" && season && episode) {
-        const expectedEpisode: Partial<Episode> = {
-          season_number: +season,
-          episode_number: +episode,
-          id: 0,
-        };
-        this.currentEpisode.set(expectedEpisode as Episode);
-
-        this.lastPlayerEpisodeState.set({
-          season: +season,
-          episode: +episode,
-        });
-      } else {
-        this.currentEpisode.set(null);
-      }
-
-      const media$: Observable<MovieDetails | TvShowDetails> =
-        mediaType === "movie"
-          ? this.movieService.getMovieDetails(+id)
-          : this.movieService.getTvShowDetails(+id);
-
-      const sub = media$.subscribe({
-        next: (details) => {
-          this.selectedMediaItem.set(details);
-          if (!details) return;
-
-          if (details.media_type === "tv" && "seasons" in details) {
-            const tvDetails = details as TvShowDetails;
-            if (season && episode) {
-              this.loadEpisodeTrailer(tvDetails, +season, +episode);
-            } else {
-              const firstSeason =
-                tvDetails.seasons.find((s) => s.season_number > 0) ||
-                tvDetails.seasons[0];
-              if (firstSeason) {
-                this.loadEpisodeTrailer(
-                  tvDetails,
-                  firstSeason.season_number,
-                  1,
-                );
-              } else {
-                this.loadMainTrailer(details);
-              }
-            }
-          } else {
-            this.loadMainTrailer(details);
-          }
-        },
-        error: (err) => {
-          console.error("Failed to load media details:", err);
-          this.selectedMediaItem.set(null);
-        },
-      });
-
-      onCleanup(() => sub.unsubscribe());
-    });
-
-    toObservable(this.currentEpisode)
-      .pipe(
-        takeUntilDestroyed(),
-        switchMap((currentEp) => {
-          const media = this.selectedMediaItem();
-          if (!currentEp || !media || media.media_type !== "tv") {
-            return of(null);
-          }
-          return this.fetchNextEpisode(media as TvShowDetails, currentEp);
-        }),
-      )
-      .subscribe((nextEp) => this.nextEpisode.set(nextEp));
+    this.initEffects();
+    this.initNextEpisodeStream();
   }
 
   ngOnInit(): void {
     this.playerMessageRouter.start();
-    this.playerMessageRouter
-      .onMessage()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((routed) => {
-        const media = this.selectedMediaItem();
-        if (!media) return;
-
-        const result = routed.provider
-          ? routed.provider.handleMessage(
-              routed.raw.data ?? routed.raw,
-              this.currentEpisode(),
-            )
-          : undefined;
-
-        const routedEventName =
-          routed.raw?.event ?? (routed.raw?.data && routed.raw?.data.event);
-
-        const msgSeason =
-          result?.episodeChange?.season ??
-          routed.raw?.season ??
-          routed.raw?.data?.season;
-        const msgEpisode =
-          result?.episodeChange?.episode ??
-          routed.raw?.episode ??
-          routed.raw?.data?.episode;
-
-        const currentEp = untracked(() => this.currentEpisode());
-        const isMetadataMismatch =
-          media.media_type === "tv" &&
-          msgSeason !== undefined &&
-          msgEpisode !== undefined &&
-          currentEp &&
-          (msgSeason !== currentEp.season_number ||
-            msgEpisode !== currentEp.episode_number);
-
-        const isStaleTime = result?.playbackProgress
-          ? this.isStalePlaybackEvent(result.playbackProgress.currentTime)
-          : false;
-
-        if (this.isNavigating()) {
-          const isRoutineEvent = [
-            "timeupdate",
-            "time",
-            "seeking",
-            "seeked",
-          ].includes(routedEventName);
-          if (isMetadataMismatch || (isRoutineEvent && isStaleTime)) {
-            return;
-          }
-        }
-
-        if (result?.playerStarted && !this.playerHasStarted()) {
-          this.playerHasStarted.set(true);
-          this.iframeLoading.set(false);
-        }
-
-        if (result?.playbackProgress && !isMetadataMismatch) {
-          if (this.iframeLoading()) {
-            this.iframeLoading.set(false);
-          }
-          this.handlePlaybackProgress(result.playbackProgress, media);
-        }
-
-        if (media.media_type === "tv" && this.playerHasStarted()) {
-          let season: number | undefined;
-          let episode: number | undefined;
-
-          if (result?.episodeChange) {
-            season = result.episodeChange.season;
-            episode = result.episodeChange.episode;
-          } else if (
-            typeof routed.raw?.season === "number" &&
-            typeof routed.raw?.episode === "number"
-          ) {
-            season = routed.raw.season;
-            episode = routed.raw.episode;
-          } else if (
-            typeof routed.raw?.data?.season === "number" &&
-            typeof routed.raw?.data?.episode === "number"
-          ) {
-            season = routed.raw.data.season;
-            episode = routed.raw.data.episode;
-          }
-
-          if (
-            season !== undefined &&
-            episode !== undefined &&
-            !isNaN(season) &&
-            !isNaN(episode)
-          ) {
-            this.syncCurrentEpisodeFromPlayerData(
-              { season, episode },
-              media as TvShowDetails,
-            );
-
-            const currentParams = untracked(() => this.params());
-            const urlNeedsUpdate =
-              currentParams?.season !== season ||
-              currentParams?.episode !== episode;
-
-            if (
-              urlNeedsUpdate &&
-              this.canProcessEpisodeChange(routedEventName)
-            ) {
-              this.handleEpisodeChangeDetection(
-                { season, episode },
-                media as TvShowDetails,
-              );
-            }
-          }
-        }
-      });
+    this.initMessageHandler();
   }
 
   ngOnDestroy(): void {
@@ -647,847 +289,72 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     this.clearAutoNextTimer();
   }
 
-  private lastKnownPlaybackTime = signal(0);
-  currentPlaybackTime = computed(() => this.lastKnownPlaybackTime());
-  private initialStartAt = signal<number | undefined>(undefined);
-  private lastProcessedStartAt = signal<number | undefined>(undefined);
-
-  private readonly PLAYBACK_THRESHOLD_SECONDS = 30;
-  private readonly AUTO_NEXT_PRELOAD_PERCENT = 90;
-  private readonly AUTO_NEXT_COMPLETE_PERCENT = 95;
-  private readonly STALE_EVENT_THRESHOLD_MS = 10000;
-  private readonly STALE_EVENT_TIME_DIFF = 10;
-  private readonly SEEK_RESET_THRESHOLD_PERCENT = 10;
-  private readonly MIN_PLAYBACK_FOR_RESET = 5;
-
-  private getMediaKey(params: any): string {
-    return `${params.mediaType}:${params.id}:${params.season ?? ""}:${params.episode ?? ""}`;
-  }
-
-  private shouldUpdatePlayerUrl(currentUrl: string, newUrl: string): boolean {
-    if (!currentUrl || currentUrl === "about:blank") return true;
-    if (!newUrl) return true;
-    if (currentUrl === newUrl) return false;
-
-    try {
-      const current = new URL(currentUrl);
-      const next = new URL(newUrl);
-
-      // Different providers or paths -> Update
-      if (
-        current.origin !== next.origin ||
-        current.pathname !== next.pathname
-      ) {
-        return true;
-      }
-
-      // Check critical params that define content identity
-      // For seasons/episodes which might be in query for some providers
-      const criticalKeys = ["season", "episode", "id", "tmdb", "imdb"];
-      for (const key of criticalKeys) {
-        if (current.searchParams.get(key) !== next.searchParams.get(key)) {
-          return true;
-        }
-      }
-
-      // If path matches and critical identity params match,
-      // differences in startAt, autoplay, etc. are not worth reloading the iframe for
-      // if it is already playing the correct content.
-      return false;
-    } catch (e) {
-      return true; // Safe fallback
-    }
-  }
-
-  private handlePlaybackProgress(
-    progressData: {
-      currentTime: number;
-      duration: number;
-      progressPercent: number;
-    },
-    media: MovieDetails | TvShowDetails,
-  ): void {
-    const { currentTime, duration, progressPercent } = progressData;
-
-    if (this.isStalePlaybackEvent(currentTime)) {
-      return;
-    }
-
-    if (typeof currentTime === "number" && currentTime > 0) {
-      this.lastKnownPlaybackTime.set(currentTime);
-
-      if (currentTime >= this.MIN_PLAYBACK_FOR_RESET && this.isNavigating()) {
-        const startAt = this.initialStartAt() || 0;
-        const isNearStartAt =
-          Math.abs(currentTime - startAt) < this.STALE_EVENT_TIME_DIFF;
-        const timeSinceNav = Date.now() - this.navigationStartTime;
-        const hasPlayedLongEnough =
-          timeSinceNav > this.STALE_EVENT_THRESHOLD_MS;
-
-        if (isNearStartAt || hasPlayedLongEnough) {
-          this.isNavigating.set(false);
-          this.playerService.unlockAutoNext();
-        }
-      }
-    }
-
-    const episode = this.currentEpisode();
-    const progressId = episode ? episode.id : media.id;
-
-    const now = Date.now();
-    const shouldUpdateProgress = now - this.lastProgressUpdateTime >= 1000;
-
-    const expectedStart = untracked(() => this.initialStartAt());
-    const isFailedResume =
-      typeof expectedStart === "number" &&
-      expectedStart > 60 &&
-      currentTime < expectedStart - 60 &&
-      currentTime < 15;
-
-    if (shouldUpdateProgress && !isFailedResume) {
-      this.lastProgressUpdateTime = now;
-
-      const playbackData: Omit<PlaybackProgress, "updatedAt"> = {
-        progress: progressPercent,
-        timestamp: currentTime,
-        duration: duration,
-      };
-
-      this.playbackProgressService.updateProgress(progressId, playbackData);
-    }
-
-    if (
-      !this.historyAdded() &&
-      (currentTime > this.PLAYBACK_THRESHOLD_SECONDS || progressPercent > 5)
-    ) {
-      this.historyService.addToHistory(
-        media,
-        this.currentEpisode() || undefined,
-      );
-      this.historyAdded.set(true);
-    }
-
-    if (
-      !this.historyService.isPaused() &&
-      progressPercent >= 5 &&
-      progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT
-    ) {
-      const continueWatchingItem: Omit<ContinueWatchingItem, "updatedAt"> = {
-        id: media.id,
-        media: media,
-        episode: episode || undefined,
-      };
-      this.continueWatchingService.addItem(continueWatchingItem);
-    } else if (progressPercent >= this.AUTO_NEXT_COMPLETE_PERCENT) {
-      this.continueWatchingManager.handleCompletePlayback(
-        media,
-        this.currentEpisode(),
-        this.playlist()?.id,
-      );
-    }
-
-    this.currentProgressPercent.set(progressPercent);
-
-    if (
-      media.media_type === "tv" &&
-      !this.recommendedNextEpisodeSent() &&
-      progressPercent >= this.AUTO_NEXT_PRELOAD_PERCENT &&
-      progressPercent < this.AUTO_NEXT_COMPLETE_PERCENT
-    ) {
-      this.recommendedNextEpisodeSent.set(true);
-      this.continueWatchingManager.maybeRecommendNextEpisode(
-        media as TvShowDetails,
-        episode || undefined,
-        this.playlist()?.id,
-      );
-    }
-
-    this.checkAndTriggerAutoNext(progressPercent, currentTime, media);
-  }
-
-  private isStalePlaybackEvent(currentTime: number): boolean {
-    if (this.isNavigating()) {
-      const startAt = this.initialStartAt() || 0;
-      const timeSinceNav = Date.now() - this.navigationStartTime;
-      const isTimeMismatch =
-        Math.abs(currentTime - startAt) > this.STALE_EVENT_TIME_DIFF;
-
-      if (timeSinceNav < this.STALE_EVENT_THRESHOLD_MS && isTimeMismatch) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private startNavigation(): void {
-    this.isNavigating.set(true);
-    this.navigationStartTime = Date.now();
-    this.clearAutoNextTimer();
-    this.autoNextState.set("idle");
-  }
-
-  private checkAndTriggerAutoNext(
-    progressPercent: number,
-    currentTime: number,
-    media: MovieDetails | TvShowDetails,
-  ): void {
-    const provider = this.playerProviderService.getProvider(
-      this.selectedPlayer(),
-    );
-
-    const autoNextEnabled = this.playerService.autoNextEnabled();
-    const playerHasStarted = this.playerHasStarted();
-    const autoPlayNextTriggered = this.autoPlayNextTriggered();
-    const hasNextItem = this.hasNextItem();
-    const threshold = this.playerService.autoNextThreshold();
-    const thresholdMet = progressPercent >= threshold;
-
-    if (
-      this.autoPlayNextTriggered() &&
-      progressPercent > 0 &&
-      currentTime > this.MIN_PLAYBACK_FOR_RESET &&
-      progressPercent < threshold - this.SEEK_RESET_THRESHOLD_PERCENT
-    ) {
-      this.autoPlayNextTriggered.set(false);
-    }
-
-    if (
-      provider?.supportsAutoNext &&
-      autoNextEnabled &&
-      playerHasStarted &&
-      !autoPlayNextTriggered &&
-      hasNextItem &&
-      !this.isNavigating() &&
-      currentTime > this.PLAYBACK_THRESHOLD_SECONDS &&
-      thresholdMet &&
-      this.playerService.tryLockAutoNext()
-    ) {
-      this.autoPlayNextTriggered.set(true);
-      this.startAutoNextCountdown(media);
-    }
-  }
-
-  private handleEpisodeChangeDetection(
-    data: { season: number; episode: number },
-    media: TvShowDetails,
-  ): void {
-    const playerEpisode: PlayerEpisodeState = {
-      season: data.season,
-      episode: data.episode,
-    };
-
-    const currentParams = untracked(() => this.params());
-    const appEpisodeState: PlayerEpisodeState | null =
-      currentParams?.season && currentParams?.episode
-        ? { season: +currentParams.season, episode: +currentParams.episode }
-        : null;
-
-    if (
-      appEpisodeState &&
-      appEpisodeState.season === playerEpisode.season &&
-      appEpisodeState.episode === playerEpisode.episode
-    ) {
-      const lastPlayerState = this.lastPlayerEpisodeState();
-      if (
-        !lastPlayerState ||
-        lastPlayerState.season !== playerEpisode.season ||
-        lastPlayerState.episode !== playerEpisode.episode
-      ) {
-        this.lastPlayerEpisodeState.set(playerEpisode);
-      }
-      const currentEp = this.currentEpisode();
-      if (currentEp && currentEp.id === 0) {
-        this.movieService
-          .getSeasonDetails(media.id, playerEpisode.season)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe((seasonDetails) => {
-            const matching = seasonDetails.episodes.find(
-              (e) => e.episode_number === playerEpisode.episode,
-            );
-            if (matching) {
-              this.currentEpisode.set(matching);
-            }
-          });
-      }
-      return;
-    }
-
-    const lastPlayerState = this.lastPlayerEpisodeState();
-    const hasPlayerChangedEpisode =
-      !lastPlayerState ||
-      lastPlayerState.season !== playerEpisode.season ||
-      lastPlayerState.episode !== playerEpisode.episode;
-
-    if (hasPlayerChangedEpisode) {
-      const isSequentialNext =
-        appEpisodeState &&
-        playerEpisode.season === appEpisodeState.season &&
-        playerEpisode.episode === appEpisodeState.episode + 1;
-
-      const userThreshold = this.playerService.autoNextThreshold();
-      const provider = this.playerProviderService.getProvider(
-        this.selectedPlayer(),
-      );
-
-      if (isSequentialNext && !this.playerService.autoNextEnabled()) {
-        this.lastPlayerEpisodeState.set(playerEpisode);
-        return;
-      }
-
-      if (
-        isSequentialNext &&
-        provider?.supportsAutoNext &&
-        this.playerService.autoNextEnabled() &&
-        userThreshold < 95
-      ) {
-        this.lastPlayerEpisodeState.set(playerEpisode);
-        return;
-      }
-
-      if (!this.playerService.tryLockAutoNext()) {
-        this.lastPlayerEpisodeState.set(playerEpisode);
-        return;
-      }
-
-      this.lastPlayerEpisodeState.set(playerEpisode);
-      this.startNavigation();
-
-      // Prevent iframe reloading since player handled it
-      // Create the target key for the next episode
-      const targetKey = `${media.media_type}:${media.id}:${playerEpisode.season}:${playerEpisode.episode}`;
-      this.skipUpdateForMediaKey.set(targetKey);
-
-      this.navigationService.navigateTo("watch", {
-        mediaType: "tv",
-        id: media.id,
-        season: playerEpisode.season,
-        episode: playerEpisode.episode,
-        playlistId: this.playlist()?.id,
-        autoplay: true,
-      });
-
-      this.movieService
-        .getSeasonDetails(media.id, playerEpisode.season)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe((seasonDetails) => {
-          const newEpisode = seasonDetails.episodes.find(
-            (e) => e.episode_number === playerEpisode.episode,
-          );
-
-          if (newEpisode) {
-            this.currentEpisode.set(newEpisode);
-            this.historyAdded.set(false);
-            this.autoPlayNextTriggered.set(false);
-          }
-        });
-    }
-  }
-
-  private startAutoNextCountdown(media: MovieDetails | TvShowDetails): void {
-    this.autoNextState.set("counting_down");
-    this.autoNextCountdown.set(5);
-
-    this.autoNextTimer = setInterval(() => {
-      const current = this.autoNextCountdown();
-      if (current <= 0) {
-        this.executeAutoNext(media);
-      } else {
-        this.autoNextCountdown.set(current - 1);
-      }
-    }, 1000);
-  }
-
-  toggleNextEpisodeMinimized(): void {
-    this.nextEpisodeMinimized.update((v) => !v);
-  }
-
-  toggleAutoNext(media: MovieDetails | TvShowDetails): void {
-    if (this.autoNextState() === "counting_down") {
-      this.cancelAutoNext();
-    } else {
-      if (this.autoPlayNextTriggered()) {
-        const currentProgress = this.currentProgressPercent();
-        const threshold = this.playerService.autoNextThreshold();
-
-        if (currentProgress >= threshold) {
-          this.startAutoNextCountdown(media);
-        } else {
-          this.autoPlayNextTriggered.set(false);
-          this.playerService.unlockAutoNext();
-        }
-      } else {
-        this.cancelAutoNext();
-      }
-    }
-  }
-
-  private executeAutoNext(media: MovieDetails | TvShowDetails): void {
-    this.clearAutoNextTimer();
-    this.autoNextState.set("idle");
-
-    if (media.media_type === "tv") {
-      this.playNextEpisode(media as TvShowDetails);
-    } else if (media.media_type === "movie") {
-      const didNavigate = this.tryPlayNextPlaylistItem(media as MovieDetails);
-      if (!didNavigate) {
-        this.playerService.unlockAutoNext();
-      }
-    }
-  }
-
-  onNextEpisodeClick(): void {
-    const media = this.selectedMediaItem();
-    if (!media) return;
-
-    if (this.autoNextState() === "counting_down") {
-      this.clearAutoNextTimer();
-    }
-
-    this.playerService.tryLockAutoNext();
-    this.executeAutoNext(media);
-  }
-
-  cancelAutoNext(): void {
-    this.clearAutoNextTimer();
-    this.autoNextState.set("idle");
-    this.autoPlayNextTriggered.set(true);
-    this.playerService.unlockAutoNext();
-  }
-
-  private clearAutoNextTimer(): void {
-    if (this.autoNextTimer) {
-      clearInterval(this.autoNextTimer);
-      this.autoNextTimer = null;
-    }
-  }
-
-  private syncCurrentEpisodeFromPlayerData(
-    data: { season: number; episode: number },
-    media: TvShowDetails,
-  ): void {
-    const currentEp = this.currentEpisode();
-
-    if (
-      currentEp &&
-      currentEp.id > 0 &&
-      currentEp.season_number === data.season &&
-      currentEp.episode_number === data.episode
-    ) {
-      return;
-    }
-
-    if (
-      !currentEp ||
-      currentEp.id === 0 ||
-      currentEp.season_number !== data.season ||
-      currentEp.episode_number !== data.episode
-    ) {
-      this.movieService
-        .getSeasonDetails(media.id, data.season)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe((seasonDetails) => {
-          const matchingEpisode = seasonDetails.episodes.find(
-            (e) => e.episode_number === data.episode,
-          );
-          if (matchingEpisode) {
-            this.currentEpisode.set(matchingEpisode);
-          }
-        });
-    }
-  }
-
-  private canProcessEpisodeChange(eventName?: string): boolean {
-    const nonRoutineEvent =
-      typeof eventName === "string" &&
-      !["timeupdate", "time", "seeking", "seeked"].includes(eventName);
-
-    return (
-      this.playerHasStarted() &&
-      !this.isNavigating() &&
-      (this.lastKnownPlaybackTime() >= 5 || nonRoutineEvent)
-    );
-  }
-
-  private fetchNextEpisode(
-    tvShow: TvShowDetails,
-    currentEp: Episode,
-  ): Observable<Episode | null> {
-    return this.movieService
-      .getSeasonDetails(tvShow.id, currentEp.season_number)
-      .pipe(
-        map((seasonDetails) => {
-          const episodes = seasonDetails.episodes || [];
-          const currentIndex = episodes.findIndex(
-            (e) => e.episode_number === currentEp.episode_number,
-          );
-
-          if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
-            return episodes[currentIndex + 1];
-          }
-          return null;
-        }),
-        switchMap((nextEp) => {
-          if (nextEp) return of(nextEp);
-
-          const currentSeasonIndex = tvShow.seasons.findIndex(
-            (s) => s.season_number === currentEp.season_number,
-          );
-
-          if (currentSeasonIndex > -1) {
-            for (
-              let i = currentSeasonIndex + 1;
-              i < tvShow.seasons.length;
-              i++
-            ) {
-              const nextSeasonObj = tvShow.seasons[i];
-              if (
-                nextSeasonObj &&
-                nextSeasonObj.episode_count > 0 &&
-                nextSeasonObj.season_number > 0
-              ) {
-                return this.movieService
-                  .getSeasonDetails(tvShow.id, nextSeasonObj.season_number)
-                  .pipe(
-                    map((nextSeasonDetails) => {
-                      return nextSeasonDetails.episodes.length > 0
-                        ? nextSeasonDetails.episodes[0]
-                        : null;
-                    }),
-                  );
-              }
-            }
-          }
-          return of(null);
-        }),
-      );
-  }
-
-  private playNextEpisode(tvShow: TvShowDetails): void {
-    const currentEp = this.currentEpisode();
-    if (!currentEp) {
-      this.playerService.unlockAutoNext();
-      return;
-    }
-
-    this.movieService
-      .getSeasonDetails(tvShow.id, currentEp.season_number)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (seasonDetails) => {
-          const episodes = seasonDetails.episodes || [];
-          const currentIndex = episodes.findIndex(
-            (e) => e.episode_number === currentEp.episode_number,
-          );
-
-          if (currentIndex === -1) {
-            console.warn(
-              "Could not find current episode in season details. Auto-play cancelled.",
-            );
-            this.playerService.unlockAutoNext();
-            return;
-          }
-
-          if (currentIndex < episodes.length - 1) {
-            const nextEpisode = episodes[currentIndex + 1];
-            this.navigateToEpisode(
-              tvShow.id,
-              currentEp.season_number,
-              nextEpisode.episode_number,
-            );
-          } else {
-            const currentSeasonIndex = tvShow.seasons.findIndex(
-              (s) => s.season_number === currentEp.season_number,
-            );
-
-            if (currentSeasonIndex > -1) {
-              let foundNextSeason = false;
-              for (
-                let i = currentSeasonIndex + 1;
-                i < tvShow.seasons.length;
-                i++
-              ) {
-                const nextSeasonObj = tvShow.seasons[i];
-                if (
-                  nextSeasonObj &&
-                  nextSeasonObj.episode_count > 0 &&
-                  nextSeasonObj.season_number > 0
-                ) {
-                  this.navigateToEpisode(
-                    tvShow.id,
-                    nextSeasonObj.season_number,
-                    1,
-                  );
-                  foundNextSeason = true;
-                  return;
-                }
-              }
-
-              if (!foundNextSeason) {
-                this.tryPlayNextAfterSeriesEnd(tvShow);
-              }
-            } else {
-              this.tryPlayNextAfterSeriesEnd(tvShow);
-            }
-          }
-        },
-        error: (err) => {
-          console.error("Failed to fetch season details for auto-next:", err);
-          this.playerService.unlockAutoNext();
-        },
-      });
-  }
-
-  private tryPlayNextAfterSeriesEnd(tvShow: TvShowDetails): void {
-    const playlistId = this.playlist()?.id;
-    if (playlistId) {
-      const nextItem = this.playlistService.getNextItemFromPlaylist(
-        playlistId,
-        tvShow.id,
-      );
-      if (nextItem) {
-        this.navigationService.navigateTo("watch", {
-          mediaType: nextItem.media_type,
-          id: nextItem.id,
-          playlistId: playlistId,
-          autoplay: true,
-        });
-        this.iframeLoading.set(true);
-        return;
-      }
-    }
-    this.playerService.unlockAutoNext();
-  }
-
-  private tryPlayNextPlaylistItem(
-    media: MovieDetails | TvShowDetails,
-  ): boolean {
-    const playlistId = this.playlist()?.id;
-    if (!playlistId) return false;
-    const nextItem = this.playlistService.getNextItemFromPlaylist(
-      playlistId,
-      media.id,
-    );
-    if (!nextItem) return false;
-
-    this.navigationService.navigateTo("watch", {
-      mediaType: nextItem.media_type,
-      id: nextItem.id,
-      playlistId: playlistId,
-      autoplay: true,
-    });
-    this.iframeLoading.set(true);
-
-    return true;
-  }
-
-  private navigateToEpisode(
-    showId: number,
-    season: number,
-    episode: number,
-  ): void {
-    // Clear any skip key since we want to force this navigation
-    this.skipUpdateForMediaKey.set(null);
-    this.startNavigation();
-
-    this.navigationService.navigateTo("watch", {
-      mediaType: "tv",
-      id: showId,
-      season: season,
-      episode: episode,
-      playlistId: this.playlist()?.id,
-      autoplay: true,
-    });
-  }
-
-  private readonly VIDSRC_MIRRORS = [
-    "https://v3.vidsrc.cc",
-    "https://vidsrc.xyz",
-    "https://vidsrc.me",
-    "https://vidsrc.to",
-    "https://vidsrc.in",
-    "https://vidsrc.net",
-    "https://vidsrc.pm",
-    "https://vidsrc.pro",
-    "https://vidsrc.stream",
-    "https://vidsrc.online",
-    "https://v3.embed.su",
-    "https://embed.su",
-  ];
-
-  private loadMainTrailer(media: MediaType): void {
-    this.loadingTrailer.set(true);
-
-    const videoRequest$ = isMovie(media)
-      ? this.movieService.getMovieVideos(media.id)
-      : this.movieService.getTvShowVideos(media.id);
-
-    videoRequest$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (response) => {
-        const trailer = response.results.find(
-          (video) => video.site === "YouTube" && video.type === "Trailer",
-        );
-        this.videoDetails.set(trailer ?? null);
-        this.loadingTrailer.set(false);
-      },
-      error: () => this.loadingTrailer.set(false),
-    });
-  }
-
-  private loadEpisodeTrailer(
-    tvShow: TvShowDetails,
-    seasonNumber: number,
-    episodeNumber: number,
-  ): void {
-    this.loadingTrailer.set(true);
-
-    this.movieService
-      .getSeasonDetails(tvShow.id, seasonNumber)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((seasonDetails) => {
-        const episode = seasonDetails.episodes.find(
-          (e) => e.episode_number === episodeNumber,
-        );
-
-        this.currentEpisode.set(episode || null);
-
-        if (episode) {
-          this.movieService
-            .getEpisodeVideos(tvShow.id, seasonNumber, episode.episode_number)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-              next: (response) => {
-                const trailer =
-                  response.results.find(
-                    (v) => v.site === "YouTube" && v.type === "Trailer",
-                  ) ?? response.results[0];
-                this.videoDetails.set(trailer ?? null);
-                this.loadingTrailer.set(false);
-              },
-              error: () => this.loadingTrailer.set(false),
-            });
-        } else {
-          this.loadingTrailer.set(false);
-        }
-      });
-  }
-
-  private removeStartAtFromUrl(): void {
-    const media = this.selectedMediaItem();
-    if (!media) return;
-
-    const currentParams = this.params();
-    if (!currentParams?.startAt) return;
-
-    const cleanParams: any = {
-      mediaType: media.media_type,
-      id: media.id,
-      playlistId: currentParams.playlistId,
-    };
-
-    if (
-      media.media_type === "tv" &&
-      currentParams.season &&
-      currentParams.episode
-    ) {
-      cleanParams.season = currentParams.season;
-      cleanParams.episode = currentParams.episode;
-    }
-
-    const path = this.navigationService.getPath("watch", cleanParams);
-    if (typeof window !== "undefined") {
-      try {
-        window.history.replaceState({}, "", path);
-      } catch {
-        // Ignore SecurityError in sandboxed environments
-      }
-    }
-  }
-
+  // ============ Template Event Handlers ============
   onEpisodeSelected(data: { episode: Episode; seasonNumber: number }): void {
     const tvShow = this.selectedMediaItem();
     if (tvShow?.media_type !== "tv") return;
 
-    this.skipUpdateForMediaKey.set(null);
-    this.startNavigation();
-
-    this.navigationService.navigateTo("watch", {
-      mediaType: "tv",
-      id: tvShow.id,
-      season: data.seasonNumber,
-      episode: data.episode.episode_number,
-      playlistId: this.playlist()?.id,
-    });
+    this.navigateToMedia(
+      "tv",
+      tvShow.id,
+      data.seasonNumber,
+      data.episode.episode_number,
+    );
   }
 
   onSelectMedia(media: MediaType): void {
-    this.skipUpdateForMediaKey.set(null);
-    this.startNavigation();
+    this.navigateToMedia(
+      media.media_type,
+      media.id,
+      undefined,
+      undefined,
+      true,
+    );
+  }
+
+  onRefreshPlayer(): void {
+    if (!this.playerUrl()) return;
+
+    this.iframeLoading.set(true);
+    this.reloading.set(true);
+    this.constructedUrl.set("");
+
+    const media = this.selectedMediaItem();
+    if (!media) return;
+
+    const p = this.params();
+    const currentTime = this.playback().currentTime;
 
     this.navigationService.navigateTo("watch", {
       mediaType: media.media_type,
       id: media.id,
+      season: p?.season,
+      episode: p?.episode,
       playlistId: this.playlist()?.id,
+      startAt: currentTime > 5 ? currentTime : 0,
       autoplay: true,
     });
-  }
 
-  onRefreshPlayer(): void {
-    const currentUrl = this.playerUrl();
-    if (currentUrl) {
-      this.iframeLoading.set(true);
-      this.reloading.set(true);
-      this.constructedPlayerUrl.set("");
-
-      const media = this.selectedMediaItem();
-      if (!media) return;
-
-      const currentParams = this.params();
-      const currentTime = this.lastKnownPlaybackTime();
-
-      this.navigationService.navigateTo("watch", {
-        mediaType: media.media_type,
-        id: media.id,
-        season: currentParams?.season,
-        episode: currentParams?.episode,
-        playlistId: this.playlist()?.id,
-        startAt: currentTime > 5 ? currentTime : 0,
-        autoplay: true,
-      });
-
-      this.startNavigation();
-
-      setTimeout(() => {
-        if (this.reloading()) {
-          this.reloading.set(false);
-          this.iframeLoading.set(false);
-          if (this.constructedPlayerUrl() === "") {
-            const url = this.playerUrl();
-            if (url) this.constructedPlayerUrl.set(url);
-          }
-        }
-      }, 300);
-    }
+    this.startNavigation();
+    setTimeout(() => this.finalizeRefresh(), 300);
   }
 
   onClosePlaylist(): void {
     const media = this.selectedMediaItem();
     if (!media) return;
 
-    const currentParams = this.params();
-
+    const p = this.params();
     this.navigationService.navigateTo("watch", {
       mediaType: media.media_type,
       id: media.id,
-      season: currentParams?.season,
-      episode: currentParams?.episode,
+      season: p?.season,
+      episode: p?.episode,
     });
   }
 
   onPlayerIframeLoad(): void {
     this.iframeLoading.set(false);
-    setTimeout(() => {
-      this.iframeLoading.set(false);
-    }, 4000);
+    setTimeout(() => this.iframeLoading.set(false), 4000);
   }
 
   onMaximizePlayer(): void {
@@ -1499,17 +366,997 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   onMaximizeBackdropClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    if (target.classList.contains("fixed")) {
+    if ((event.target as HTMLElement).classList.contains("fixed")) {
       this.closeMaximize();
     }
   }
 
-  @HostListener("document:keydown.escape", ["$event"])
-  onEscapeKey(event: KeyboardEvent): void {
-    if (this.isMaximized()) {
-      this.closeMaximize();
-      event.preventDefault();
+  @HostListener("document:keydown.escape")
+  onEscapeKey(): void {
+    if (this.isMaximized()) this.closeMaximize();
+  }
+
+  toggleNextEpisodeMinimized(): void {
+    this.patchAutoNext({ minimized: !this.autoNext().minimized });
+  }
+
+  toggleAutoNext(media: MovieDetails | TvShowDetails): void {
+    const state = this.autoNext();
+
+    if (state.phase === "counting_down") {
+      this.cancelAutoNext();
+    } else if (state.triggered) {
+      const threshold = this.playerService.autoNextThreshold();
+      if (this.playback().progressPercent >= threshold) {
+        this.startAutoNextCountdown(media);
+      } else {
+        this.patchAutoNext({ triggered: false });
+        this.playerService.unlockAutoNext();
+      }
+    } else {
+      this.cancelAutoNext();
+    }
+  }
+
+  onNextEpisodeClick(): void {
+    const media = this.selectedMediaItem();
+    if (!media) return;
+
+    if (this.autoNext().phase === "counting_down") {
+      this.clearAutoNextTimer();
+    }
+
+    this.playerService.tryLockAutoNext();
+    this.executeAutoNext(media);
+  }
+
+  cancelAutoNext(): void {
+    this.clearAutoNextTimer();
+    this.patchAutoNext({ phase: "idle", triggered: true });
+    this.playerService.unlockAutoNext();
+  }
+
+  // ============ State Helpers ============
+  private patchNavState(patch: Partial<NavigationState>): void {
+    this.navState.update((s) => ({ ...s, ...patch }));
+  }
+
+  private patchPlayback(patch: Partial<PlaybackState>): void {
+    this.playback.update((s) => ({ ...s, ...patch }));
+  }
+
+  private patchAutoNext(patch: Partial<AutoNextState>): void {
+    this.autoNext.update((s) => ({ ...s, ...patch }));
+  }
+
+  private startNavigation(): void {
+    this.patchNavState({ active: true, startTime: Date.now() });
+    this.clearAutoNextTimer();
+    this.patchAutoNext({ phase: "idle" });
+  }
+
+  private getMediaKey(p: any): string {
+    return `${p?.mediaType}:${p?.id}:${p?.season ?? ""}:${p?.episode ?? ""}`;
+  }
+
+  // ============ Initialization ============
+  private initEffects(): void {
+    // URL update effect
+    effect(() => {
+      const url = this.playerUrl();
+      if (this.reloading() || !url) return;
+
+      const current = this.constructedUrl();
+      const key = this.getMediaKey(untracked(() => this.params()));
+      const skipKey = this.navState().skipMediaKey;
+
+      if (skipKey === key) return;
+      if (skipKey) this.patchNavState({ skipMediaKey: null });
+
+      if (this.shouldUpdateUrl(current, url)) {
+        this.iframeLoading.set(true);
+        this.constructedUrl.set(url);
+      }
+    });
+
+    // StartAt cleanup effect
+    effect(() => {
+      const startAt = this.initialStartAt();
+      const { currentTime, playerStarted } = this.playback();
+
+      if (
+        typeof startAt === "number" &&
+        startAt > 60 &&
+        currentTime >= startAt - 60
+      ) {
+        this.clearStartAt();
+      } else if (playerStarted || currentTime > 5) {
+        this.clearStartAt();
+      }
+    });
+
+    // Main params effect
+    effect((onCleanup) => {
+      const p = this.params();
+      if (!p) {
+        this.selectedMediaItem.set(null);
+        return;
+      }
+
+      const { mediaType, id, season, episode, autoplay } = p;
+      this.autoplay.set(!!autoplay);
+
+      const mediaKey = this.getMediaKey(p);
+      const player = this.selectedPlayer();
+
+      const isMediaChange = untracked(() => this.prevMediaKey()) !== mediaKey;
+      const isPlayerChange =
+        untracked(() => this.prevPlayer()) !== null &&
+        untracked(() => this.prevPlayer()) !== player;
+
+      if (isMediaChange || isPlayerChange) {
+        this.handleStateTransition(
+          p,
+          mediaKey,
+          player,
+          isMediaChange,
+          isPlayerChange,
+        );
+      } else if (p.startAt) {
+        this.handleStartAtUpdate(Number(p.startAt));
+      }
+
+      this.prepareForLoad(mediaKey, isMediaChange || isPlayerChange);
+
+      if (!id || !mediaType) {
+        this.selectedMediaItem.set(null);
+        return;
+      }
+
+      this.initEpisodeState(mediaType, season, episode);
+      const sub = this.loadMedia(mediaType, +id, season, episode);
+      onCleanup(() => sub.unsubscribe());
+    });
+  }
+
+  private initNextEpisodeStream(): void {
+    toObservable(this.currentEpisode)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((ep) => {
+          const media = this.selectedMediaItem();
+          return ep && isTvShow(media)
+            ? this.fetchNextEpisode(media, ep)
+            : of(null);
+        }),
+      )
+      .subscribe((next) => this.nextEpisode.set(next));
+  }
+
+  private initMessageHandler(): void {
+    this.playerMessageRouter
+      .onMessage()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((routed) => this.processMessage(routed));
+  }
+
+  // ============ State Transition Handlers ============
+  private handleStateTransition(
+    p: any,
+    mediaKey: string,
+    player: string,
+    isMediaChange: boolean,
+    isPlayerChange: boolean,
+  ): void {
+    // Preserve playback time on player switch
+    if (isPlayerChange && !isMediaChange) {
+      const time = untracked(() => this.playback().currentTime);
+      if (time > 5) {
+        this.initialStartAt.set(time);
+        this.lastProcessedStartAt.set(time);
+      }
+    }
+
+    this.resetPlaybackState();
+    this.prevMediaKey.set(mediaKey);
+    this.prevPlayer.set(player);
+    this.startNavigation();
+
+    if (isMediaChange) {
+      const startAt = p?.startAt ? Number(p.startAt) : undefined;
+      this.initialStartAt.set(startAt);
+      this.lastProcessedStartAt.set(startAt);
+    }
+  }
+
+  private handleStartAtUpdate(startAt: number): boolean {
+    if (untracked(() => this.lastProcessedStartAt()) === startAt) return false;
+
+    this.initialStartAt.set(startAt);
+    this.lastProcessedStartAt.set(startAt);
+    this.patchPlayback({ playerStarted: false, currentTime: 0 });
+    this.startNavigation();
+    return true;
+  }
+
+  private resetPlaybackState(): void {
+    this.patchPlayback({
+      playerStarted: false,
+      currentTime: 0,
+      progressPercent: 0,
+      lastUpdateTime: 0,
+      historyAdded: false,
+    });
+    this.lastPlayerEpisode.set(null);
+    this.patchAutoNext({
+      phase: "idle",
+      triggered: false,
+      recommendedSent: false,
+    });
+    this.clearAutoNextTimer();
+    this.playerService.unlockAutoNext();
+  }
+
+  private prepareForLoad(mediaKey: string, shouldReload: boolean): void {
+    const skipKey = this.navState().skipMediaKey;
+    if (skipKey !== mediaKey && shouldReload) {
+      this.triggerReload();
+    }
+    this.videoDetails.set(null);
+    this.patchPlayback({ historyAdded: false });
+  }
+
+  private triggerReload(): void {
+    this.reloading.set(true);
+    this.constructedUrl.set("");
+    setTimeout(() => this.reloading.set(false), 100);
+  }
+
+  private initEpisodeState(
+    mediaType: string,
+    season?: number,
+    episode?: number,
+  ): void {
+    if (mediaType === "tv" && season && episode) {
+      this.currentEpisode.set({
+        season_number: +season,
+        episode_number: +episode,
+        id: 0,
+      } as Episode);
+      this.lastPlayerEpisode.set({ season: +season, episode: +episode });
+    } else {
+      this.currentEpisode.set(null);
+    }
+  }
+
+  // ============ Media Loading ============
+  private loadMedia(
+    mediaType: string,
+    id: number,
+    season?: number,
+    episode?: number,
+  ) {
+    const media$: Observable<MovieDetails | TvShowDetails> =
+      mediaType === "movie"
+        ? this.movieService.getMovieDetails(id)
+        : this.movieService.getTvShowDetails(id);
+
+    return media$.subscribe({
+      next: (details) => {
+        this.selectedMediaItem.set(details);
+        if (!details) return;
+
+        if (isTvShow(details)) {
+          this.loadTvContent(details, season, episode);
+        } else {
+          this.loadTrailer(details);
+        }
+      },
+      error: () => this.selectedMediaItem.set(null),
+    });
+  }
+
+  private loadTvContent(
+    tv: TvShowDetails,
+    season?: number,
+    episode?: number,
+  ): void {
+    if (season && episode) {
+      this.loadEpisodeTrailer(tv, +season, +episode);
+    } else {
+      const first =
+        tv.seasons.find((s) => s.season_number > 0) ?? tv.seasons[0];
+      first
+        ? this.loadEpisodeTrailer(tv, first.season_number, 1)
+        : this.loadTrailer(tv);
+    }
+  }
+
+  private loadTrailer(media: MediaType): void {
+    this.loadingTrailer.set(true);
+
+    const videos$ = isMovie(media)
+      ? this.movieService.getMovieVideos(media.id)
+      : this.movieService.getTvShowVideos(media.id);
+
+    videos$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (r) => {
+        const trailer = r.results.find(
+          (v) => v.site === "YouTube" && v.type === "Trailer",
+        );
+        this.videoDetails.set(trailer ?? null);
+        this.loadingTrailer.set(false);
+      },
+      error: () => this.loadingTrailer.set(false),
+    });
+  }
+
+  private loadEpisodeTrailer(
+    tv: TvShowDetails,
+    season: number,
+    episode: number,
+  ): void {
+    this.loadingTrailer.set(true);
+
+    this.movieService
+      .getSeasonDetails(tv.id, season)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((seasonData) => {
+        const ep = seasonData.episodes.find(
+          (e) => e.episode_number === episode,
+        );
+        this.currentEpisode.set(ep ?? null);
+
+        if (!ep) {
+          this.loadingTrailer.set(false);
+          return;
+        }
+
+        this.movieService
+          .getEpisodeVideos(tv.id, season, ep.episode_number)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: (r) => {
+              const trailer =
+                r.results.find(
+                  (v) => v.site === "YouTube" && v.type === "Trailer",
+                ) ?? r.results[0];
+              this.videoDetails.set(trailer ?? null);
+              this.loadingTrailer.set(false);
+            },
+            error: () => this.loadingTrailer.set(false),
+          });
+      });
+  }
+
+  // ============ Message Processing ============
+  private processMessage(routed: any): void {
+    const media = this.selectedMediaItem();
+    if (!media) return;
+
+    const result = routed.provider?.handleMessage(
+      routed.raw.data ?? routed.raw,
+      this.currentEpisode(),
+    );
+    const eventName = routed.raw?.event ?? routed.raw?.data?.event;
+
+    if (this.shouldIgnoreMessage(result, eventName, media)) return;
+
+    if (result?.playerStarted && !this.playback().playerStarted) {
+      this.patchPlayback({ playerStarted: true });
+      this.iframeLoading.set(false);
+    }
+
+    if (result?.playbackProgress && !this.isMetadataMismatch(result, media)) {
+      this.iframeLoading.set(false);
+      this.processPlaybackProgress(result.playbackProgress, media);
+    }
+
+    if (isTvShow(media) && this.playback().playerStarted) {
+      this.processEpisodeData(routed, result, media, eventName);
+    }
+  }
+
+  private shouldIgnoreMessage(
+    result: any,
+    eventName: string,
+    media: MovieDetails | TvShowDetails,
+  ): boolean {
+    if (!this.navState().active) return false;
+
+    const isRoutine = ["timeupdate", "time", "seeking", "seeked"].includes(
+      eventName,
+    );
+    const isStale =
+      result?.playbackProgress &&
+      this.isStaleEvent(result.playbackProgress.currentTime);
+    const isMismatch = this.isMetadataMismatch(result, media);
+
+    return isMismatch || (isRoutine && isStale);
+  }
+
+  private isMetadataMismatch(
+    result: any,
+    media: MovieDetails | TvShowDetails,
+  ): boolean {
+    if (!isTvShow(media) || !result?.episodeChange) return false;
+
+    const ep = untracked(() => this.currentEpisode());
+    return (
+      ep &&
+      (result.episodeChange.season !== ep.season_number ||
+        result.episodeChange.episode !== ep.episode_number)
+    );
+  }
+
+  // ============ Playback Progress ============
+  private processPlaybackProgress(
+    data: { currentTime: number; duration: number; progressPercent: number },
+    media: MovieDetails | TvShowDetails,
+  ): void {
+    const { currentTime, duration, progressPercent } = data;
+    if (!duration || duration <= 0 || !isFinite(progressPercent)) return;
+    if (this.isStaleEvent(currentTime)) return;
+
+    const now = Date.now();
+    const shouldUpdate =
+      now - this.playback().lastUpdateTime >= THRESHOLDS.SIGNAL_UPDATE_MS;
+
+    if (shouldUpdate || progressPercent >= 100) {
+      this.patchPlayback({ currentTime, progressPercent, lastUpdateTime: now });
+      this.checkNavigationUnlock(currentTime, now);
+    }
+
+    const episode = this.currentEpisode();
+    const progressId = episode?.id ?? media.id;
+
+    if (!this.isFailedResume(currentTime) && shouldUpdate) {
+      this.playbackProgressService.updateProgress(progressId, {
+        progress: progressPercent,
+        timestamp: currentTime,
+        duration,
+      });
+    }
+
+    this.updateWatchingState(media, currentTime, progressPercent, episode);
+    this.checkAutoNextTrigger(progressPercent, currentTime, media);
+  }
+
+  private updateWatchingState(
+    media: MovieDetails | TvShowDetails,
+    currentTime: number,
+    progressPercent: number,
+    episode: Episode | null,
+  ): void {
+    // Add to history
+    if (
+      !this.playback().historyAdded &&
+      (currentTime > THRESHOLDS.PLAYBACK_SECONDS || progressPercent > 5)
+    ) {
+      this.historyService.addToHistory(media, episode ?? undefined);
+      this.patchPlayback({ historyAdded: true });
+    }
+
+    // Continue watching
+    if (!this.historyService.isPaused()) {
+      if (
+        progressPercent >= 5 &&
+        progressPercent < THRESHOLDS.AUTO_NEXT_COMPLETE
+      ) {
+        this.continueWatchingService.addItem({
+          id: media.id,
+          media,
+          episode: episode ?? undefined,
+        });
+      } else if (progressPercent >= THRESHOLDS.AUTO_NEXT_COMPLETE) {
+        this.continueWatchingManager.handleCompletePlayback(
+          media,
+          episode,
+          this.playlist()?.id,
+        );
+      }
+    }
+
+    // Recommend next
+    if (
+      isTvShow(media) &&
+      !this.autoNext().recommendedSent &&
+      progressPercent >= THRESHOLDS.AUTO_NEXT_PRELOAD &&
+      progressPercent < THRESHOLDS.AUTO_NEXT_COMPLETE
+    ) {
+      this.patchAutoNext({ recommendedSent: true });
+      this.continueWatchingManager.maybeRecommendNextEpisode(
+        media,
+        episode ?? undefined,
+        this.playlist()?.id,
+      );
+    }
+  }
+
+  private checkNavigationUnlock(currentTime: number, now: number): void {
+    if (currentTime < THRESHOLDS.MIN_PLAYBACK_RESET || !this.navState().active)
+      return;
+
+    const startAt = this.initialStartAt() ?? 0;
+    const nearStart =
+      Math.abs(currentTime - startAt) < THRESHOLDS.STALE_TIME_DIFF;
+    const longEnough =
+      now - this.navState().startTime > THRESHOLDS.STALE_EVENT_MS;
+
+    if (nearStart || longEnough) {
+      this.patchNavState({ active: false });
+      this.playerService.unlockAutoNext();
+    }
+  }
+
+  private isStaleEvent(currentTime: number): boolean {
+    if (!this.navState().active) return false;
+
+    const startAt = this.initialStartAt() ?? 0;
+    const timeSinceNav = Date.now() - this.navState().startTime;
+
+    return (
+      timeSinceNav < THRESHOLDS.STALE_EVENT_MS &&
+      Math.abs(currentTime - startAt) > THRESHOLDS.STALE_TIME_DIFF
+    );
+  }
+
+  private isFailedResume(currentTime: number): boolean {
+    const startAt = untracked(() => this.initialStartAt());
+    return (
+      typeof startAt === "number" &&
+      startAt > 60 &&
+      currentTime < startAt - 60 &&
+      currentTime < 15
+    );
+  }
+
+  // ============ Auto Next ============
+  private checkAutoNextTrigger(
+    progressPercent: number,
+    currentTime: number,
+    media: MovieDetails | TvShowDetails,
+  ): void {
+    const threshold = this.playerService.autoNextThreshold();
+    const state = this.autoNext();
+
+    // Reset on seek back
+    if (
+      state.triggered &&
+      currentTime > THRESHOLDS.MIN_PLAYBACK_RESET &&
+      progressPercent < threshold - THRESHOLDS.SEEK_RESET_PERCENT
+    ) {
+      this.patchAutoNext({ triggered: false });
+    }
+
+    const provider = this.playerProviderService.getProvider(
+      this.selectedPlayer(),
+    );
+    const canTrigger =
+      provider?.supportsAutoNext &&
+      this.playerService.autoNextEnabled() &&
+      this.playback().playerStarted &&
+      !state.triggered &&
+      this.hasNextItem() &&
+      !this.navState().active &&
+      currentTime > THRESHOLDS.PLAYBACK_SECONDS &&
+      progressPercent >= threshold &&
+      this.playerService.tryLockAutoNext();
+
+    if (canTrigger) {
+      this.patchAutoNext({ triggered: true });
+      this.startAutoNextCountdown(media);
+    }
+  }
+
+  private startAutoNextCountdown(media: MovieDetails | TvShowDetails): void {
+    this.patchAutoNext({
+      phase: "counting_down",
+      countdown: THRESHOLDS.AUTO_NEXT_COUNTDOWN,
+    });
+
+    this.autoNextTimer = setInterval(() => {
+      const count = this.autoNext().countdown;
+      if (count <= 0) {
+        this.executeAutoNext(media);
+      } else {
+        this.patchAutoNext({ countdown: count - 1 });
+      }
+    }, 1000);
+  }
+
+  private executeAutoNext(media: MovieDetails | TvShowDetails): void {
+    this.clearAutoNextTimer();
+    this.patchAutoNext({ phase: "idle" });
+
+    if (isTvShow(media)) {
+      this.playNextEpisode(media);
+    } else if (!this.tryPlayNextPlaylistItem(media)) {
+      this.playerService.unlockAutoNext();
+    }
+  }
+
+  private clearAutoNextTimer(): void {
+    if (this.autoNextTimer) {
+      clearInterval(this.autoNextTimer);
+      this.autoNextTimer = null;
+    }
+  }
+
+  // ============ Episode Handling ============
+  private processEpisodeData(
+    routed: any,
+    result: any,
+    media: TvShowDetails,
+    eventName: string,
+  ): void {
+    const season =
+      result?.episodeChange?.season ??
+      routed.raw?.season ??
+      routed.raw?.data?.season;
+    const episode =
+      result?.episodeChange?.episode ??
+      routed.raw?.episode ??
+      routed.raw?.data?.episode;
+
+    if (
+      season === undefined ||
+      episode === undefined ||
+      isNaN(season) ||
+      isNaN(episode)
+    )
+      return;
+
+    this.syncEpisodeFromPlayer({ season, episode }, media);
+
+    const params = untracked(() => this.params());
+    if (
+      (params?.season !== season || params?.episode !== episode) &&
+      this.canProcessEpisodeChange(eventName)
+    ) {
+      this.handleEpisodeChange({ season, episode }, media);
+    }
+  }
+
+  private syncEpisodeFromPlayer(
+    data: EpisodeState,
+    media: TvShowDetails,
+  ): void {
+    const current = this.currentEpisode();
+    if (
+      current?.id &&
+      current.season_number === data.season &&
+      current.episode_number === data.episode
+    ) {
+      return;
+    }
+
+    this.movieService
+      .getSeasonDetails(media.id, data.season)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((season) => {
+        const ep = season.episodes.find(
+          (e) => e.episode_number === data.episode,
+        );
+        if (ep) this.currentEpisode.set(ep);
+      });
+  }
+
+  private handleEpisodeChange(data: EpisodeState, media: TvShowDetails): void {
+    const params = untracked(() => this.params());
+    const appState =
+      params?.season && params?.episode
+        ? { season: +params.season, episode: +params.episode }
+        : null;
+
+    // Already synced
+    if (appState?.season === data.season && appState?.episode === data.episode)
+      return;
+
+    const last = this.lastPlayerEpisode();
+    if (last?.season === data.season && last?.episode === data.episode) return;
+
+    const isSequential =
+      appState &&
+      data.season === appState.season &&
+      data.episode === appState.episode + 1;
+
+    const provider = this.playerProviderService.getProvider(
+      this.selectedPlayer(),
+    );
+
+    // Skip if player handles auto-next
+    if (
+      isSequential &&
+      provider?.supportsAutoNext &&
+      this.playerService.autoNextEnabled() &&
+      this.playerService.autoNextThreshold() < 95
+    ) {
+      this.lastPlayerEpisode.set(data);
+      return;
+    }
+
+    if (!this.playerService.tryLockAutoNext()) {
+      this.lastPlayerEpisode.set(data);
+      return;
+    }
+
+    this.lastPlayerEpisode.set(data);
+    this.startNavigation();
+
+    const targetKey = `${media.media_type}:${media.id}:${data.season}:${data.episode}`;
+    this.patchNavState({ skipMediaKey: targetKey });
+
+    this.navigationService.navigateTo("watch", {
+      mediaType: "tv",
+      id: media.id,
+      season: data.season,
+      episode: data.episode,
+      playlistId: this.playlist()?.id,
+      autoplay: true,
+    });
+
+    this.fetchEpisode(media.id, data.season, data.episode);
+  }
+
+  private canProcessEpisodeChange(eventName?: string): boolean {
+    const nonRoutine =
+      eventName &&
+      !["timeupdate", "time", "seeking", "seeked"].includes(eventName);
+    return (
+      this.playback().playerStarted &&
+      !this.navState().active &&
+      (this.playback().currentTime >= 5 || !!nonRoutine)
+    );
+  }
+
+  private fetchEpisode(showId: number, season: number, episode: number): void {
+    this.movieService
+      .getSeasonDetails(showId, season)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((s) => {
+        const ep = s.episodes.find((e) => e.episode_number === episode);
+        if (ep) {
+          this.currentEpisode.set(ep);
+          this.patchPlayback({ historyAdded: false });
+          this.patchAutoNext({ triggered: false });
+        }
+      });
+  }
+
+  private fetchNextEpisode(
+    tv: TvShowDetails,
+    current: Episode,
+  ): Observable<Episode | null> {
+    return this.movieService
+      .getSeasonDetails(tv.id, current.season_number)
+      .pipe(
+        map((s) => {
+          const idx = s.episodes.findIndex(
+            (e) => e.episode_number === current.episode_number,
+          );
+          return idx >= 0 && idx < s.episodes.length - 1
+            ? s.episodes[idx + 1]
+            : null;
+        }),
+        switchMap((next) => {
+          if (next) return of(next);
+
+          const seasonIdx = tv.seasons.findIndex(
+            (s) => s.season_number === current.season_number,
+          );
+          for (let i = seasonIdx + 1; i < tv.seasons.length; i++) {
+            const nextSeason = tv.seasons[i];
+            if (nextSeason?.episode_count > 0 && nextSeason.season_number > 0) {
+              return this.movieService
+                .getSeasonDetails(tv.id, nextSeason.season_number)
+                .pipe(map((s) => s.episodes[0] ?? null));
+            }
+          }
+          return of(null);
+        }),
+      );
+  }
+
+  // ============ Navigation ============
+  private navigateToMedia(
+    type: string,
+    id: number,
+    season?: number,
+    episode?: number,
+    autoplay = false,
+  ): void {
+    this.patchNavState({ skipMediaKey: null });
+    this.startNavigation();
+
+    this.navigationService.navigateTo("watch", {
+      mediaType: type,
+      id,
+      season,
+      episode,
+      playlistId: this.playlist()?.id,
+      autoplay: autoplay || undefined,
+    });
+  }
+
+  private playNextEpisode(tv: TvShowDetails): void {
+    const current = this.currentEpisode();
+    if (!current) {
+      this.playerService.unlockAutoNext();
+      return;
+    }
+
+    this.movieService
+      .getSeasonDetails(tv.id, current.season_number)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (season) => {
+          const episodes = season.episodes ?? [];
+          const idx = episodes.findIndex(
+            (e) => e.episode_number === current.episode_number,
+          );
+
+          if (idx < 0) {
+            this.playerService.unlockAutoNext();
+            return;
+          }
+
+          if (idx < episodes.length - 1) {
+            this.navigateToMedia(
+              "tv",
+              tv.id,
+              current.season_number,
+              episodes[idx + 1].episode_number,
+              true,
+            );
+          } else {
+            this.tryNextSeason(tv, current);
+          }
+        },
+        error: () => this.playerService.unlockAutoNext(),
+      });
+  }
+
+  private tryNextSeason(tv: TvShowDetails, current: Episode): void {
+    const seasonIdx = tv.seasons.findIndex(
+      (s) => s.season_number === current.season_number,
+    );
+
+    for (let i = seasonIdx + 1; i < tv.seasons.length; i++) {
+      const next = tv.seasons[i];
+      if (next?.episode_count > 0 && next.season_number > 0) {
+        this.navigateToMedia("tv", tv.id, next.season_number, 1, true);
+        return;
+      }
+    }
+
+    this.tryPlayNextPlaylistItem(tv);
+  }
+
+  private tryPlayNextPlaylistItem(
+    media: MovieDetails | TvShowDetails,
+  ): boolean {
+    const playlistId = this.playlist()?.id;
+    if (!playlistId) return false;
+
+    const next = this.playlistService.getNextItemFromPlaylist(
+      playlistId,
+      media.id,
+    );
+    if (!next) return false;
+
+    this.navigationService.navigateTo("watch", {
+      mediaType: next.media_type,
+      id: next.id,
+      playlistId,
+      autoplay: true,
+    });
+    this.iframeLoading.set(true);
+    return true;
+  }
+
+  // ============ Utilities ============
+  private calculateResumeTime(
+    media: MovieDetails | TvShowDetails,
+    episode: Episode | null,
+  ): number {
+    const params = untracked(() => this.params());
+    const progressId = this.getProgressId(media, episode, params);
+    const progress = untracked(() =>
+      this.playbackProgressService.getProgress(progressId),
+    );
+    const startAt = untracked(() => this.initialStartAt());
+    const { currentTime, playerStarted } = untracked(() => this.playback());
+
+    if (
+      typeof startAt === "number" &&
+      startAt > 0 &&
+      !playerStarted &&
+      currentTime <= 5
+    ) {
+      return startAt;
+    }
+    if (currentTime > 5) return currentTime;
+    if (progress?.progress > 5 && progress.progress < 100)
+      return progress.timestamp;
+    return 0;
+  }
+
+  private getProgressId(
+    media: MovieDetails | TvShowDetails,
+    episode: Episode | null,
+    params: any,
+  ): number {
+    if (isTvShow(media) && params?.season && params?.episode && episode) {
+      return episode.season_number === +params.season &&
+        episode.episode_number === +params.episode
+        ? episode.id
+        : media.id;
+    }
+    return episode?.id ?? media.id;
+  }
+
+  private shouldUpdateUrl(current: string, next: string): boolean {
+    if (!current || current === "about:blank" || !next || current === next) {
+      return current !== next && !!next;
+    }
+
+    try {
+      const c = new URL(current);
+      const n = new URL(next);
+
+      if (c.origin !== n.origin || c.pathname !== n.pathname) return true;
+
+      const criticalKeys = ["season", "episode", "id", "tmdb", "imdb", "v"];
+      return criticalKeys.some(
+        (k) => c.searchParams.get(k) !== n.searchParams.get(k),
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  private clearStartAt(): void {
+    this.initialStartAt.set(undefined);
+    if (this.params()?.startAt) this.removeStartAtFromUrl();
+  }
+
+  private removeStartAtFromUrl(): void {
+    const media = this.selectedMediaItem();
+    const params = this.params();
+    if (!media || !params?.startAt) return;
+
+    const cleanParams: Record<string, any> = {
+      mediaType: media.media_type,
+      id: media.id,
+      playlistId: params.playlistId,
+    };
+
+    if (media.media_type === "tv" && params.season && params.episode) {
+      cleanParams.season = params.season;
+      cleanParams.episode = params.episode;
+    }
+
+    try {
+      window.history.replaceState(
+        {},
+        "",
+        this.navigationService.getPath("watch", cleanParams),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private finalizeRefresh(): void {
+    if (!this.reloading()) return;
+
+    this.reloading.set(false);
+    this.iframeLoading.set(false);
+
+    if (this.constructedUrl() === "") {
+      const url = this.playerUrl();
+      if (url) this.constructedUrl.set(url);
     }
   }
 }

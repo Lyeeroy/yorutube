@@ -73,10 +73,18 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
   }
 
   handleMessage(
-    data: PlayerEventData,
-    currentEpisode: Episode | null
+    input: any,
+    currentEpisode: Episode | null,
   ): PlayerMessageResult {
     const result: PlayerMessageResult = {};
+
+    if (!input) return result;
+
+    // Support both direct data and nested { data: ... } structure
+    let data = input;
+    if (input.data && typeof input.data === "object") {
+      data = input.data;
+    }
 
     // Vidlink sends MEDIA_DATA messages
     if (data) {
@@ -84,15 +92,17 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
     }
 
     // Handle playback progress from PLAYER_EVENT messages
+    // STRICT CHECK: Ensure duration exists and is positive
     if (
       (data.event === "timeupdate" || data.event === "time") &&
       typeof data.currentTime === "number" &&
       typeof data.duration === "number" &&
       data.duration > 0
     ) {
-      const timeRemaining = data.duration - data.currentTime;
-      // If within 0.5s of end, report 100% to ensure auto-next triggers
-      const progressPercent = this.calculateProgressPercent(data.currentTime, data.duration);
+      const progressPercent = this.calculateProgressPercent(
+        data.currentTime,
+        data.duration,
+      );
 
       result.playbackProgress = {
         currentTime: data.currentTime,
@@ -103,11 +113,15 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
 
     // Handle ended event explicitly to ensure we hit 100%
     if (data.event === "ended") {
-      result.playbackProgress = {
-        currentTime: data.duration || 0,
-        duration: data.duration || 0,
-        progressPercent: 100,
-      };
+      // For 'ended', we can trust it's done, but we need a valid duration to report
+      const duration = data.duration || 0;
+      if (duration > 0) {
+        result.playbackProgress = {
+          currentTime: duration,
+          duration: duration,
+          progressPercent: 100,
+        };
+      }
     }
 
     // Handle episode changes - Vidlink sends strings, so parse them
@@ -178,20 +192,34 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
   }
 
   /** Safe progress calculation with division by zero protection */
-  private calculateProgressPercent(currentTime: number, duration: number): number {
-    if (typeof duration !== 'number' || duration <= 0) return 0;
-    if (typeof currentTime !== 'number' || currentTime < 0) return 0;
-    
+  private calculateProgressPercent(
+    currentTime: number,
+    duration: number,
+  ): number {
+    if (typeof duration !== "number" || duration <= 0) return 0;
+    if (typeof currentTime !== "number" || currentTime < 0) return 0;
+
+    // Safety: If duration is extremely small (e.g. 0.1s), it's likely invalid/loading data.
+    // Don't calculate progress for trivial durations.
+    if (duration < 1) return 0;
+
     const timeRemaining = duration - currentTime;
+
+    // Only snap to 100% if:
+    // 1. We are within 2 seconds of the end
+    // 2. AND we haven't overshot significantly (which implies bad data)
+    // 3. AND the content is substantial (>30s) to avoid glitches on short clips/trailers
+    if (duration > 30 && timeRemaining < 2 && timeRemaining > -1) {
+      return 100;
+    }
+
     const progress = (currentTime / duration) * 100;
-    
+
     // Handle edge cases
     if (isNaN(progress) || !isFinite(progress)) return 0;
-    if (timeRemaining < 0.5) return 100; // Near end
-    if (progress > 100) return 100;
-    if (progress < 0) return 0;
-    
-    return progress;
+
+    // Hard clamp between 0 and 100
+    return Math.min(Math.max(progress, 0), 100);
   }
 
   onMediaData(rawData: any): void {
@@ -205,18 +233,24 @@ export class VidlinkPlayerProvider implements IPlayerProvider {
 
   /** Sanitize storage data to prevent injection attacks */
   private sanitizeStorageData(data: any): any {
-    if (!data || typeof data !== 'object') return {};
-    
+    if (!data || typeof data !== "object") return {};
+
     // Only allow known safe properties
     const sanitized: any = {};
-    const allowedKeys = ['currentTime', 'duration', 'episode', 'season', 'progressPercent'];
-    
+    const allowedKeys = [
+      "currentTime",
+      "duration",
+      "episode",
+      "season",
+      "progressPercent",
+    ];
+
     for (const key of allowedKeys) {
-      if (key in data && typeof data[key] === 'number') {
+      if (key in data && typeof data[key] === "number") {
         sanitized[key] = data[key];
       }
     }
-    
+
     return sanitized;
   }
 }

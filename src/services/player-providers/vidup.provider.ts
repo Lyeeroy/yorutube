@@ -22,7 +22,7 @@ export class VidUpPlayerProvider implements IPlayerProvider {
 
     if (media.media_type === "movie") {
       // Movie URL: https://vidup.to/movie/{id}?autoPlay=true
-      const funcAutoPlay = autoplay ? "true" : "false"; 
+      const funcAutoPlay = autoplay ? "true" : "false";
       let url = `https://vidup.to/movie/${media.id}?autoPlay=${funcAutoPlay}`;
       // Append startAt if provided
       if (resumeTime && resumeTime > 5) {
@@ -31,7 +31,7 @@ export class VidUpPlayerProvider implements IPlayerProvider {
       return url;
     } else if (media.media_type === "tv" && episode) {
       // TV Show URL: https://vidup.to/tv/{id}/{season}/{episode}?autoPlay=true
-      const funcAutoPlay = autoplay ? "true" : "false"; 
+      const funcAutoPlay = autoplay ? "true" : "false";
       let url = `https://vidup.to/tv/${media.id}/${episode.season_number}/${episode.episode_number}?autoPlay=${funcAutoPlay}`;
       // Append startAt if provided
       if (resumeTime && resumeTime > 5) {
@@ -45,32 +45,33 @@ export class VidUpPlayerProvider implements IPlayerProvider {
 
   handleMessage(
     data: any,
-    currentEpisode: Episode | null
+    currentEpisode: Episode | null,
   ): PlayerMessageResult {
     const result: PlayerMessageResult = {};
-    
+
     // The user provided events are wrapped in { type: "PLAYER_EVENT", data: { ... } }
     // or { type: "MEDIA_DATA", data: { ... } }
-    
+
     // Check if we have the nested structure
     let eventData: PlayerEventData | null = null;
-    
+
     if (data && data.type === "PLAYER_EVENT" && data.data) {
-        eventData = data.data;
+      eventData = data.data;
     } else if (data && data.event) {
-        // Fallback for flat structure if mixed
-        eventData = data;
+      // Fallback for flat structure if mixed
+      eventData = data;
     }
 
     if (!eventData) {
-        return result;
+      return result;
     }
 
     // Handle playback progress
     if (
       eventData.event === "timeupdate" &&
       typeof eventData.currentTime === "number" &&
-      typeof eventData.duration === "number"
+      typeof eventData.duration === "number" &&
+      eventData.duration > 0
     ) {
       result.playbackProgress = {
         currentTime: eventData.currentTime,
@@ -85,28 +86,28 @@ export class VidUpPlayerProvider implements IPlayerProvider {
 
     // Handle play status
     if (eventData.playing === true) {
-        result.playerStarted = true;
-        // In the sample, "playing": true is sent with timeupdate
+      result.playerStarted = true;
+      // In the sample, "playing": true is sent with timeupdate
     }
 
     // Handle episode changes
     // The sample "timeupdate" includes "season", "episode", "tmdbId".
     if (
-        typeof eventData.season === "number" && 
-        typeof eventData.episode === "number"
+      typeof eventData.season === "number" &&
+      typeof eventData.episode === "number"
     ) {
-         const episodeDiffers =
+      const episodeDiffers =
         !currentEpisode ||
         currentEpisode.season_number !== eventData.season ||
         currentEpisode.episode_number !== eventData.episode;
 
-        if (episodeDiffers) {
-             // Only report change if we are confident it's a new episode
-             result.episodeChange = {
-                season: eventData.season,
-                episode: eventData.episode
-             };
-        }
+      if (episodeDiffers) {
+        // Only report change if we are confident it's a new episode
+        result.episodeChange = {
+          season: eventData.season,
+          episode: eventData.episode,
+        };
+      }
     }
 
     return result;

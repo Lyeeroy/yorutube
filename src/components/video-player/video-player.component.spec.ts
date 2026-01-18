@@ -12,6 +12,14 @@ import { PlayerProviderService } from "../../services/player-provider.service";
 import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
 import { ContinueWatchingItem } from "../../models/continue-watching.model";
 import { TvShowDetails, MovieDetails, Episode } from "../../models/movie.model";
+import { signal } from "@angular/core";
+
+// Declare test globals to satisfy TypeScript compiler
+declare var describe: any;
+declare var it: any;
+declare var expect: any;
+declare var beforeEach: any;
+declare var jasmine: any;
 
 describe("VideoPlayerComponent: Continue Watching behavior", () => {
   let component: VideoPlayerComponent;
@@ -72,6 +80,9 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
 
     const fixture = TestBed.createComponent(VideoPlayerComponent);
     component = fixture.componentInstance;
+
+    // Hack: Overwrite the computed playlist signal with a writable signal for testing purposes
+    (component as any).playlist = signal(null);
   });
 
   it("removes movie from continue watching on complete", () => {
@@ -107,7 +118,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
           { episode_number: 2 },
           { episode_number: 3 },
         ],
-      } as any)
+      } as any),
     );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
@@ -139,7 +150,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
 
     const mockMovieService = TestBed.inject(MovieService) as any;
     mockMovieService.getSeasonDetails.and.returnValue(
-      of({ episodes: [{ episode_number: 1 }] } as any)
+      of({ episodes: [{ episode_number: 1 }] } as any),
     );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
@@ -171,7 +182,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
           { episode_number: 2 },
           { episode_number: 3 },
         ],
-      } as any)
+      } as any),
     );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
@@ -181,7 +192,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
 
     component["handlePlaybackProgress"](
       { currentTime: 60, duration: 120, progressPercent: 90 },
-      tv
+      tv,
     );
 
     // We should have added an entry with the next episode (3)
@@ -213,7 +224,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
           { episode_number: 2 },
           { episode_number: 3 },
         ],
-      } as any)
+      } as any),
     );
 
     const cw = TestBed.inject(ContinueWatchingService) as any;
@@ -222,12 +233,12 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
     // first time: triggers recommendation
     component["handlePlaybackProgress"](
       { currentTime: 30, duration: 120, progressPercent: 90 },
-      tv
+      tv,
     );
     // second time: should not recommend again
     component["handlePlaybackProgress"](
       { currentTime: 31, duration: 120, progressPercent: 92 },
-      tv
+      tv,
     );
 
     expect(cw.addItem.calls.count()).toBeGreaterThan(0);
@@ -246,15 +257,18 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
     playerSvc.tryLockAutoNext = () => true;
 
     const providerSvc = TestBed.inject(PlayerProviderService) as any;
-    providerSvc.getProvider = () => ({ supportsAutoNext: true } as any);
+    providerSvc.getProvider = () => ({ supportsAutoNext: true }) as any;
 
-    component["playlist"].set({ id: "pl", items: [movie, nextMovie] } as any);
+    (component["playlist"] as any).set({
+      id: "pl",
+      items: [movie, nextMovie],
+    } as any);
     // mark player started so threshold can be checked
-    component["playerHasStarted"].set(true);
+    (component as any).playerHasStarted = true;
 
     component["handlePlaybackProgress"](
       { currentTime: 60, duration: 120, progressPercent: 100 },
-      movie
+      movie,
     );
 
     const nav = TestBed.inject(NavigationService) as any;
@@ -279,7 +293,7 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
 
     const mockMovieService = TestBed.inject(MovieService) as any;
     mockMovieService.getSeasonDetails.and.returnValue(
-      of({ episodes: [{ episode_number: 1 }] } as any)
+      of({ episodes: [{ episode_number: 1 }] } as any),
     );
 
     const playerSvc = TestBed.inject(PlayerService) as any;
@@ -287,9 +301,9 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
     playerSvc.tryLockAutoNext = () => true;
 
     const providerSvc = TestBed.inject(PlayerProviderService) as any;
-    providerSvc.getProvider = () => ({ supportsAutoNext: true } as any);
+    providerSvc.getProvider = () => ({ supportsAutoNext: true }) as any;
 
-    component["playlist"].set({
+    (component["playlist"] as any).set({
       id: "pl2",
       items: [tv, nextPlaylistItem],
     } as any);
@@ -298,11 +312,11 @@ describe("VideoPlayerComponent: Continue Watching behavior", () => {
       season_number: 1,
       episode_number: 1,
     } as any);
-    component["playerHasStarted"].set(true);
+    (component as any).playerHasStarted = true;
 
     component["handlePlaybackProgress"](
       { currentTime: 1200, duration: 1200, progressPercent: 100 },
-      tv
+      tv,
     );
 
     const nav = TestBed.inject(NavigationService) as any;
