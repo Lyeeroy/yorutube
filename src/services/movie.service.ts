@@ -51,7 +51,7 @@ export class MovieService {
   private seasonDetailsCache = new Map<string, Observable<SeasonDetails>>();
 
   private createGenreMapObservable(
-    url: string
+    url: string,
   ): Observable<Map<number, string>> {
     return this.http.get<GenreResponse>(url).pipe(
       map((response) => {
@@ -61,7 +61,7 @@ export class MovieService {
         });
         return genreMap;
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
   }
 
@@ -83,7 +83,7 @@ export class MovieService {
 
   getCombinedGenreMap(): Observable<Map<number, string>> {
     return forkJoin([this.getMovieGenreMap(), this.getTvGenreMap()]).pipe(
-      map(([movieGenres, tvGenres]) => new Map([...movieGenres, ...tvGenres]))
+      map(([movieGenres, tvGenres]) => new Map([...movieGenres, ...tvGenres])),
     );
   }
 
@@ -94,9 +94,9 @@ export class MovieService {
       .pipe(
         map((response) =>
           response.results.filter(
-            (r) => r.media_type === "movie" || r.media_type === "tv"
-          )
-        )
+            (r) => r.media_type === "movie" || r.media_type === "tv",
+          ),
+        ),
       );
   }
 
@@ -108,8 +108,8 @@ export class MovieService {
       .get<{ results: Omit<TvShow, "media_type">[] }>(url)
       .pipe(
         map((response) =>
-          response.results.map((r) => ({ ...r, media_type: "tv" }))
-        )
+          response.results.map((r) => ({ ...r, media_type: "tv" })),
+        ),
       );
   }
 
@@ -121,8 +121,8 @@ export class MovieService {
       .get<{ results: Omit<Movie, "media_type">[] }>(url)
       .pipe(
         map((response) =>
-          response.results.map((r) => ({ ...r, media_type: "movie" }))
-        )
+          response.results.map((r) => ({ ...r, media_type: "movie" })),
+        ),
       );
   }
 
@@ -134,13 +134,13 @@ export class MovieService {
       .get<{ results: Omit<Movie, "media_type">[] }>(url)
       .pipe(
         map((response) =>
-          response.results.map((r) => ({ ...r, media_type: "movie" }))
-        )
+          response.results.map((r) => ({ ...r, media_type: "movie" })),
+        ),
       );
   }
 
   discoverMedia(
-    params: DiscoverParams
+    params: DiscoverParams,
   ): Observable<{ results: MediaType[]; total_pages: number }> {
     const {
       type,
@@ -208,9 +208,10 @@ export class MovieService {
       const tvUrl = `${this.BASE_URL}/discover/tv?${tvQueryParams}`;
 
       const movieRequest = this.http
-        .get<{ results: Omit<Movie, "media_type">[]; total_pages: number }>(
-          movieUrl
-        )
+        .get<{
+          results: Omit<Movie, "media_type">[];
+          total_pages: number;
+        }>(movieUrl)
         .pipe(
           map((res) => ({
             ...res,
@@ -218,12 +219,13 @@ export class MovieService {
               ...r,
               media_type: "movie" as const,
             })),
-          }))
+          })),
         );
       const tvRequest = this.http
-        .get<{ results: Omit<TvShow, "media_type">[]; total_pages: number }>(
-          tvUrl
-        )
+        .get<{
+          results: Omit<TvShow, "media_type">[];
+          total_pages: number;
+        }>(tvUrl)
         .pipe(
           map((res) => ({
             ...res,
@@ -231,7 +233,7 @@ export class MovieService {
               ...r,
               media_type: "tv" as const,
             })),
-          }))
+          })),
         );
 
       return forkJoin([movieRequest, tvRequest]).pipe(
@@ -250,7 +252,7 @@ export class MovieService {
             results: combined,
             total_pages: Math.max(movieRes.total_pages, tvRes.total_pages),
           };
-        })
+        }),
       );
     }
 
@@ -287,7 +289,7 @@ export class MovieService {
               media_type: "movie" as const,
             })),
             total_pages: response.total_pages,
-          }))
+          })),
         );
     } else {
       // type === 'tv'
@@ -305,9 +307,10 @@ export class MovieService {
       }
       const url = `${this.BASE_URL}/discover/tv?${queryParams}`;
       return this.http
-        .get<{ results: Omit<TvShow, "media_type">[]; total_pages: number }>(
-          url
-        )
+        .get<{
+          results: Omit<TvShow, "media_type">[];
+          total_pages: number;
+        }>(url)
         .pipe(
           map((response) => ({
             results: response.results.map((r) => ({
@@ -315,7 +318,7 @@ export class MovieService {
               media_type: "tv" as const,
             })),
             total_pages: response.total_pages,
-          }))
+          })),
         );
     }
   }
@@ -327,36 +330,28 @@ export class MovieService {
 
     const movieRequests = Array.from({ length: pageLimit }, (_, i) =>
       this.http
-        .get<{ results: Omit<Movie, "media_type">[] }>(
-          `${this.BASE_URL}/discover/movie?api_key=${
-            this.API_KEY
-          }&primary_release_date.gte=${start}&primary_release_date.lte=${end}&sort_by=popularity.desc&page=${
-            i + 1
-          }`
-        )
+        .get<{
+          results: Omit<Movie, "media_type">[];
+        }>(`${this.BASE_URL}/discover/movie?api_key=${this.API_KEY}&primary_release_date.gte=${start}&primary_release_date.lte=${end}&sort_by=popularity.desc&page=${i + 1}`)
         .pipe(
           map((res) =>
-            res.results.map((r) => ({ ...r, media_type: "movie" as const }))
+            res.results.map((r) => ({ ...r, media_type: "movie" as const })),
           ),
-          catchError(() => of([] as Movie[]))
-        )
+          catchError(() => of([] as Movie[])),
+        ),
     );
 
     const tvRequests = Array.from({ length: pageLimit }, (_, i) =>
       this.http
-        .get<{ results: Omit<TvShow, "media_type">[] }>(
-          `${this.BASE_URL}/discover/tv?api_key=${
-            this.API_KEY
-          }&first_air_date.gte=${start}&first_air_date.lte=${end}&sort_by=popularity.desc&page=${
-            i + 1
-          }`
-        )
+        .get<{
+          results: Omit<TvShow, "media_type">[];
+        }>(`${this.BASE_URL}/discover/tv?api_key=${this.API_KEY}&first_air_date.gte=${start}&first_air_date.lte=${end}&sort_by=popularity.desc&page=${i + 1}`)
         .pipe(
           map((res) =>
-            res.results.map((r) => ({ ...r, media_type: "tv" as const }))
+            res.results.map((r) => ({ ...r, media_type: "tv" as const })),
           ),
-          catchError(() => of([] as TvShow[]))
-        )
+          catchError(() => of([] as TvShow[])),
+        ),
     );
 
     return forkJoin([...movieRequests, ...tvRequests]).pipe(
@@ -370,14 +365,14 @@ export class MovieService {
           }
         });
         return Array.from(mediaMap.values());
-      })
+      }),
     );
   }
 
   searchMulti(
     query: string,
     page: number = 1,
-    includeNoPoster: boolean = false
+    includeNoPoster: boolean = false,
   ): Observable<{
     results: MediaType[];
     total_pages: number;
@@ -389,7 +384,7 @@ export class MovieService {
     return this.http.get<MediaResponse>(url).pipe(
       map((response) => {
         const mediaItems = response.results.filter(
-          (r) => r.media_type === "movie" || r.media_type === "tv"
+          (r) => r.media_type === "movie" || r.media_type === "tv",
         );
 
         // Helper: treat null, "null" (string), and empty strings as missing images
@@ -400,10 +395,10 @@ export class MovieService {
 
         // For the UI we prefer items that have a valid backdrop — hide ones without a valid backdrop
         const withImages = mediaItems.filter((r) =>
-          hasValidPath(r.backdrop_path)
+          hasValidPath(r.backdrop_path),
         );
         const withoutImages = mediaItems.filter(
-          (r) => !hasValidPath(r.backdrop_path)
+          (r) => !hasValidPath(r.backdrop_path),
         );
 
         return {
@@ -411,13 +406,13 @@ export class MovieService {
           total_pages: response.total_pages,
           hidden_count: includeNoPoster ? 0 : withoutImages.length,
         };
-      })
+      }),
     );
   }
 
   searchCompanies(
     query: string,
-    page: number = 1
+    page: number = 1,
   ): Observable<{ results: SubscribableChannel[]; total_pages: number }> {
     const url = `${this.BASE_URL}/search/company?api_key=${
       this.API_KEY
@@ -430,14 +425,14 @@ export class MovieService {
             .filter((c) => c.logo_path) // Only companies with logos for better UI
             .map((c) => ({ ...c, type: "company" as const })),
           total_pages: response.total_pages,
-        }))
+        })),
       );
   }
 
   searchCollections(
     query: string,
     page: number = 1,
-    includeNoPoster: boolean = false
+    includeNoPoster: boolean = false,
   ): Observable<{
     results: CollectionSearchResult[];
     total_pages: number;
@@ -455,10 +450,10 @@ export class MovieService {
 
         // Collections without a valid backdrop should be hidden (they look broken in the UI)
         const withImages = response.results.filter((c) =>
-          hasValidPath(c.backdrop_path)
+          hasValidPath(c.backdrop_path),
         );
         const withoutImages = response.results.filter(
-          (c) => !hasValidPath(c.backdrop_path)
+          (c) => !hasValidPath(c.backdrop_path),
         );
         const allMapped = response.results.map((c) => ({
           ...c,
@@ -474,31 +469,31 @@ export class MovieService {
           total_pages: response.total_pages,
           hidden_count: includeNoPoster ? 0 : withoutImages.length,
         };
-      })
+      }),
     );
   }
 
   searchAll(
     query: string,
     page: number = 1,
-    includeNoPoster: boolean = false
+    includeNoPoster: boolean = false,
   ): Observable<{
     results: SearchResult[];
     total_pages: number;
     hidden_count: number;
   }> {
     const media$ = this.searchMulti(query, page, includeNoPoster).pipe(
-      catchError(() => of({ results: [], total_pages: 0, hidden_count: 0 }))
+      catchError(() => of({ results: [], total_pages: 0, hidden_count: 0 })),
     );
     const companies$ = this.searchCompanies(query, page).pipe(
-      catchError(() => of({ results: [], total_pages: 0 }))
+      catchError(() => of({ results: [], total_pages: 0 })),
     );
     const collections$ = this.searchCollections(
       query,
       page,
-      includeNoPoster
+      includeNoPoster,
     ).pipe(
-      catchError(() => of({ results: [], total_pages: 0, hidden_count: 0 }))
+      catchError(() => of({ results: [], total_pages: 0, hidden_count: 0 })),
     );
 
     let networks$: Observable<SubscribableChannel[]> = of([]);
@@ -510,7 +505,7 @@ export class MovieService {
             .filter((n) => n.name.toLowerCase().includes(query.toLowerCase()))
             .map((n) => ({ ...n, type: "network" as const }));
         }),
-        catchError(() => of([])) // In case of error, return empty array
+        catchError(() => of([])), // In case of error, return empty array
       );
     }
 
@@ -542,7 +537,7 @@ export class MovieService {
         });
 
         const uniqueChannels: SubscribableChannel[] = Array.from(
-          mergedChannelMap.values()
+          mergedChannelMap.values(),
         )
           .map((entry) => {
             if (entry.network && entry.company) {
@@ -575,7 +570,7 @@ export class MovieService {
 
         const calculateRelevance = (
           item: SearchResult,
-          name: string
+          name: string,
         ): number => {
           const nameLower = name.toLowerCase();
           const queryWords = queryLower
@@ -644,14 +639,14 @@ export class MovieService {
         const total_pages = Math.max(
           media.total_pages,
           companies.total_pages,
-          collections.total_pages
+          collections.total_pages,
         );
 
         const hidden_count =
           (media.hidden_count || 0) + (collections.hidden_count || 0);
 
         return { results: allResults, total_pages, hidden_count };
-      })
+      }),
     );
   }
 
@@ -668,7 +663,7 @@ export class MovieService {
   getEpisodeVideos(
     tvId: number,
     seasonNumber: number,
-    episodeNumber: number
+    episodeNumber: number,
   ): Observable<VideoResponse> {
     const url = `${this.BASE_URL}/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}/videos?api_key=${this.API_KEY}`;
     return this.http.get<VideoResponse>(url);
@@ -681,7 +676,7 @@ export class MovieService {
     const url = `${this.BASE_URL}/movie/${movieId}?api_key=${this.API_KEY}&append_to_response=videos,credits`;
     const details$ = this.http.get<Omit<MovieDetails, "media_type">>(url).pipe(
       map((movie) => ({ ...movie, media_type: "movie" as const })),
-      shareReplay(1)
+      shareReplay(1),
     );
     this.movieDetailsCache.set(movieId, details$);
     return details$;
@@ -694,7 +689,7 @@ export class MovieService {
     const url = `${this.BASE_URL}/tv/${tvId}?api_key=${this.API_KEY}&append_to_response=videos,credits`;
     const details$ = this.http.get<Omit<TvShowDetails, "media_type">>(url).pipe(
       map((tvShow) => ({ ...tvShow, media_type: "tv" as const })),
-      shareReplay(1)
+      shareReplay(1),
     );
     this.tvShowDetailsCache.set(tvId, details$);
     return details$;
@@ -702,7 +697,7 @@ export class MovieService {
 
   getSeasonDetails(
     tvId: number,
-    seasonNumber: number
+    seasonNumber: number,
   ): Observable<SeasonDetails> {
     const cacheKey = `${tvId}_${seasonNumber}`;
     if (this.seasonDetailsCache.has(cacheKey)) {
@@ -721,8 +716,8 @@ export class MovieService {
       .get<{ results: Omit<Movie, "media_type">[] }>(url)
       .pipe(
         map((response) =>
-          response.results.map((r) => ({ ...r, media_type: "movie" }))
-        )
+          response.results.map((r) => ({ ...r, media_type: "movie" })),
+        ),
       );
   }
 
@@ -732,8 +727,8 @@ export class MovieService {
       .get<{ results: Omit<TvShow, "media_type">[] }>(url)
       .pipe(
         map((response) =>
-          response.results.map((r) => ({ ...r, media_type: "tv" }))
-        )
+          response.results.map((r) => ({ ...r, media_type: "tv" })),
+        ),
       );
   }
 
@@ -754,14 +749,14 @@ export class MovieService {
 
     // 1. Directly fetch popular networks to guarantee their inclusion
     const popularNetworkRequests = Array.from(popularNetworkIds).map(
-      (id) => this.getNetworkDetails(id).pipe(catchError(() => of(null))) // return null if a network fails to load
+      (id) => this.getNetworkDetails(id).pipe(catchError(() => of(null))), // return null if a network fails to load
     );
 
     // 2. Discover other networks from popular shows
     const pageRequests = [1, 2, 3, 4, 5].map((page) =>
       this.http.get<{ results: TvShow[] }>(
-        `${this.BASE_URL}/tv/popular?api_key=${this.API_KEY}&page=${page}`
-      )
+        `${this.BASE_URL}/tv/popular?api_key=${this.API_KEY}&page=${page}`,
+      ),
     );
 
     const discoveredNetworks$ = forkJoin(pageRequests).pipe(
@@ -769,21 +764,21 @@ export class MovieService {
       switchMap((allShows) => {
         // Fetch details, but ignore errors for individual shows
         const detailRequests = allShows.map((tv) =>
-          this.getTvShowDetails(tv.id).pipe(catchError(() => of(null)))
+          this.getTvShowDetails(tv.id).pipe(catchError(() => of(null))),
         );
         return forkJoin(detailRequests);
       }),
       map((detailedShows) => {
         // Filter out nulls from failed requests
         const validShows = detailedShows.filter(
-          (d): d is TvShowDetails => d !== null
+          (d): d is TvShowDetails => d !== null,
         );
         const networks = validShows.flatMap((show) => show.networks || []);
         // Return a unique list of discovered networks
         return Array.from(
-          new Map(networks.map((n: Network) => [n.id, n])).values()
+          new Map(networks.map((n: Network) => [n.id, n])).values(),
         );
-      })
+      }),
     );
 
     this.popularNetworksCache$ = forkJoin({
@@ -792,7 +787,7 @@ export class MovieService {
     }).pipe(
       map(({ guaranteedPopular, discovered }) => {
         const validPopularNetworks = guaranteedPopular.filter(
-          (n): n is Network => n !== null
+          (n): n is Network => n !== null,
         );
 
         // Combine and de-duplicate, prioritizing networks with logos
@@ -805,7 +800,7 @@ export class MovieService {
 
         return Array.from(allNetworksMap.values());
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
     return this.popularNetworksCache$;
   }
@@ -816,33 +811,31 @@ export class MovieService {
     }
     const pageRequests = [1, 2, 3, 4, 5].map((page) =>
       this.http.get<{ results: Movie[] }>(
-        `${this.BASE_URL}/movie/popular?api_key=${this.API_KEY}&page=${page}`
-      )
+        `${this.BASE_URL}/movie/popular?api_key=${this.API_KEY}&page=${page}`,
+      ),
     );
 
     this.popularMovieStudiosCache$ = forkJoin(pageRequests).pipe(
       map((responses) => responses.flatMap((response) => response.results)),
       switchMap((allMovies) => {
         const detailRequests = allMovies.map((movie) =>
-          this.getMovieDetails(movie.id)
+          this.getMovieDetails(movie.id),
         );
         return forkJoin(detailRequests);
       }),
       map((detailedMovies) => {
         const companies = detailedMovies.flatMap(
-          (movie) => movie.production_companies || []
+          (movie) => movie.production_companies || [],
         );
         const uniqueCompanies = Array.from(
-          new Map(companies.map((c) => [c.id, c])).values()
+          new Map(companies.map((c) => [c.id, c])).values(),
         );
         return uniqueCompanies.filter((c: ProductionCompany) => c.logo_path);
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
     return this.popularMovieStudiosCache$;
   }
-
-
 
   getPopularAnimeStudios(): Observable<ProductionCompany[]> {
     if (this.popularAnimeStudiosCache$) {
@@ -850,28 +843,28 @@ export class MovieService {
     }
     const pageRequests = [1, 2, 3, 4, 5].map((page) =>
       this.http.get<{ results: Movie[] }>(
-        `${this.BASE_URL}/discover/movie?api_key=${this.API_KEY}&with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
-      )
+        `${this.BASE_URL}/discover/movie?api_key=${this.API_KEY}&with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`,
+      ),
     );
 
     this.popularAnimeStudiosCache$ = forkJoin(pageRequests).pipe(
       map((responses) => responses.flatMap((response) => response.results)),
       switchMap((allAnimes) => {
         const detailRequests = allAnimes.map((anime) =>
-          this.getMovieDetails(anime.id)
+          this.getMovieDetails(anime.id),
         );
         return forkJoin(detailRequests);
       }),
       map((detailedAnimes) => {
         const companies = detailedAnimes.flatMap(
-          (anime) => anime.production_companies || []
+          (anime) => anime.production_companies || [],
         );
         const uniqueCompanies = Array.from(
-          new Map(companies.map((c) => [c.id, c])).values()
+          new Map(companies.map((c) => [c.id, c])).values(),
         );
         return uniqueCompanies.filter((c: ProductionCompany) => c.logo_path);
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
     return this.popularAnimeStudiosCache$;
   }
@@ -891,7 +884,7 @@ export class MovieService {
     page: number = 1,
     sortBy = "popularity.desc",
     year?: number,
-    minRating?: number
+    minRating?: number,
   ): Observable<{ results: MediaType[]; total_pages: number }> {
     return this.discoverMedia({
       type: "tv",
@@ -908,7 +901,7 @@ export class MovieService {
     page: number = 1,
     sortBy = "popularity.desc",
     year?: number,
-    minRating?: number
+    minRating?: number,
   ): Observable<{ results: MediaType[]; total_pages: number }> {
     return this.discoverMedia({
       type: "movie",
@@ -923,16 +916,16 @@ export class MovieService {
   getPopularOnNetflix(): Observable<MediaType[]> {
     const netflixId = 213;
     return this.getTvShowsByNetwork(netflixId, 1, "popularity.desc").pipe(
-      map((response) => response.results)
+      map((response) => response.results),
     );
   }
 
   getCollectionDetails(id: number): Observable<Collection> {
     const url = `${this.BASE_URL}/collection/${id}?api_key=${this.API_KEY}`;
     return this.http
-      .get<{ parts: Omit<Movie, "media_type">[] } & Omit<Collection, "parts">>(
-        url
-      )
+      .get<
+        { parts: Omit<Movie, "media_type">[] } & Omit<Collection, "parts">
+      >(url)
       .pipe(
         map((collection) => ({
           ...collection,
@@ -940,7 +933,7 @@ export class MovieService {
             ...p,
             media_type: "movie" as const,
           })),
-        }))
+        })),
       );
   }
 
@@ -978,7 +971,7 @@ export class MovieService {
         allProviders.forEach((p) => unique.set(p.provider_id, p));
         return Array.from(unique.values());
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
 
     return this.watchProvidersCache$;
@@ -990,17 +983,17 @@ export class MovieService {
         const normalizedQuery = query.toLowerCase().trim();
         // Exact match first
         const exact = providers.find(
-          (p) => p.provider_name.toLowerCase() === normalizedQuery
+          (p) => p.provider_name.toLowerCase() === normalizedQuery,
         );
         if (exact) return exact.provider_id;
 
         // Then contains match
         const match = providers.find((p) =>
-          p.provider_name.toLowerCase().includes(normalizedQuery)
+          p.provider_name.toLowerCase().includes(normalizedQuery),
         );
         return match ? match.provider_id : null;
       }),
-      catchError(() => of(null))
+      catchError(() => of(null)),
     );
   }
 }
