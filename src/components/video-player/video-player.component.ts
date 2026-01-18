@@ -50,7 +50,6 @@ import { PlayerMessageRouterService } from "../../services/player-message-router
 import { ContinueWatchingManagerService } from "../../services/continue-watching-manager.service";
 import { PlayerUrlConfig } from "../../models/player-provider.model";
 
-
 const isMovie = (media: MediaType | TvShowDetails): media is Movie =>
   media.media_type === "movie";
 
@@ -102,7 +101,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private continueWatchingManager = inject(ContinueWatchingManagerService);
   private destroyRef = inject(DestroyRef);
 
-
   params = input.required<any>();
   genreMap = toSignal(this.movieService.getCombinedGenreMap(), {
     initialValue: new Map<number, string>(),
@@ -125,17 +123,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   historyAdded = signal(false);
 
-
-
-
-
   // provider messages are routed through PlayerMessageRouterService
 
   // Track the last episode state reported by the player
   private lastPlayerEpisodeState = signal<PlayerEpisodeState | null>(null);
 
-  // Track if we should skip the next player URL update (player already navigated internally)
-  private skipNextPlayerUpdate = signal(false);
+  // Track if we should skip iframe updates for a specific media key (avoids reload loops on auto-nav)
+  private skipUpdateForMediaKey = signal<string | null>(null);
 
   // Track if player has started playing (to avoid false episode detection on initial load)
   private playerHasStarted = signal(false);
@@ -157,7 +151,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   // Track the previous media key to avoid blanking iframe on no-op param syncs
   private previousMediaKey = signal<string | null>(null);
 
-
   private previousPlayer = signal<string | null>(null);
 
   selectedPlayer = this.playerService.selectedPlayer;
@@ -169,7 +162,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   // Debounce counter for progress updates
   private lastProgressUpdateTime = 0;
-
 
   // Auto-next visualization signals
   autoNextState = signal<"idle" | "counting_down">("idle");
@@ -184,29 +176,16 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (!media) return false;
 
     if (media.media_type === "tv") {
-      // For TV shows, check if there is a next episode
-      // We can infer this from the current episode and season details
-      // Ideally we'd have the full season details here, but for now we can rely on
-      // the fact that if we're not at the last episode of the season (or show), there's likely a next one.
-      // A robust check would require fetching season details if not available.
-      // For now, let's assume true for TV shows unless we know it's the finale (which is hard to know without full details).
-      // Optimization: The `continueWatchingManager` handles the logic of finding the next episode.
-      // If we want to be precise, we might need to expose that logic or just assume true for now.
-      // Given the user request "movies do not have episode therefore there is no need for auto next",
-      // sticking to "TV shows always have auto-next candidate" (unless it's the very last one, which we handle gracefully by failing to play) is a safe start.
+      // For TV shows, we assume there's always a potential next episode unless known otherwise
       return true;
     } else if (media.media_type === "movie") {
       // For movies, only if in a playlist and not the last item
       const playlist = this.playlist();
-      const video = this.videoDetails(); // Note: videoDetails might be trailer info, not playlist item info
-
       if (!playlist || !playlist.items || playlist.items.length === 0)
         return false;
 
-      // We need to find the current index.
-      // The playlist service/component usually handles this, but we can try to find by ID.
       const currentIndex = playlist.items.findIndex(
-        (item) => item.id === media.id
+        (item) => item.id === media.id,
       );
       return currentIndex !== -1 && currentIndex < playlist.items.length - 1;
     }
@@ -268,9 +247,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (!provider) return null;
 
     // Use params to determine the episode we're navigating to, not currentEpisode()
-    // This prevents a race condition where currentEpisode() still references the old
-    // episode during autonext navigation, causing the old episode's progress to be
-    // applied to the new episode URL.
     const params = untracked(() => this.params());
     const episode = this.currentEpisode();
 
@@ -282,34 +258,22 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       params?.episode &&
       episode
     ) {
-      // For TV shows, only use episode.id if the episode matches what params say we're navigating to
-      // This prevents using the old episode's ID during navigation
       if (
         episode.season_number === +params.season &&
         episode.episode_number === +params.episode
       ) {
         progressId = episode.id;
       } else {
-        // Episode signal hasn't updated yet, use media.id as fallback
-        // This means we won't resume progress, but that's better than resuming the wrong episode
         progressId = media.id;
       }
     } else {
       progressId = episode ? episode.id : media.id;
     }
 
-    // Get resume time for supported players
-    // Priority: 1) startAt from URL params, 2) saved progress
-    const urlStartAt = params?.startAt;
-
     const progress = untracked(() =>
-      this.playbackProgressService.getProgress(progressId)
+      this.playbackProgressService.getProgress(progressId),
     );
 
-    // Use URL startAt only if provided for this navigation and player hasn't
-    // started yet; otherwise prefer saved progress. This prevents a shared
-    // start time from being re-applied when the user switches providers while
-    // watching.
     const initialStart = untracked(() => this.initialStartAt());
 
     let resumeTime = 0;
@@ -323,7 +287,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     ) {
       resumeTime = initialStart;
     } else if (currentTime > 5) {
-      // If we have an active playback time (e.g. switching sources or refreshing), use it
       resumeTime = currentTime;
     } else if (progress && progress.progress > 5 && progress.progress < 100) {
       resumeTime = progress.timestamp;
@@ -335,10 +298,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       autoplay: this.autoplay() || this.playerService.autoplayEnabled(),
       autoNext: this.playerService.autoNextEnabled(),
       resumeTime,
-      // For VidFast we allow passing a small theme override. If you need
-      // other colors or per-user settings consider adding a UI control.
-      // VidFast expects hex values without the leading '#', e.g. 'dc2626'.
-      // Theme selection moved into provider (VidFast applies a default accent color)
     };
 
     return provider.generateUrl(config);
@@ -353,60 +312,59 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private navigationStartTime = 0;
 
   constructor() {
-    this.playerMessageRouter.start(); // Helper to start router if needed, but mostly Effects here.
+    this.playerMessageRouter.start();
 
-
-    // Update the player URL, but only if we're not skipping the update
+    // Update the player URL, filtering out unnecessary reloads
     effect(() => {
       const url = this.playerUrl();
       const reloading = this.reloading();
 
       if (reloading) return;
 
-      if (url && !this.skipNextPlayerUpdate()) {
-        this.iframeLoading.set(true);
-        this.constructedPlayerUrl.set(url);
-      } else if (this.skipNextPlayerUpdate()) {
-        this.skipNextPlayerUpdate.set(false);
+      const currentUrl = this.constructedPlayerUrl();
+
+      // Calculate current media key for skip check
+      const params = untracked(() => this.params());
+      const key = this.getMediaKey(params);
+      const skipKey = this.skipUpdateForMediaKey();
+
+      if (skipKey && skipKey === key) {
+        // We are intentionally skipping updates for this media state (e.g. auto-navigated)
+        return;
+      } else if (skipKey) {
+        // We moved to a different state, clear the skip flag
+        this.skipUpdateForMediaKey.set(null);
+      }
+
+      if (url) {
+        if (this.shouldUpdatePlayerUrl(currentUrl, url)) {
+          this.iframeLoading.set(true);
+          this.constructedPlayerUrl.set(url);
+        }
       }
     });
 
-
-    // Clear initialStartAt once the player has a meaningful playback time so
-    // that switching providers will respect the true user progress instead of
-    // the shared 'startAt'. We also clear when the player starts.
+    // Clear initialStartAt logic (prevent resume loops)
     effect(() => {
       const startAt = this.initialStartAt();
       const currentTime = this.lastKnownPlaybackTime();
       const playerStarted = this.playerHasStarted();
       const params = this.params();
 
-      // "Safe Resume" Logic:
-      // If we have a large startAt target (>60s), we should be careful about clearing it.
-      // If the player starts at 0s (failed resume), we want to KEEP startAt so we can
-      // use it as a guard to prevent overwriting saved progress.
       if (typeof startAt === "number" && startAt > 60) {
-        // Only clear if we have successfully reached the target (or close to it)
-        // or if we've played past it.
-        // We use a 60s buffer to consider it "reached" or if the player is just
-        // normally playing well past it.
         if (currentTime >= startAt - 60) {
           this.initialStartAt.set(undefined);
-          // Remove startAt from URL to prevent it from overriding future saved progress
           this.removeStartAtFromUrl();
         }
       } else {
-        // Standard behavior for small/no startAt (or if undefined)
         if (playerStarted || currentTime > 5) {
           this.initialStartAt.set(undefined);
-          // Remove startAt from URL if it exists
           if (params?.startAt) {
             this.removeStartAtFromUrl();
           }
         }
       }
     });
-
 
     effect((onCleanup) => {
       const p = this.params();
@@ -416,14 +374,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.selectedMediaItem.set(null);
         return;
       }
-      const { mediaType, id, season, episode, playlistId, autoplay } = p;
+      const { mediaType, id, season, episode, autoplay } = p;
 
       this.autoplay.set(!!autoplay);
 
-      // Compute a key representing the current media identity
-      const currentMediaKey = `${mediaType}:${id}:${season ?? ""}:${
-        episode ?? ""
-      }`;
+      const currentMediaKey = this.getMediaKey(p);
       const prevKey = untracked(() => this.previousMediaKey());
       const isActualMediaChange = prevKey !== currentMediaKey;
 
@@ -434,7 +389,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       let isForcedRefresh = false;
 
       if (isActualMediaChange || isPlayerChange) {
-        // If switching players for the same media, carry over the current time
         if (isPlayerChange && !isActualMediaChange) {
           const currentTime = untracked(() => this.lastKnownPlaybackTime());
           if (currentTime > 5) {
@@ -443,66 +397,51 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           }
         }
 
-        // Reset player state tracking when source or media changes
         this.playerHasStarted.set(false);
         this.lastPlayerEpisodeState.set(null);
         this.autoPlayNextTriggered.set(false);
         this.recommendedNextEpisodeSent.set(false);
         this.lastKnownPlaybackTime.set(0);
-        this.lastProgressUpdateTime = 0; // Reset debounce timer
+        this.lastProgressUpdateTime = 0;
         this.previousMediaKey.set(currentMediaKey);
         this.previousPlayer.set(currentPlayer);
 
-
-
-        // Reset auto-next state
         this.currentProgressPercent.set(0);
         this.clearAutoNextTimer();
         this.autoNextState.set("idle");
 
-        // Unlock any auto-next
         this.playerService.unlockAutoNext();
-
-        // Mark that we're navigating to prevent stale player messages from interfering
-        // This shield is active until 5 seconds of playback are reported
         this.startNavigation();
 
         if (isActualMediaChange) {
-          // shared startAt if the user switches player sources.
           const startAtVal = p?.startAt ? Number(p.startAt) : undefined;
           this.initialStartAt.set(startAtVal);
           this.lastProcessedStartAt.set(startAtVal);
         }
       } else if (p?.startAt) {
-        // Not a media change, but startAt param is present (e.g. from refresh or safeguard recovery)
-        // Update initialStartAt to match the new startAt so playerUrl doesn't regenerate with different values
         const startAtVal = Number(p.startAt);
         const lastProcessed = untracked(() => this.lastProcessedStartAt());
-        
-        // Only update if this is a NEW startAt value (prevents loops)
+
         if (lastProcessed !== startAtVal) {
           this.initialStartAt.set(startAtVal);
           this.lastProcessedStartAt.set(startAtVal);
           isForcedRefresh = true;
-          
-          // CRITICAL: Reset player state on refresh to avoid using stale state from before reload
           this.playerHasStarted.set(false);
           this.lastKnownPlaybackTime.set(0);
           this.startNavigation();
         }
       }
 
-      const shouldReloadPlayer = !this.skipNextPlayerUpdate();
+      // Check skip key to avoid reload if we just auto-navigated
+      const skipKey = this.skipUpdateForMediaKey();
+      const shouldReloadPlayer = skipKey !== currentMediaKey;
 
-      // Only blank the iframe when we're actually changing media content, player or forcing a refresh
       if (
         shouldReloadPlayer &&
         (isActualMediaChange || isForcedRefresh || isPlayerChange)
       ) {
         this.reloading.set(true);
-        // Set to empty string (not 'about:blank') to immediately stop all media/audio
         this.constructedPlayerUrl.set("");
-        // Force a small delay to ensure the iframe actually unloads/resets on all devices (especially iPad)
         setTimeout(() => {
           this.reloading.set(false);
         }, 100);
@@ -511,26 +450,19 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.videoDetails.set(null);
       this.historyAdded.set(false);
 
-      // Playlist is now computed, no need to set it manually
-
       if (!id || !mediaType) {
         this.selectedMediaItem.set(null);
         return;
       }
 
-      // For TV shows, immediately set the expected episode from params to avoid race conditions
-      // This ensures currentEpisode is correct before any async operations or player messages
       if (mediaType === "tv" && season && episode) {
-        // Create a temporary episode object with the expected state
-        // This will be replaced with full episode details once loaded
         const expectedEpisode: Partial<Episode> = {
           season_number: +season,
           episode_number: +episode,
-          id: 0, // Temporary, will be replaced
+          id: 0,
         };
         this.currentEpisode.set(expectedEpisode as Episode);
 
-        // Also update lastPlayerEpisodeState to match our navigation intent
         this.lastPlayerEpisodeState.set({
           season: +season,
           episode: +episode,
@@ -561,7 +493,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                 this.loadEpisodeTrailer(
                   tvDetails,
                   firstSeason.season_number,
-                  1
+                  1,
                 );
               } else {
                 this.loadMainTrailer(details);
@@ -589,7 +521,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             return of(null);
           }
           return this.fetchNextEpisode(media as TvShowDetails, currentEp);
-        })
+        }),
       )
       .subscribe((nextEp) => this.nextEpisode.set(nextEp));
   }
@@ -606,40 +538,42 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         const result = routed.provider
           ? routed.provider.handleMessage(
               routed.raw.data ?? routed.raw,
-              this.currentEpisode()
+              this.currentEpisode(),
             )
           : undefined;
 
-        // Some providers embed the `event` inside a `data` wrapper. Normalize
-        // here so we can decide whether this was a non-routine event (e.g.
-        // explicit player navigation) and therefore bypass playback guards.
         const routedEventName =
           routed.raw?.event ?? (routed.raw?.data && routed.raw?.data.event);
 
-
-
-        // Check if the message corresponds to a different episode than what we expect.
-        // This prevents processing stale messages from the previous episode during navigation.
-        // We check both the normalized result and any raw/nested season/episode data.
-        const msgSeason = result?.episodeChange?.season ?? routed.raw?.season ?? routed.raw?.data?.season;
-        const msgEpisode = result?.episodeChange?.episode ?? routed.raw?.episode ?? routed.raw?.data?.episode;
+        const msgSeason =
+          result?.episodeChange?.season ??
+          routed.raw?.season ??
+          routed.raw?.data?.season;
+        const msgEpisode =
+          result?.episodeChange?.episode ??
+          routed.raw?.episode ??
+          routed.raw?.data?.episode;
 
         const currentEp = untracked(() => this.currentEpisode());
         const isMetadataMismatch =
-          media.media_type === "tv" && 
-          msgSeason !== undefined && msgEpisode !== undefined &&
+          media.media_type === "tv" &&
+          msgSeason !== undefined &&
+          msgEpisode !== undefined &&
           currentEp &&
-          (msgSeason !== currentEp.season_number || msgEpisode !== currentEp.episode_number);
+          (msgSeason !== currentEp.season_number ||
+            msgEpisode !== currentEp.episode_number);
 
-        // STALENESS CHECK: Ignore messages that are clearly from the previous episode
-        // either by metadata mismatch or timing mismatch while navigating.
-        const isStaleTime = result?.playbackProgress ? this.isStalePlaybackEvent(result.playbackProgress.currentTime) : false;
-        
-        // We are extremely strict during navigation.
+        const isStaleTime = result?.playbackProgress
+          ? this.isStalePlaybackEvent(result.playbackProgress.currentTime)
+          : false;
+
         if (this.isNavigating()) {
-          const isRoutineEvent = ["timeupdate", "time", "seeking", "seeked"].includes(routedEventName);
-          // If metadata is present and wrong, it's definitely stale.
-          // If metadata is missing but time is mismatched, it's also stale.
+          const isRoutineEvent = [
+            "timeupdate",
+            "time",
+            "seeking",
+            "seeked",
+          ].includes(routedEventName);
           if (isMetadataMismatch || (isRoutineEvent && isStaleTime)) {
             return;
           }
@@ -651,7 +585,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         }
 
         if (result?.playbackProgress && !isMetadataMismatch) {
-          // Any progress message implies the player is loaded and active.
           if (this.iframeLoading()) {
             this.iframeLoading.set(false);
           }
@@ -685,15 +618,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             !isNaN(season) &&
             !isNaN(episode)
           ) {
-            // Update UI-only state
             this.syncCurrentEpisodeFromPlayerData(
               { season, episode },
-              media as TvShowDetails
+              media as TvShowDetails,
             );
 
-            // If the metadata indicates a different episode than our current params
-            // and we've had meaningful playback, trigger proper navigation.
-            // This catches internal player 'next' button clicks.
             const currentParams = untracked(() => this.params());
             const urlNeedsUpdate =
               currentParams?.season !== season ||
@@ -703,10 +632,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
               urlNeedsUpdate &&
               this.canProcessEpisodeChange(routedEventName)
             ) {
-              // Use the provider-normalized metadata to update the app state
               this.handleEpisodeChangeDetection(
                 { season, episode },
-                media as TvShowDetails
+                media as TvShowDetails,
               );
             }
           }
@@ -719,22 +647,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     this.clearAutoNextTimer();
   }
 
-  // Track last known currentTime to prevent premature episode-change navigation
   private lastKnownPlaybackTime = signal(0);
-
-  // Public signal for components that need current playback time (e.g., share modal)
   currentPlaybackTime = computed(() => this.lastKnownPlaybackTime());
-
-  // be applied once when the user navigates to a new media. After meaningful
-  // playback or the player starts, this value will be cleared so it isn't
-  // reapplied when the user switches providers.
   private initialStartAt = signal<number | undefined>(undefined);
-
-  // Track the last `startAt` param we successfully processed to prevent
-  // spurious reloads when unrelated params change (preventing reload loops).
   private lastProcessedStartAt = signal<number | undefined>(undefined);
 
-  // Constants for auto-next logic
   private readonly PLAYBACK_THRESHOLD_SECONDS = 30;
   private readonly AUTO_NEXT_PRELOAD_PERCENT = 90;
   private readonly AUTO_NEXT_COMPLETE_PERCENT = 95;
@@ -743,13 +660,52 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private readonly SEEK_RESET_THRESHOLD_PERCENT = 10;
   private readonly MIN_PLAYBACK_FOR_RESET = 5;
 
+  private getMediaKey(params: any): string {
+    return `${params.mediaType}:${params.id}:${params.season ?? ""}:${params.episode ?? ""}`;
+  }
+
+  private shouldUpdatePlayerUrl(currentUrl: string, newUrl: string): boolean {
+    if (!currentUrl || currentUrl === "about:blank") return true;
+    if (!newUrl) return true;
+    if (currentUrl === newUrl) return false;
+
+    try {
+      const current = new URL(currentUrl);
+      const next = new URL(newUrl);
+
+      // Different providers or paths -> Update
+      if (
+        current.origin !== next.origin ||
+        current.pathname !== next.pathname
+      ) {
+        return true;
+      }
+
+      // Check critical params that define content identity
+      // For seasons/episodes which might be in query for some providers
+      const criticalKeys = ["season", "episode", "id", "tmdb", "imdb"];
+      for (const key of criticalKeys) {
+        if (current.searchParams.get(key) !== next.searchParams.get(key)) {
+          return true;
+        }
+      }
+
+      // If path matches and critical identity params match,
+      // differences in startAt, autoplay, etc. are not worth reloading the iframe for
+      // if it is already playing the correct content.
+      return false;
+    } catch (e) {
+      return true; // Safe fallback
+    }
+  }
+
   private handlePlaybackProgress(
     progressData: {
       currentTime: number;
       duration: number;
       progressPercent: number;
     },
-    media: MovieDetails | TvShowDetails
+    media: MovieDetails | TvShowDetails,
   ): void {
     const { currentTime, duration, progressPercent } = progressData;
 
@@ -757,46 +713,36 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Update last known playback time
     if (typeof currentTime === "number" && currentTime > 0) {
       this.lastKnownPlaybackTime.set(currentTime);
 
-      // Once we have meaningful playback (>5s) and it's not a stale event, clear the navigation flag.
-      // We check against startAt to ensure we've actually "landed" near our target time.
       if (currentTime >= this.MIN_PLAYBACK_FOR_RESET && this.isNavigating()) {
         const startAt = this.initialStartAt() || 0;
-        const isNearStartAt = Math.abs(currentTime - startAt) < this.STALE_EVENT_TIME_DIFF;
+        const isNearStartAt =
+          Math.abs(currentTime - startAt) < this.STALE_EVENT_TIME_DIFF;
         const timeSinceNav = Date.now() - this.navigationStartTime;
-        const hasPlayedLongEnough = timeSinceNav > this.STALE_EVENT_THRESHOLD_MS;
-        
+        const hasPlayedLongEnough =
+          timeSinceNav > this.STALE_EVENT_THRESHOLD_MS;
+
         if (isNearStartAt || hasPlayedLongEnough) {
           this.isNavigating.set(false);
-          // Crucial: Unlock auto-next only when we've successfully landed and content is playing.
           this.playerService.unlockAutoNext();
         }
       }
     }
 
-    // Get episode once for use in multiple places below
     const episode = this.currentEpisode();
-
     const progressId = episode ? episode.id : media.id;
 
-
-
-    // Debounce progress updates to reduce excessive writes (max once per second)
     const now = Date.now();
     const shouldUpdateProgress = now - this.lastProgressUpdateTime >= 1000;
 
-    // Safe Resume Guard: Prevent overwriting progress if resume failed
-    // If we expected to start late (e.g. > 60s) but are playing from the start,
-    // assume the player ignored the startAt param and DO NOT save this progress.
     const expectedStart = untracked(() => this.initialStartAt());
     const isFailedResume =
       typeof expectedStart === "number" &&
       expectedStart > 60 &&
       currentTime < expectedStart - 60 &&
-      currentTime < 15; // Timeout: if we played 15s from the start, assume resume failed and accept reality
+      currentTime < 15;
 
     if (shouldUpdateProgress && !isFailedResume) {
       this.lastProgressUpdateTime = now;
@@ -810,19 +756,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.playbackProgressService.updateProgress(progressId, playbackData);
     }
 
-    // Add to history after significant playback
     if (
       !this.historyAdded() &&
       (currentTime > this.PLAYBACK_THRESHOLD_SECONDS || progressPercent > 5)
     ) {
       this.historyService.addToHistory(
         media,
-        this.currentEpisode() || undefined
+        this.currentEpisode() || undefined,
       );
       this.historyAdded.set(true);
     }
 
-    // Update continue watching list based on current progress
     if (
       !this.historyService.isPaused() &&
       progressPercent >= 5 &&
@@ -838,14 +782,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.continueWatchingManager.handleCompletePlayback(
         media,
         this.currentEpisode(),
-        this.playlist()?.id
+        this.playlist()?.id,
       );
     }
 
-    // Update signal for UI
     this.currentProgressPercent.set(progressPercent);
 
-    // Proactively recommend next episode
     if (
       media.media_type === "tv" &&
       !this.recommendedNextEpisodeSent() &&
@@ -856,16 +798,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       this.continueWatchingManager.maybeRecommendNextEpisode(
         media as TvShowDetails,
         episode || undefined,
-        this.playlist()?.id
+        this.playlist()?.id,
       );
     }
 
     this.checkAndTriggerAutoNext(progressPercent, currentTime, media);
   }
 
-  /**
-   * Checks if a playback event is stale (from previous episode during navigation).
-   */
   private isStalePlaybackEvent(currentTime: number): boolean {
     if (this.isNavigating()) {
       const startAt = this.initialStartAt() || 0;
@@ -873,9 +812,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       const isTimeMismatch =
         Math.abs(currentTime - startAt) > this.STALE_EVENT_TIME_DIFF;
 
-      // Filter out stale events occurring shortly after navigation start.
-      // We use a much larger threshold now (10s) to accommodate slow iframe unloads/reloads
-      // especially on mobile or with slow providers.
       if (timeSinceNav < this.STALE_EVENT_THRESHOLD_MS && isTimeMismatch) {
         return true;
       }
@@ -886,25 +822,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private startNavigation(): void {
     this.isNavigating.set(true);
     this.navigationStartTime = Date.now();
-    
-
-
-    // CRITICAL: Clear any active auto-next timer when navigation starts
-    // This prevents orphaned timers from triggering navigation to wrong content
     this.clearAutoNextTimer();
     this.autoNextState.set("idle");
   }
 
-  /**
-   * Checks conditions and triggers auto-next if met.
-   */
   private checkAndTriggerAutoNext(
     progressPercent: number,
     currentTime: number,
-    media: MovieDetails | TvShowDetails
+    media: MovieDetails | TvShowDetails,
   ): void {
     const provider = this.playerProviderService.getProvider(
-      this.selectedPlayer()
+      this.selectedPlayer(),
     );
 
     const autoNextEnabled = this.playerService.autoNextEnabled();
@@ -914,8 +842,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const threshold = this.playerService.autoNextThreshold();
     const thresholdMet = progressPercent >= threshold;
 
-    // Reset auto-next trigger if user seeks back significantly
-    // Guard against glitches where progress might briefly drop to 0
     if (
       this.autoPlayNextTriggered() &&
       progressPercent > 0 &&
@@ -941,39 +867,27 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Handle a completed playback event for the provided media.
-   * - For movies: remove from Continue Watching
-   * - For TV shows: try to add the next episode to Continue Watching; if none exists, remove.
-   * - If a playlist next item exists, prefer that (keeps playlist semantics consistent with playNextEpisode)
-   */
-  // handleCompletePlayback moved to ContinueWatchingManagerService
-
   private handleEpisodeChangeDetection(
     data: { season: number; episode: number },
-    media: TvShowDetails
+    media: TvShowDetails,
   ): void {
     const playerEpisode: PlayerEpisodeState = {
       season: data.season,
       episode: data.episode,
     };
 
-    // Get the current episode from our app's state (from params)
     const currentParams = untracked(() => this.params());
     const appEpisodeState: PlayerEpisodeState | null =
       currentParams?.season && currentParams?.episode
         ? { season: +currentParams.season, episode: +currentParams.episode }
         : null;
 
-    // If the player state already matches the app state,
-    // just update our internal 'last state' and exit to prevent a navigation loop.
     if (
       appEpisodeState &&
       appEpisodeState.season === playerEpisode.season &&
       appEpisodeState.episode === playerEpisode.episode
     ) {
       const lastPlayerState = this.lastPlayerEpisodeState();
-      // Only set if it's not already set, to avoid extra signal writes.
       if (
         !lastPlayerState ||
         lastPlayerState.season !== playerEpisode.season ||
@@ -981,10 +895,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       ) {
         this.lastPlayerEpisodeState.set(playerEpisode);
       }
-      // If the app params match the player but the current episode object is
-      // the temporary placeholder (created from params while we load details),
-      // fetch the season details so UI components like EpisodeSelector and
-      // watchlist highlight the correct episode instance.
       const currentEp = this.currentEpisode();
       if (currentEp && currentEp.id === 0) {
         this.movieService
@@ -992,7 +902,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe((seasonDetails) => {
             const matching = seasonDetails.episodes.find(
-              (e) => e.episode_number === playerEpisode.episode
+              (e) => e.episode_number === playerEpisode.episode,
             );
             if (matching) {
               this.currentEpisode.set(matching);
@@ -1002,8 +912,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // If we've reached here, it means the player has navigated to a DIFFERENT episode
-    // than what our app's URL params say. We need to check if we should sync our app.
     const lastPlayerState = this.lastPlayerEpisodeState();
     const hasPlayerChangedEpisode =
       !lastPlayerState ||
@@ -1011,60 +919,44 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       lastPlayerState.episode !== playerEpisode.episode;
 
     if (hasPlayerChangedEpisode) {
-      // Check if this is likely a player-initiated auto-next (sequential episode progression)
-      // Handle both forwards and backwards navigation to properly detect manual vs auto
       const isSequentialNext =
         appEpisodeState &&
         playerEpisode.season === appEpisodeState.season &&
         playerEpisode.episode === appEpisodeState.episode + 1;
 
-      const isSequentialPrevious =
-        appEpisodeState &&
-        playerEpisode.season === appEpisodeState.season &&
-        playerEpisode.episode === appEpisodeState.episode - 1;
-
       const userThreshold = this.playerService.autoNextThreshold();
       const provider = this.playerProviderService.getProvider(
-        this.selectedPlayer()
+        this.selectedPlayer(),
       );
 
-      // If auto-next is disabled, ignore sequential forward episode changes (auto-next behavior)
-      // but allow backwards navigation and non-sequential changes (manual episode selection)
       if (isSequentialNext && !this.playerService.autoNextEnabled()) {
-        // Auto-next is disabled, ignore this sequential episode change
         this.lastPlayerEpisodeState.set(playerEpisode);
         return;
       }
 
-      // If this looks like player auto-next AND user wants early triggering (< 95%),
-      // ignore the player's navigation and let our app handle it at the user's preferred threshold
       if (
         isSequentialNext &&
         provider?.supportsAutoNext &&
         this.playerService.autoNextEnabled() &&
         userThreshold < 95
       ) {
-        // Ignore player-initiated auto-next, let app handle it at user's threshold
         this.lastPlayerEpisodeState.set(playerEpisode);
         return;
       }
 
-      // Try to acquire lock to prevent duplicate navigation from both player and progress events
       if (!this.playerService.tryLockAutoNext()) {
-        // Lock already held, just update our tracking and exit
         this.lastPlayerEpisodeState.set(playerEpisode);
         return;
       }
 
       this.lastPlayerEpisodeState.set(playerEpisode);
-
-      // Mark that we're starting a navigation
       this.startNavigation();
 
-      // Tell the component not to reload the iframe since the player did it internally.
-      this.skipNextPlayerUpdate.set(true);
+      // Prevent iframe reloading since player handled it
+      // Create the target key for the next episode
+      const targetKey = `${media.media_type}:${media.id}:${playerEpisode.season}:${playerEpisode.episode}`;
+      this.skipUpdateForMediaKey.set(targetKey);
 
-      // Update the URL and app state to match the player.
       this.navigationService.navigateTo("watch", {
         mediaType: "tv",
         id: media.id,
@@ -1073,15 +965,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         playlistId: this.playlist()?.id,
         autoplay: true,
       });
-      // DO NOT unlock here. Let handlePlaybackProgress unlock once it confirms we've landed on the new episode.
 
-      // Update the currentEpisode signal so the UI reflects the change.
       this.movieService
         .getSeasonDetails(media.id, playerEpisode.season)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe((seasonDetails) => {
           const newEpisode = seasonDetails.episodes.find(
-            (e) => e.episode_number === playerEpisode.episode
+            (e) => e.episode_number === playerEpisode.episode,
           );
 
           if (newEpisode) {
@@ -1096,7 +986,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private startAutoNextCountdown(media: MovieDetails | TvShowDetails): void {
     this.autoNextState.set("counting_down");
     this.autoNextCountdown.set(5);
-    // this.nextEpisodeMinimized.set(false); // Ensure it's visible when countdown starts
 
     this.autoNextTimer = setInterval(() => {
       const current = this.autoNextCountdown();
@@ -1116,23 +1005,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (this.autoNextState() === "counting_down") {
       this.cancelAutoNext();
     } else {
-      // If idle
       if (this.autoPlayNextTriggered()) {
-        // Was cancelled or finished -> Restart
         const currentProgress = this.currentProgressPercent();
         const threshold = this.playerService.autoNextThreshold();
 
         if (currentProgress >= threshold) {
-          // We are already past threshold, so start countdown immediately
           this.startAutoNextCountdown(media);
         } else {
-          // We are before threshold, just re-arm it.
           this.autoPlayNextTriggered.set(false);
-          // Unlock so checkAndTriggerAutoNext can pick it up again
           this.playerService.unlockAutoNext();
         }
       } else {
-        // Not yet triggered -> Pre-emptive cancel
         this.cancelAutoNext();
       }
     }
@@ -1156,12 +1039,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const media = this.selectedMediaItem();
     if (!media) return;
 
-    // If countdown is active, clear it and execute immediately
     if (this.autoNextState() === "counting_down") {
       this.clearAutoNextTimer();
     }
 
-    // Lock if not already locked (manual click should also prevent other auto-events)
     this.playerService.tryLockAutoNext();
     this.executeAutoNext(media);
   }
@@ -1169,7 +1050,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   cancelAutoNext(): void {
     this.clearAutoNextTimer();
     this.autoNextState.set("idle");
-    // Ensure we mark it as triggered so it doesn't auto-fire again if we pre-emptively cancelled
     this.autoPlayNextTriggered.set(true);
     this.playerService.unlockAutoNext();
   }
@@ -1181,18 +1061,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Sync currentEpisode from player metadata even if navigation isn't triggered.
-   * This ensures episode-selector highlights correctly when the player reports
-   * episode data that matches our current route params.
-   */
   private syncCurrentEpisodeFromPlayerData(
     data: { season: number; episode: number },
-    media: TvShowDetails
+    media: TvShowDetails,
   ): void {
     const currentEp = this.currentEpisode();
 
-    // If currentEpisode already matches and has a valid id, no need to fetch
     if (
       currentEp &&
       currentEp.id > 0 &&
@@ -1202,14 +1076,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Check if URL params need updating (episode changed but URL is stale)
-    const currentParams = untracked(() => this.params());
-    const urlNeedsUpdate =
-      currentParams?.season !== data.season ||
-      currentParams?.episode !== data.episode;
-
-    // If currentEpisode is null, a placeholder (id === 0), or doesn't match
-    // the player's reported episode, fetch and update it
     if (
       !currentEp ||
       currentEp.id === 0 ||
@@ -1221,27 +1087,16 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe((seasonDetails) => {
           const matchingEpisode = seasonDetails.episodes.find(
-            (e) => e.episode_number === data.episode
+            (e) => e.episode_number === data.episode,
           );
           if (matchingEpisode) {
-            // Only update the UI selection; DO NOT update the URL from metadata.
-            // URL updates should only happen via explicit navigation.
             this.currentEpisode.set(matchingEpisode);
           }
         });
     }
   }
 
-  /**
-   * Check if we can safely process episode change navigation.
-   * Requires the player to have started and a small playback threshold to avoid
-   * false positives from timeupdate events that include metadata.
-   */
   private canProcessEpisodeChange(eventName?: string): boolean {
-    // Consider events other than routine time updates as 'non-routine'.
-    // Non-routine events (for example explicit player navigation events)
-    // should be allowed to drive URL updates immediately, even when
-    // playback hasn't reached the 5 second guard threshold.
     const nonRoutineEvent =
       typeof eventName === "string" &&
       !["timeupdate", "time", "seeking", "seeked"].includes(eventName);
@@ -1255,7 +1110,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
   private fetchNextEpisode(
     tvShow: TvShowDetails,
-    currentEp: Episode
+    currentEp: Episode,
   ): Observable<Episode | null> {
     return this.movieService
       .getSeasonDetails(tvShow.id, currentEp.season_number)
@@ -1263,7 +1118,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         map((seasonDetails) => {
           const episodes = seasonDetails.episodes || [];
           const currentIndex = episodes.findIndex(
-            (e) => e.episode_number === currentEp.episode_number
+            (e) => e.episode_number === currentEp.episode_number,
           );
 
           if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
@@ -1274,9 +1129,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         switchMap((nextEp) => {
           if (nextEp) return of(nextEp);
 
-          // Check next season
           const currentSeasonIndex = tvShow.seasons.findIndex(
-            (s) => s.season_number === currentEp.season_number
+            (s) => s.season_number === currentEp.season_number,
           );
 
           if (currentSeasonIndex > -1) {
@@ -1298,29 +1152,23 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                       return nextSeasonDetails.episodes.length > 0
                         ? nextSeasonDetails.episodes[0]
                         : null;
-                    })
+                    }),
                   );
               }
             }
           }
           return of(null);
-        })
+        }),
       );
   }
 
   private playNextEpisode(tvShow: TvShowDetails): void {
     const currentEp = this.currentEpisode();
     if (!currentEp) {
-      // No current episode, unlock and exit
       this.playerService.unlockAutoNext();
       return;
     }
 
-    // First try to advance to the next episode in the series. Only if no
-    // next episode or season is found should we fall back to the playlist
-    // order (so playlists don't interrupt sequential show playback).
-
-    // Get current season details to find next episode
     this.movieService
       .getSeasonDetails(tvShow.id, currentEp.season_number)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -1328,36 +1176,30 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         next: (seasonDetails) => {
           const episodes = seasonDetails.episodes || [];
           const currentIndex = episodes.findIndex(
-            (e) => e.episode_number === currentEp.episode_number
+            (e) => e.episode_number === currentEp.episode_number,
           );
 
           if (currentIndex === -1) {
-            // Failsafe: if current episode not found, maybe it was removed.
-            // Don't auto-play to avoid unexpected behavior.
             console.warn(
-              "Could not find current episode in season details. Auto-play cancelled."
+              "Could not find current episode in season details. Auto-play cancelled.",
             );
             this.playerService.unlockAutoNext();
             return;
           }
 
           if (currentIndex < episodes.length - 1) {
-            // Next episode exists in the current season.
             const nextEpisode = episodes[currentIndex + 1];
             this.navigateToEpisode(
               tvShow.id,
               currentEp.season_number,
-              nextEpisode.episode_number
+              nextEpisode.episode_number,
             );
-            // Navigation will trigger cleanup that unlocks auto-next
           } else {
-            // This is the last episode of the current season. Try to find the next season.
             const currentSeasonIndex = tvShow.seasons.findIndex(
-              (s) => s.season_number === currentEp.season_number
+              (s) => s.season_number === currentEp.season_number,
             );
 
             if (currentSeasonIndex > -1) {
-              // Search for the next season with episodes, skipping empty seasons.
               let foundNextSeason = false;
               for (
                 let i = currentSeasonIndex + 1;
@@ -1365,7 +1207,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                 i++
               ) {
                 const nextSeasonObj = tvShow.seasons[i];
-                // Also check for season_number > 0 to skip "specials" seasons
                 if (
                   nextSeasonObj &&
                   nextSeasonObj.episode_count > 0 &&
@@ -1374,20 +1215,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                   this.navigateToEpisode(
                     tvShow.id,
                     nextSeasonObj.season_number,
-                    1
+                    1,
                   );
                   foundNextSeason = true;
-                  // Navigation will trigger cleanup that unlocks auto-next
-                  return; // Found and navigated, so exit.
+                  return;
                 }
               }
 
               if (!foundNextSeason) {
-                // No next season found, try playlist
                 this.tryPlayNextAfterSeriesEnd(tvShow);
               }
             } else {
-              // Could not find current season, try playlist
               this.tryPlayNextAfterSeriesEnd(tvShow);
             }
           }
@@ -1399,16 +1237,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       });
   }
 
-  /**
-   * Helper to try playing next playlist item after series ends
-   * Unlocks auto-next if no playlist item found
-   */
   private tryPlayNextAfterSeriesEnd(tvShow: TvShowDetails): void {
     const playlistId = this.playlist()?.id;
     if (playlistId) {
       const nextItem = this.playlistService.getNextItemFromPlaylist(
         playlistId,
-        tvShow.id
+        tvShow.id,
       );
       if (nextItem) {
         this.navigationService.navigateTo("watch", {
@@ -1418,30 +1252,23 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
           autoplay: true,
         });
         this.iframeLoading.set(true);
-        // Navigation will trigger cleanup that unlocks auto-next
         return;
       }
     }
-    // No playlist item found, end of series - unlock auto-next
     this.playerService.unlockAutoNext();
   }
 
-  /**
-   * If currently playing from a playlist, navigate to the next media item
-   * (movie or tv) in that playlist. Returns true if navigation started.
-   */
   private tryPlayNextPlaylistItem(
-    media: MovieDetails | TvShowDetails
+    media: MovieDetails | TvShowDetails,
   ): boolean {
     const playlistId = this.playlist()?.id;
     if (!playlistId) return false;
     const nextItem = this.playlistService.getNextItemFromPlaylist(
       playlistId,
-      media.id
+      media.id,
     );
     if (!nextItem) return false;
 
-    // Navigate to the next playlist item
     this.navigationService.navigateTo("watch", {
       mediaType: nextItem.media_type,
       id: nextItem.id,
@@ -1456,9 +1283,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private navigateToEpisode(
     showId: number,
     season: number,
-    episode: number
+    episode: number,
   ): void {
-    this.skipNextPlayerUpdate.set(false);
+    // Clear any skip key since we want to force this navigation
+    this.skipUpdateForMediaKey.set(null);
     this.startNavigation();
 
     this.navigationService.navigateTo("watch", {
@@ -1471,7 +1299,6 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Vidsrc mirror list
   private readonly VIDSRC_MIRRORS = [
     "https://v3.vidsrc.cc",
     "https://vidsrc.xyz",
@@ -1497,7 +1324,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     videoRequest$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
         const trailer = response.results.find(
-          (video) => video.site === "YouTube" && video.type === "Trailer"
+          (video) => video.site === "YouTube" && video.type === "Trailer",
         );
         this.videoDetails.set(trailer ?? null);
         this.loadingTrailer.set(false);
@@ -1509,7 +1336,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   private loadEpisodeTrailer(
     tvShow: TvShowDetails,
     seasonNumber: number,
-    episodeNumber: number
+    episodeNumber: number,
   ): void {
     this.loadingTrailer.set(true);
 
@@ -1518,7 +1345,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((seasonDetails) => {
         const episode = seasonDetails.episodes.find(
-          (e) => e.episode_number === episodeNumber
+          (e) => e.episode_number === episodeNumber,
         );
 
         this.currentEpisode.set(episode || null);
@@ -1531,7 +1358,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
               next: (response) => {
                 const trailer =
                   response.results.find(
-                    (v) => v.site === "YouTube" && v.type === "Trailer"
+                    (v) => v.site === "YouTube" && v.type === "Trailer",
                   ) ?? response.results[0];
                 this.videoDetails.set(trailer ?? null);
                 this.loadingTrailer.set(false);
@@ -1549,26 +1376,30 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     if (!media) return;
 
     const currentParams = this.params();
-    if (!currentParams?.startAt) return; // Nothing to remove
+    if (!currentParams?.startAt) return;
 
-    // Navigate without startAt, using replaceState (no browser history entry)
-    // This silently updates the URL without triggering a reload
     const cleanParams: any = {
       mediaType: media.media_type,
       id: media.id,
       playlistId: currentParams.playlistId,
     };
 
-    if (media.media_type === "tv" && currentParams.season && currentParams.episode) {
+    if (
+      media.media_type === "tv" &&
+      currentParams.season &&
+      currentParams.episode
+    ) {
       cleanParams.season = currentParams.season;
       cleanParams.episode = currentParams.episode;
     }
 
-    // Use NavigationService but we need to update it to support replaceState
-    // For now, construct the URL manually and use window.history.replaceState
     const path = this.navigationService.getPath("watch", cleanParams);
     if (typeof window !== "undefined") {
-      window.history.replaceState({}, "", path);
+      try {
+        window.history.replaceState({}, "", path);
+      } catch {
+        // Ignore SecurityError in sandboxed environments
+      }
     }
   }
 
@@ -1576,7 +1407,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     const tvShow = this.selectedMediaItem();
     if (tvShow?.media_type !== "tv") return;
 
-    this.skipNextPlayerUpdate.set(false);
+    this.skipUpdateForMediaKey.set(null);
     this.startNavigation();
 
     this.navigationService.navigateTo("watch", {
@@ -1589,7 +1420,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   onSelectMedia(media: MediaType): void {
-    this.skipNextPlayerUpdate.set(false);
+    this.skipUpdateForMediaKey.set(null);
     this.startNavigation();
 
     this.navigationService.navigateTo("watch", {
@@ -1603,19 +1434,16 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   onRefreshPlayer(): void {
     const currentUrl = this.playerUrl();
     if (currentUrl) {
-      // Show loading state and IMMEDIATELY clear the iframe to stop audio
       this.iframeLoading.set(true);
       this.reloading.set(true);
       this.constructedPlayerUrl.set("");
-      
+
       const media = this.selectedMediaItem();
       if (!media) return;
 
       const currentParams = this.params();
       const currentTime = this.lastKnownPlaybackTime();
 
-      // Navigate with updated startAt. This usually triggers the effect which
-      // will eventually set reloading to false.
       this.navigationService.navigateTo("watch", {
         mediaType: media.media_type,
         id: media.id,
@@ -1626,16 +1454,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         autoplay: true,
       });
 
-      // Mark as navigating to block stale progress from the old iframe instance
       this.startNavigation();
 
-      // Safety: In case navigation is a no-op (params identical), 
-      // ensure we reset reloading and restore the URL after a short delay.
       setTimeout(() => {
         if (this.reloading()) {
           this.reloading.set(false);
           this.iframeLoading.set(false);
-          // If the effect didn't set the URL (because it was a no-op), set it now
           if (this.constructedPlayerUrl() === "") {
             const url = this.playerUrl();
             if (url) this.constructedPlayerUrl.set(url);
@@ -1656,18 +1480,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
       id: media.id,
       season: currentParams?.season,
       episode: currentParams?.episode,
-      // playlistId is omitted
     });
   }
 
   onPlayerIframeLoad(): void {
-    // Basic safety: if the iframe actually loaded, we should eventually see progress.
-    // But we clear it here as the primary signal.
     this.iframeLoading.set(false);
-    
-    // Set a timeout as a fallback in case the player never sends messages or is stuck.
     setTimeout(() => {
-      // Final fallback if no message was ever received
       this.iframeLoading.set(false);
     }, 4000);
   }
@@ -1681,16 +1499,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   onMaximizeBackdropClick(event: MouseEvent): void {
-    // Close if clicking the backdrop (not the iframe)
     const target = event.target as HTMLElement;
     if (target.classList.contains("fixed")) {
       this.closeMaximize();
     }
   }
-
-
-
-
 
   @HostListener("document:keydown.escape", ["$event"])
   onEscapeKey(event: KeyboardEvent): void {

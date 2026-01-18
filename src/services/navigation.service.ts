@@ -32,7 +32,7 @@ export class NavigationService {
   navigateTo(
     view: View,
     params: any = null,
-    options?: { skipHistory?: boolean }
+    options?: { skipHistory?: boolean },
   ) {
     // Update internal state immediately
     this.currentView.set({ view, params });
@@ -44,7 +44,10 @@ export class NavigationService {
         window.history.pushState({}, "", url);
       } catch (e) {
         // ignore pushState errors (e.g., in constrained environments)
-        console.error("Failed to push history state", e);
+        // Suppress SecurityError which happens in sandboxed environments
+        if ((e as any)?.name !== "SecurityError") {
+          console.warn("Failed to push history state", e);
+        }
       }
     }
   }
@@ -329,7 +332,7 @@ export class NavigationService {
     // Sync on back/forward
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", () =>
-        this.parseUrlAndUpdateState(true)
+        this.parseUrlAndUpdateState(true),
       );
     }
   }

@@ -17,7 +17,7 @@ import {
   isPlatformBrowser,
 } from "@angular/common";
 import { Playlist } from "../../models/playlist.model";
-import { MediaType } from "../../models/movie.model";
+import { MediaType, Movie } from "../../models/movie.model";
 import {
   DragDropModule,
   CdkDragDrop,
@@ -29,7 +29,8 @@ import { NavigationService } from "../../services/navigation.service";
 import { AddToPlaylistModalComponent } from "../add-to-playlist-modal/add-to-playlist-modal.component";
 import { MediaDetailModalComponent } from "../media-detail-modal/media-detail-modal.component";
 
-const isMovie = (media: MediaType) => media.media_type === "movie";
+const isMovie = (media: MediaType): media is Movie =>
+  media.media_type === "movie";
 
 @Component({
   selector: "app-video-player-playlist",
@@ -71,7 +72,7 @@ export class VideoPlayerPlaylistComponent implements OnDestroy {
 
   currentIndex = computed(() => {
     return this.playlist().items.findIndex(
-      (item) => item.id === this.currentMediaId()
+      (item) => item.id === this.currentMediaId(),
     );
   });
 
@@ -95,7 +96,7 @@ export class VideoPlayerPlaylistComponent implements OnDestroy {
     if (this.isShuffled()) {
       this.playlistService.updatePlaylistItems(
         this.playlist().id,
-        this.originalItems
+        this.originalItems,
       );
     }
   }
@@ -124,7 +125,7 @@ export class VideoPlayerPlaylistComponent implements OnDestroy {
       // Restore
       this.playlistService.updatePlaylistItems(
         this.playlist().id,
-        this.originalItems
+        this.originalItems,
       );
       this.isShuffled.set(false);
       this.originalItems = [];
